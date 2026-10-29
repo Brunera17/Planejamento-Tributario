@@ -1,0 +1,2 @@
+Coloque aqui Archivo-Regular.ttf e Archivo-SemiBold.ttf (Google Fonts, licença OFL).
+Sem eles, o relatório PDF usa Helvetica.

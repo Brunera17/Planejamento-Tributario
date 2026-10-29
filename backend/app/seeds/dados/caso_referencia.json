@@ -1,0 +1,2096 @@
+{
+ "descricao": "Caso de referência – comércio de autopeças em marketplace, jun–ago/2026 (dados agregados por NCM/CFOP, anonimizados)",
+ "uf": "SP",
+ "regime_atual": "SIMPLES_NACIONAL",
+ "competencias": [
+  "2026-06",
+  "2026-07",
+  "2026-08"
+ ],
+ "devolucoes": {
+  "2026-06": "9915.07",
+  "2026-07": "11535.67",
+  "2026-08": "11632.02"
+ },
+ "compras": {
+  "2026-06": "106485.13",
+  "2026-07": "92957.60",
+  "2026-08": "90172.60"
+ },
+ "itens": [
+  {
+   "ncm": "40093100",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "637.95",
+   "qtd_linhas": 9,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "1703.9",
+   "qtd_linhas": 4,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "1760.22",
+   "qtd_linhas": 26,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "120",
+   "qtd_linhas": 6,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "16157.24",
+   "qtd_linhas": 439,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "23690.5",
+   "qtd_linhas": 179,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "24730.65",
+   "qtd_linhas": 650,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "837.8",
+   "qtd_linhas": 20,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "4214.4",
+   "qtd_linhas": 119,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40169990",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "315.6",
+   "qtd_linhas": 4,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1753.92",
+   "qtd_linhas": 59,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "1448",
+   "qtd_linhas": 14,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "4108.69",
+   "qtd_linhas": 117,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "168",
+   "qtd_linhas": 11,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "624",
+   "qtd_linhas": 39,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "2338.38",
+   "qtd_linhas": 30,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "56803.29",
+   "qtd_linhas": 27,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "6300.57",
+   "qtd_linhas": 77,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "10222.93",
+   "qtd_linhas": 15,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1374.75",
+   "qtd_linhas": 19,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "5490",
+   "qtd_linhas": 22,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "2546.73",
+   "qtd_linhas": 31,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "210",
+   "qtd_linhas": 3,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "810",
+   "qtd_linhas": 16,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1453.09",
+   "qtd_linhas": 23,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "11385.5",
+   "qtd_linhas": 22,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "3527.75",
+   "qtd_linhas": 58,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "1498.5",
+   "qtd_linhas": 8,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "432",
+   "qtd_linhas": 2,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "15646.9",
+   "qtd_linhas": 17,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "2658.89",
+   "qtd_linhas": 12,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2699.1",
+   "qtd_linhas": 5,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84831090",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "2762.81",
+   "qtd_linhas": 3,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84831090",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "18663.9",
+   "qtd_linhas": 12,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84831090",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "13072.94",
+   "qtd_linhas": 14,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1644.81",
+   "qtd_linhas": 26,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "13798.0",
+   "qtd_linhas": 26,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "2948.53",
+   "qtd_linhas": 48,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "1628.8",
+   "qtd_linhas": 6,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "4426.5",
+   "qtd_linhas": 21,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "8549.75",
+   "qtd_linhas": 71,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "80343.0",
+   "qtd_linhas": 96,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "17284.34",
+   "qtd_linhas": 132,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "6066.2",
+   "qtd_linhas": 21,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "12662.0",
+   "qtd_linhas": 58,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85129000",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "88.58",
+   "qtd_linhas": 4,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "256.87",
+   "qtd_linhas": 9,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "1644.5",
+   "qtd_linhas": 17,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "600.27",
+   "qtd_linhas": 21,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "328.9",
+   "qtd_linhas": 4,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "657.8",
+   "qtd_linhas": 9,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "4843.44",
+   "qtd_linhas": 100,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "8046",
+   "qtd_linhas": 30,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "13876.44",
+   "qtd_linhas": 261,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "459",
+   "qtd_linhas": 7,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "1206",
+   "qtd_linhas": 29,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85395200",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "96.79",
+   "qtd_linhas": 2,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "85395200",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "899.0",
+   "qtd_linhas": 4,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1049.82",
+   "qtd_linhas": 13,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "10438.33",
+   "qtd_linhas": 17,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "2989.20",
+   "qtd_linhas": 35,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2398.4",
+   "qtd_linhas": 7,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "6147.91",
+   "qtd_linhas": 111,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "47986.6",
+   "qtd_linhas": 89,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "24514.69",
+   "qtd_linhas": 335,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2058.4",
+   "qtd_linhas": 9,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "6705.5",
+   "qtd_linhas": 51,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "10124.27",
+   "qtd_linhas": 271,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "38250.65",
+   "qtd_linhas": 144,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "21823.89",
+   "qtd_linhas": 559,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2006.9",
+   "qtd_linhas": 33,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "7351.3",
+   "qtd_linhas": 133,
+   "competencia": "2026-06"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "642.28",
+   "qtd_linhas": 11,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "1280",
+   "qtd_linhas": 7,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "2411.41",
+   "qtd_linhas": 36,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "60",
+   "qtd_linhas": 3,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "200",
+   "qtd_linhas": 10,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "17717.50",
+   "qtd_linhas": 491,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "37619.6",
+   "qtd_linhas": 210,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "28623.96",
+   "qtd_linhas": 775,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2311.1",
+   "qtd_linhas": 53,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "7614.7",
+   "qtd_linhas": 224,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40169990",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "75.79",
+   "qtd_linhas": 1,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40169990",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "388.49",
+   "qtd_linhas": 5,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1876.00",
+   "qtd_linhas": 63,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "4464",
+   "qtd_linhas": 28,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "5553.96",
+   "qtd_linhas": 181,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "184",
+   "qtd_linhas": 7,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "928",
+   "qtd_linhas": 35,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "5190.64",
+   "qtd_linhas": 68,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "76844.07",
+   "qtd_linhas": 36,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "11297.54",
+   "qtd_linhas": 141,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "5198.10",
+   "qtd_linhas": 18,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "14901.22",
+   "qtd_linhas": 23,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1772.11",
+   "qtd_linhas": 25,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "4110",
+   "qtd_linhas": 19,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "4502.60",
+   "qtd_linhas": 67,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "510",
+   "qtd_linhas": 6,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "1770",
+   "qtd_linhas": 24,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1589.58",
+   "qtd_linhas": 26,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "35461.1",
+   "qtd_linhas": 46,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "6146.31",
+   "qtd_linhas": 99,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2297.7",
+   "qtd_linhas": 9,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "6752.4",
+   "qtd_linhas": 37,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1716.5",
+   "qtd_linhas": 8,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "16561.8",
+   "qtd_linhas": 17,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "3811.63",
+   "qtd_linhas": 18,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "599.8",
+   "qtd_linhas": 2,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84831090",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "3730.3",
+   "qtd_linhas": 4,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "2504.91",
+   "qtd_linhas": 41,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "37521.5",
+   "qtd_linhas": 56,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "5264.41",
+   "qtd_linhas": 82,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2388.2",
+   "qtd_linhas": 12,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "5906.0",
+   "qtd_linhas": 23,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "4377.30",
+   "qtd_linhas": 30,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "20351.2",
+   "qtd_linhas": 37,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "9067.86",
+   "qtd_linhas": 66,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "1069.6",
+   "qtd_linhas": 10,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "4128.1",
+   "qtd_linhas": 28,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "82.0",
+   "qtd_linhas": 4,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "2771.7",
+   "qtd_linhas": 8,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "308.49",
+   "qtd_linhas": 9,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "269.1",
+   "qtd_linhas": 4,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "13518.76",
+   "qtd_linhas": 287,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "18882",
+   "qtd_linhas": 87,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "31600.19",
+   "qtd_linhas": 642,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "1341",
+   "qtd_linhas": 23,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "3564",
+   "qtd_linhas": 71,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85395200",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "77.79",
+   "qtd_linhas": 2,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "85395200",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "70.79",
+   "qtd_linhas": 1,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "2479.91",
+   "qtd_linhas": 30,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "44266.73",
+   "qtd_linhas": 62,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "7132.55",
+   "qtd_linhas": 85,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "3447.7",
+   "qtd_linhas": 12,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "7944.7",
+   "qtd_linhas": 21,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "9508.68",
+   "qtd_linhas": 147,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "52928.4",
+   "qtd_linhas": 126,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "37179.26",
+   "qtd_linhas": 496,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "3527.7",
+   "qtd_linhas": 29,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "13312.4",
+   "qtd_linhas": 104,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "8691.42",
+   "qtd_linhas": 255,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "41202.80",
+   "qtd_linhas": 172,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "20317.36",
+   "qtd_linhas": 561,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2573.1",
+   "qtd_linhas": 21,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "12010.4",
+   "qtd_linhas": 145,
+   "competencia": "2026-07"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "299.49",
+   "qtd_linhas": 5,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "20",
+   "qtd_linhas": 1,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "604.96",
+   "qtd_linhas": 10,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "20",
+   "qtd_linhas": 1,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40093100",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "80",
+   "qtd_linhas": 4,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "17152.77",
+   "qtd_linhas": 466,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "30384.7",
+   "qtd_linhas": 141,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "30069.60",
+   "qtd_linhas": 784,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "1410.6",
+   "qtd_linhas": 33,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "40169300",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "4670.3",
+   "qtd_linhas": 142,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "559.3",
+   "qtd_linhas": 21,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "4416",
+   "qtd_linhas": 68,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "2003.14",
+   "qtd_linhas": 52,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "136",
+   "qtd_linhas": 1,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "73181500",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "416",
+   "qtd_linhas": 17,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "5351.13",
+   "qtd_linhas": 71,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "89969.86",
+   "qtd_linhas": 53,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "11374.40",
+   "qtd_linhas": 146,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "4505.02",
+   "qtd_linhas": 10,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818021",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "17673.54",
+   "qtd_linhas": 38,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1165.67",
+   "qtd_linhas": 17,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "5760",
+   "qtd_linhas": 19,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "3567.33",
+   "qtd_linhas": 43,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "120",
+   "qtd_linhas": 3,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818092",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "750",
+   "qtd_linhas": 14,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1798.91",
+   "qtd_linhas": 30,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "28321.6",
+   "qtd_linhas": 46,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "7477.76",
+   "qtd_linhas": 121,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2297.7",
+   "qtd_linhas": 18,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84818099",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "6803.1",
+   "qtd_linhas": 45,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "647.9",
+   "qtd_linhas": 3,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "214.9",
+   "qtd_linhas": 1,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "1776.5",
+   "qtd_linhas": 8,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "899.7",
+   "qtd_linhas": 3,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84831020",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "299.9",
+   "qtd_linhas": 1,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "1484.75",
+   "qtd_linhas": 26,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "14444.1",
+   "qtd_linhas": 26,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "3286.46",
+   "qtd_linhas": 54,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2238.0",
+   "qtd_linhas": 13,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "84842000",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2107.9",
+   "qtd_linhas": 11,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "8137.93",
+   "qtd_linhas": 52,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "43372.76",
+   "qtd_linhas": 81,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "16013.45",
+   "qtd_linhas": 116,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "3038.5",
+   "qtd_linhas": 24,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85113020",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "4248.2",
+   "qtd_linhas": 28,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85129000",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "45.89",
+   "qtd_linhas": 1,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "124.47",
+   "qtd_linhas": 5,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "57.9",
+   "qtd_linhas": 1,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85364100",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "317.47",
+   "qtd_linhas": 10,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "15003.52",
+   "qtd_linhas": 333,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "19305",
+   "qtd_linhas": 116,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "33713.92",
+   "qtd_linhas": 677,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "1179",
+   "qtd_linhas": 22,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85365090",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "4158",
+   "qtd_linhas": 91,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85395200",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "34.9",
+   "qtd_linhas": 1,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85395200",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "1258.6",
+   "qtd_linhas": 6,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85395200",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "212.7",
+   "qtd_linhas": 3,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "85395200",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "179.8",
+   "qtd_linhas": 2,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "2453.92",
+   "qtd_linhas": 30,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "5556.52",
+   "qtd_linhas": 15,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "7664.83",
+   "qtd_linhas": 90,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "899.4",
+   "qtd_linhas": 4,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87088000",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "5246.5",
+   "qtd_linhas": 31,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "6069.51",
+   "qtd_linhas": 94,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "38117.98",
+   "qtd_linhas": 111,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "27247.21",
+   "qtd_linhas": 364,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "4088.2",
+   "qtd_linhas": 25,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "87089990",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "9358.7",
+   "qtd_linhas": 84,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 5106,
+   "ambito": "Interna",
+   "gera_receita": true,
+   "valor": "8402.49",
+   "qtd_linhas": 244,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 5949,
+   "ambito": "Interna",
+   "gera_receita": false,
+   "valor": "70539.09",
+   "qtd_linhas": 212,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6106,
+   "ambito": "Interestadual",
+   "gera_receita": true,
+   "valor": "17606.06",
+   "qtd_linhas": 468,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6905,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "2734.7",
+   "qtd_linhas": 23,
+   "competencia": "2026-08"
+  },
+  {
+   "ncm": "90328929",
+   "cfop": 6949,
+   "ambito": "Interestadual",
+   "gera_receita": false,
+   "valor": "7851.2",
+   "qtd_linhas": 120,
+   "competencia": "2026-08"
+  }
+ ],
+ "despesas": [
+  {
+   "descricao": "Publicidade e propaganda",
+   "valores": [
+    "8605.97",
+    "9515.28",
+    "10616.64"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": false,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Fretes",
+   "valores": [
+    "0",
+    "306.58",
+    "726.42"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": true,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Tarifas armazenamento Mercado Livre",
+   "valores": [
+    "226.72",
+    "333.65",
+    "280.19"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": true,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Tarifas envios Mercado Livre",
+   "valores": [
+    "36481.68",
+    "44839.9",
+    "41680.61"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": true,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Tarifas vendas Mercado Livre",
+   "valores": [
+    "19504.82",
+    "22973.45",
+    "22284.41"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": false,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Tarifas de envio Full Mercado Livre",
+   "valores": [
+    "924.03",
+    "1135.84",
+    "1055.71"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": true,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Contabilidade",
+   "valores": [
+    "400",
+    "400",
+    "400"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": false,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Escritório",
+   "valores": [
+    "0",
+    "2388.62",
+    "1900.84"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": false,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Garantia",
+   "valores": [
+    "0",
+    "223",
+    "176.9"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": false,
+   "credito_ibs_cbs": true
+  },
+  {
+   "descricao": "Tarifas Mercado Livre – campanhas de publicidade",
+   "valores": [
+    "6369.09",
+    "8230.75",
+    "7266.7"
+   ],
+   "dedutivel": true,
+   "credito_pis_cofins": false,
+   "credito_ibs_cbs": true
+  }
+ ]
+}

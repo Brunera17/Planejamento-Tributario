@@ -1,0 +1,17 @@
+[
+ {"cfop": 5101, "natureza": "Venda de produção do estabelecimento (interna)", "gera_receita": true},
+ {"cfop": 5102, "natureza": "Venda de mercadoria adquirida de terceiros (interna)", "gera_receita": true},
+ {"cfop": 5106, "natureza": "Venda – mercadoria que não transita pelo estabelecimento (interna)", "gera_receita": true},
+ {"cfop": 5403, "natureza": "Venda de mercadoria sujeita a ST, como contribuinte substituto (interna)", "gera_receita": true},
+ {"cfop": 5405, "natureza": "Venda de mercadoria sujeita a ST, como contribuinte substituído (interna)", "gera_receita": true},
+ {"cfop": 6101, "natureza": "Venda de produção do estabelecimento (interestadual)", "gera_receita": true},
+ {"cfop": 6102, "natureza": "Venda de mercadoria adquirida de terceiros (interestadual)", "gera_receita": true},
+ {"cfop": 6106, "natureza": "Venda – mercadoria que não transita pelo estabelecimento (interestadual)", "gera_receita": true},
+ {"cfop": 6108, "natureza": "Venda de mercadoria a não contribuinte (interestadual)", "gera_receita": true},
+ {"cfop": 6403, "natureza": "Venda de mercadoria sujeita a ST, como contribuinte substituto (interestadual)", "gera_receita": true},
+ {"cfop": 6404, "natureza": "Venda de mercadoria sujeita a ST já retido (interestadual)", "gera_receita": true},
+ {"cfop": 5905, "natureza": "Remessa para depósito fechado ou armazém geral (interna)", "gera_receita": false},
+ {"cfop": 5949, "natureza": "Outras saídas / remessa – sem receita (interna)", "gera_receita": false},
+ {"cfop": 6905, "natureza": "Remessa para depósito fechado ou armazém geral (interestadual)", "gera_receita": false},
+ {"cfop": 6949, "natureza": "Outras saídas / remessa – sem receita (interestadual)", "gera_receita": false}
+]

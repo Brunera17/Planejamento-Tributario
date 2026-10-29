@@ -1,0 +1,52 @@
+{
+ "_legenda": "d = dedutível IRPJ/CSLL; pc = crédito PIS/COFINS no Lucro Real; ibs = crédito IBS/CBS na Reforma",
+ "grupos": [
+  {"nome": "Despesas com Vendas", "itens": [
+   {"nome": "Brindes", "d": false, "pc": false, "ibs": true},
+   {"nome": "Amostras Grátis", "d": true, "pc": false, "ibs": true},
+   {"nome": "Fretes", "d": true, "pc": true, "ibs": true, "natureza": "Frete na venda suportado pelo vendedor: crédito (Lei 10.833/2003, art. 3º, IX)"},
+   {"nome": "Publicidade e Propaganda", "d": true, "pc": false, "ibs": true, "natureza": "Dedutível (RIR/2018, art. 380); sem crédito de PIS/COFINS no comércio"},
+   {"nome": "Tarifas de Envio (marketplace)", "d": true, "pc": true, "ibs": true, "natureza": "Frete na venda intermediado pelo marketplace: crédito (art. 3º, IX)"},
+   {"nome": "Tarifas de Envio Full (marketplace)", "d": true, "pc": true, "ibs": true, "natureza": "Frete/armazenagem do fulfillment: crédito (art. 3º, IX)"},
+   {"nome": "Tarifas de Armazenamento (marketplace)", "d": true, "pc": true, "ibs": true, "natureza": "Armazenagem de mercadoria: crédito (art. 3º, IX)"},
+   {"nome": "Tarifas de Venda / Comissão (marketplace)", "d": true, "pc": false, "ibs": true, "natureza": "Comissão de intermediação: dedutível; sem crédito de PIS/COFINS"},
+   {"nome": "Campanhas de Publicidade (marketplace)", "d": true, "pc": false, "ibs": true},
+   {"nome": "Embalagens", "d": true, "pc": false, "ibs": true},
+   {"nome": "Garantia", "d": true, "pc": false, "ibs": true}
+  ]},
+  {"nome": "Despesas Administrativas", "itens": [
+   {"nome": "Alimentação de Sócios e Administradores", "d": false, "pc": false, "ibs": false},
+   {"nome": "Assistência Médica, Odontológica e Convênios", "d": true, "pc": false, "ibs": false},
+   {"nome": "Vale Refeição / Alimentação", "d": true, "pc": false, "ibs": false},
+   {"nome": "Vale Transporte", "d": true, "pc": false, "ibs": false},
+   {"nome": "Combustíveis e Lubrificantes", "d": true, "pc": false, "ibs": true},
+   {"nome": "Manutenção de Veículos", "d": true, "pc": false, "ibs": true},
+   {"nome": "Material de Escritório", "d": true, "pc": false, "ibs": true},
+   {"nome": "Honorários Advocatícios", "d": true, "pc": false, "ibs": true},
+   {"nome": "Honorários Contábeis", "d": true, "pc": false, "ibs": true},
+   {"nome": "Folha de Pagamento", "d": true, "pc": false, "ibs": false}
+  ]},
+  {"nome": "Despesas Gerais", "itens": [
+   {"nome": "Aluguel de Imóveis", "d": true, "pc": true, "ibs": true, "natureza": "Aluguel pago a PJ: crédito (art. 3º, IV)"},
+   {"nome": "Energia Elétrica", "d": true, "pc": true, "ibs": true, "natureza": "Crédito (art. 3º, III)"},
+   {"nome": "Telefone e Internet", "d": true, "pc": false, "ibs": true},
+   {"nome": "Seguros", "d": true, "pc": false, "ibs": false},
+   {"nome": "Revistas e Publicações", "d": true, "pc": false, "ibs": true},
+   {"nome": "Vigilância e Segurança", "d": true, "pc": false, "ibs": true},
+   {"nome": "Manutenção e Conservação de Imóveis", "d": true, "pc": false, "ibs": true},
+   {"nome": "Materiais de Higiene e Limpeza", "d": true, "pc": false, "ibs": true},
+   {"nome": "Copa e Cozinha", "d": true, "pc": false, "ibs": true},
+   {"nome": "Perdas de Mercadorias", "d": true, "pc": false, "ibs": false},
+   {"nome": "IPVA Veículos", "d": true, "pc": false, "ibs": false},
+   {"nome": "IPTU Imóveis e Terrenos", "d": true, "pc": false, "ibs": false},
+   {"nome": "Despesas com Cartório", "d": true, "pc": false, "ibs": false},
+   {"nome": "Despesas com Correio", "d": true, "pc": false, "ibs": true},
+   {"nome": "Softwares", "d": true, "pc": false, "ibs": true},
+   {"nome": "Pedágios", "d": true, "pc": false, "ibs": true}
+  ]},
+  {"nome": "Outras Despesas Operacionais", "itens": [
+   {"nome": "Despesas Bancárias (taxas, tarifas)", "d": true, "pc": false, "ibs": false},
+   {"nome": "Taxas de Maquininha de Cartão", "d": true, "pc": false, "ibs": false}
+  ]}
+ ]
+}

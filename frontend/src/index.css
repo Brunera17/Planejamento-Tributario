@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/* Identidade visual (paleta A – ardósia e azul-petróleo): nenhuma cor fixa nos componentes, só tokens. */
+@theme {
+  --color-bg: #f5f7fa;            /* fundo da aplicação */
+  --color-surface: #e4e9ef;       /* cabeçalho de tabela, faixas alternadas, bordas de card */
+  --color-highlight: #e0eff3;     /* linha sob o mouse, campo em foco */
+  --color-border: #cbd2d9;        /* borda de campos de digitação */
+  --color-text: #1f2933;          /* texto (14,3:1 sobre o fundo) */
+  --color-text-strong: #1f2933;
+  --color-text-muted: #52606d;    /* texto de apoio (6,2:1) */
+  --color-brand: #155e75;         /* menu, links, ícones, bordas de destaque */
+  --color-brand-strong: #155e75;  /* botão principal, texto branco (7,4:1) */
+  --color-success: #2f855a;       /* barra 100%, borda do melhor regime */
+  --color-success-soft: #e6f4ec;  /* fundo de selo de sucesso */
+  --color-success-ink: #22543d;   /* texto sobre success-soft */
+  --color-warning: #b7791f;       /* barra 50–99% */
+  --color-warning-soft: #fbefd9;  /* fundo de selo "Preliminar" */
+  --color-warning-ink: #744210;   /* texto sobre warning-soft */
+  --color-alert: #c53030;         /* erros, pendências, barra 0–49% (5,6:1) */
+  --color-alert-soft: #fdf2f2;    /* fundo de mensagem de erro */
+  --color-alert-ink: #822727;     /* texto de mensagem de erro */
+  --color-brand-hover: #0f4a5c;   /* botão principal sob o mouse */
+  /* composição da carga: escala de petróleo, do estadual ao previdenciário */
+  --color-t-icms: #155e75;
+  --color-t-piscofins: #4f8fa4;
+  --color-t-irpjcsll: #9ec5d3;
+  --color-t-cpp: #52606d;
+  --font-sans: "Archivo", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Escala tipográfica (Bringhurst): 12 · 14 · 16 · 21 · 36. Em @layer base para as utilidades poderem sobrescrever. */
+@layer base {
+  html {
+    font-size: 15px;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    font-stretch: 105%;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 1.07rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+}
+
+/* Largura como parte do desenho: tabelas condensadas, veredito expandido. */
+.condensado {
+  font-stretch: 87%;
+}
+
+.expandido {
+  font-stretch: 112%;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 0;
+  background: var(--color-highlight);
+}
+
+/* O único movimento automático do sistema: a composição da carga cresce ao abrir o resultado. */
+@keyframes crescer {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.barra-carga {
+  transform-origin: left;
+  animation: crescer 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra-carga {
+    animation: none;
+  }
+}

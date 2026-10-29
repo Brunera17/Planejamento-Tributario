@@ -1,0 +1,13 @@
+{
+ "anexo": "I",
+ "descricao": "LC 123/2006, Anexo I – Comércio",
+ "vigencia_inicio": "2018-01-01",
+ "faixas": [
+  {"faixa": 1, "rbt12_de": "0",          "rbt12_ate": "180000",  "aliq_nominal": "0.04",  "parcela_deduzir": "0",      "p_irpj": "0.055", "p_csll": "0.035", "p_cofins": "0.1274", "p_pis": "0.0276", "p_cpp": "0.415", "p_icms": "0.34"},
+  {"faixa": 2, "rbt12_de": "180000.01",  "rbt12_ate": "360000",  "aliq_nominal": "0.073", "parcela_deduzir": "5940",   "p_irpj": "0.055", "p_csll": "0.035", "p_cofins": "0.1274", "p_pis": "0.0276", "p_cpp": "0.415", "p_icms": "0.34"},
+  {"faixa": 3, "rbt12_de": "360000.01",  "rbt12_ate": "720000",  "aliq_nominal": "0.095", "parcela_deduzir": "13860",  "p_irpj": "0.055", "p_csll": "0.035", "p_cofins": "0.1274", "p_pis": "0.0276", "p_cpp": "0.42",  "p_icms": "0.335"},
+  {"faixa": 4, "rbt12_de": "720000.01",  "rbt12_ate": "1800000", "aliq_nominal": "0.107", "parcela_deduzir": "22500",  "p_irpj": "0.055", "p_csll": "0.035", "p_cofins": "0.1274", "p_pis": "0.0276", "p_cpp": "0.42",  "p_icms": "0.335"},
+  {"faixa": 5, "rbt12_de": "1800000.01", "rbt12_ate": "3600000", "aliq_nominal": "0.143", "parcela_deduzir": "87300",  "p_irpj": "0.055", "p_csll": "0.035", "p_cofins": "0.1274", "p_pis": "0.0276", "p_cpp": "0.42",  "p_icms": "0.335"},
+  {"faixa": 6, "rbt12_de": "3600000.01", "rbt12_ate": "4800000", "aliq_nominal": "0.19",  "parcela_deduzir": "378000", "p_irpj": "0.135", "p_csll": "0.10",  "p_cofins": "0.2827", "p_pis": "0.0613", "p_cpp": "0.421", "p_icms": "0"}
+ ]
+}

@@ -1,0 +1,55 @@
+"""Leitura das tabelas legais da carga inicial (arquivos JSON em seeds/dados)."""
+from __future__ import annotations
+
+import json
+from dataclasses import fields
+from decimal import Decimal
+from functools import cache
+from pathlib import Path
+
+from app.motor.classificacao import RegraCfop, RegraNcm
+from app.motor.tipos import AnoReforma, FaixaSimples, Parametros
+
+DADOS = Path(__file__).parent / "dados"
+
+
+def ler(nome: str):
+    return json.loads((DADOS / nome).read_text(encoding="utf-8"))
+
+
+@cache
+def faixas_simples() -> tuple[FaixaSimples, ...]:
+    return tuple(
+        FaixaSimples(
+            faixa=f["faixa"],
+            **{k: Decimal(f[k]) for k in ("rbt12_de", "rbt12_ate", "aliq_nominal", "parcela_deduzir",
+                                          "p_irpj", "p_csll", "p_cofins", "p_pis", "p_cpp", "p_icms")},
+        )
+        for f in ler("simples_anexo1.json")["faixas"]
+    )
+
+
+@cache
+def reforma() -> tuple[AnoReforma, ...]:
+    return tuple(
+        AnoReforma(a["ano"], Decimal(a["cbs"]), Decimal(a["ibs"]), Decimal(a["fator_icms"]))
+        for a in ler("reforma_cronograma.json")["anos"]
+    )
+
+
+def parametros(valores: dict[str, Decimal] | None = None) -> Parametros:
+    """Parâmetros a partir de {chave: valor}; sem argumento, usa a carga inicial."""
+    if valores is None:
+        valores = {p["chave"]: Decimal(p["valor"]) for p in ler("parametros.json")}
+    nomes = {f.name for f in fields(Parametros)}
+    return Parametros(**{k: v for k, v in valores.items() if k in nomes})
+
+
+@cache
+def regras_cfop() -> dict[int, RegraCfop]:
+    return {r["cfop"]: RegraCfop(r["cfop"], r["gera_receita"]) for r in ler("cfop_regras.json")}
+
+
+@cache
+def regras_ncm() -> dict[str, RegraNcm]:
+    return {r["ncm"]: RegraNcm(r["ncm"], r["monofasico"], r["sujeito_st"]) for r in ler("ncm_regras.json")}

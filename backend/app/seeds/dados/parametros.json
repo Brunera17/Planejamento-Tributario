@@ -1,0 +1,22 @@
+[
+ {"chave": "pis_cumulativo", "valor": "0.0065", "descricao": "PIS cumulativo (Lucro Presumido)", "fundamento": "Lei 9.718/1998"},
+ {"chave": "cofins_cumulativo", "valor": "0.03", "descricao": "COFINS cumulativa (Lucro Presumido)", "fundamento": "Lei 9.718/1998"},
+ {"chave": "pis_nao_cumulativo", "valor": "0.0165", "descricao": "PIS não cumulativo (Lucro Real)", "fundamento": "Lei 10.637/2002"},
+ {"chave": "cofins_nao_cumulativo", "valor": "0.076", "descricao": "COFINS não cumulativa (Lucro Real)", "fundamento": "Lei 10.833/2003"},
+ {"chave": "irpj", "valor": "0.15", "descricao": "IRPJ", "fundamento": "Lei 9.249/1995, art. 3º"},
+ {"chave": "irpj_adicional", "valor": "0.10", "descricao": "Adicional de IRPJ", "fundamento": "Lei 9.430/1996, art. 3º"},
+ {"chave": "irpj_limite_adicional_mensal", "valor": "20000", "descricao": "Parcela mensal isenta do adicional", "fundamento": "Lei 9.430/1996, art. 3º"},
+ {"chave": "csll", "valor": "0.09", "descricao": "CSLL", "fundamento": "Lei 7.689/1988"},
+ {"chave": "presuncao_irpj", "valor": "0.08", "descricao": "Presunção IRPJ – revenda de mercadorias", "fundamento": "Lei 9.249/1995, art. 15"},
+ {"chave": "presuncao_csll", "valor": "0.12", "descricao": "Presunção CSLL – revenda de mercadorias", "fundamento": "Lei 9.249/1995, art. 20"},
+ {"chave": "acrescimo_presuncao", "valor": "0.10", "descricao": "Acréscimo da presunção sobre a receita excedente", "fundamento": "LC 224/2025"},
+ {"chave": "limite_receita_anual_presuncao", "valor": "5000000", "descricao": "Receita anual sem acréscimo de presunção", "fundamento": "LC 224/2025; IN RFB 2.305/2025"},
+ {"chave": "compensacao_prejuizo_limite", "valor": "0.30", "descricao": "Limite de compensação de prejuízo fiscal", "fundamento": "Lei 9.065/1995, art. 15"},
+ {"chave": "sublimite_simples", "valor": "3600000", "descricao": "Sublimite do Simples (ICMS/ISS)", "fundamento": "LC 123/2006, art. 13-A"},
+ {"chave": "teto_simples", "valor": "4800000", "descricao": "Teto do Simples Nacional", "fundamento": "LC 123/2006, art. 3º"},
+ {"chave": "alerta_sublimite", "valor": "0.70", "descricao": "Percentual do sublimite que dispara o alerta", "fundamento": "regra interna"},
+ {"chave": "encargos_folha", "valor": "0.278", "descricao": "Encargos patronais sobre a folha (CPP 20% + RAT + Terceiros)", "fundamento": "Lei 8.212/1991"},
+ {"chave": "inss_pro_labore", "valor": "0.20", "descricao": "INSS patronal sobre o pró-labore", "fundamento": "Lei 8.212/1991, art. 22, III"},
+ {"chave": "aliq_icms_interna", "valor": "0.18", "descricao": "Alíquota interna de ICMS (SP – autopeças)", "fundamento": "RICMS/SP"},
+ {"chave": "aliq_icms_interestadual", "valor": "0.12", "descricao": "Alíquota interestadual média (origem S/SE)", "fundamento": "Res. Senado 22/1989"}
+]

@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+backend/uploads/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Ambiente e dados de clientes
+.env
+*.pfx
+*.p12
+**/clientes/
