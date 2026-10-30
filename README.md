@@ -115,7 +115,8 @@ cd frontend && npm test
 | Progresso e pendências por bloco | ✅ |
 | Exportação Excel | ✅ |
 | Relatório PDF (ReportLab): veredito, composição da carga, Reforma, oportunidades, recomendação editável, anexos, marca PRELIMINAR, arquivamento com SHA-256 | ✅ |
-| Bens, documentos (upload) e tela de tabelas legais | ⏳ modelos prontos, rotas/telas pendentes |
+| Bens próprios e documentos (envio de arquivos, "não se aplica" com justificativa) | ✅ |
+| Tela de tabelas legais | ⏳ modelos e rotas prontos, tela pendente |
 | Processamento em segundo plano para importações grandes | ⏳ |
 
 ### Fonte do relatório PDF

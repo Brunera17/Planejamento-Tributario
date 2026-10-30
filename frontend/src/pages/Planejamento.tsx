@@ -6,10 +6,14 @@ import { api, lerSessao, mensagemErro } from "../api/cliente";
 import type { Bloco, Catalogo, Planejamento as TPlanejamento, SimulacaoResumo } from "../api/tipos";
 import { Badge, BarraProgresso, Botao, Cabecalho, CampoMoeda, Card, Erro, Ficha, Tabela } from "../components/ui";
 import { brl, competenciaExtenso, dataHora, formatarCnpj, REGIMES } from "../lib/formato";
+import { Bens } from "./Bens";
+import { Documentos } from "./Documentos";
 
 const ABAS = [
   { id: "coleta", rotulo: "Faturamento, compras e folha" },
   { id: "despesas", rotulo: "Despesas" },
+  { id: "bens", rotulo: "Bens" },
+  { id: "documentos", rotulo: "Documentos" },
   { id: "pendencias", rotulo: "Pendências" },
   { id: "simulacoes", rotulo: "Simulações" },
 ];
@@ -52,6 +56,8 @@ export function Planejamento() {
       </nav>
       {aba === "coleta" && <Coleta pid={p.id} />}
       {aba === "despesas" && <Despesas pid={p.id} />}
+      {aba === "bens" && <Bens pid={p.id} />}
+      {aba === "documentos" && <Documentos pid={p.id} />}
       {aba === "pendencias" && <Pendencias pid={p.id} />}
       {aba === "simulacoes" && <Simulacoes pid={p.id} />}
     </>

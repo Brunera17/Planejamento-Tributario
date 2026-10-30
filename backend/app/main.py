@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, dashboard, empresas, planejamentos, simulacoes, tabelas
+from app.api.routes import auth, bens_documentos, dashboard, empresas, planejamentos, simulacoes, tabelas
 from app.core.config import get_settings
 from app.core.erros import registrar_handlers
 
@@ -15,7 +15,7 @@ def criar_app() -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_lista, allow_credentials=True,
                        allow_methods=["*"], allow_headers=["*"])
     registrar_handlers(app)
-    for r in (auth, empresas, tabelas, planejamentos, simulacoes, dashboard):
+    for r in (auth, empresas, tabelas, planejamentos, bens_documentos, simulacoes, dashboard):
         app.include_router(r.router, prefix="/api")
 
     @app.get("/api/saude", tags=["Infra"])

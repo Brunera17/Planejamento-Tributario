@@ -50,3 +50,15 @@ export function mensagemErro(e: unknown): string {
   const campos = Object.entries(dados.campos ?? {}).map(([k, v]) => `${k}: ${v}`);
   return [dados.erro, ...campos].join(" — ");
 }
+
+/** Baixa um arquivo protegido pela sessão. */
+export async function baixarArquivo(url: string, nome: string) {
+  const r = await api.get(url, { responseType: "blob" }).catch(async (e: AxiosError<Blob>) => {
+    // com responseType blob, o erro da API também chega como blob
+    if (e.response?.data instanceof Blob) (e.response as { data: unknown }).data = JSON.parse(await e.response.data.text());
+    throw e;
+  });
+  const link = URL.createObjectURL(r.data);
+  Object.assign(document.createElement("a"), { href: link, download: nome }).click();
+  URL.revokeObjectURL(link);
+}

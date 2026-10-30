@@ -152,7 +152,8 @@ class Documento(Base):
     id: Mapped[PK]
     levantamento_id: Mapped[int] = mapped_column(ForeignKey("levantamento.id", ondelete="CASCADE"))
     tipo_documento_id: Mapped[int] = mapped_column(ForeignKey("tipo_documento.id"))
-    arquivo: Mapped[str | None] = mapped_column(String(255))
+    arquivo: Mapped[str | None] = mapped_column(String(255))  # nome gerado no armazenamento
+    arquivo_nome: Mapped[str | None] = mapped_column(String(255))  # nome original enviado
     nao_se_aplica: Mapped[bool] = mapped_column(default=False)
     justificativa: Mapped[str | None] = mapped_column(Text)
     enviado_em: Mapped[Momento]

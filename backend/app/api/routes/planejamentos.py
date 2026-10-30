@@ -243,13 +243,6 @@ def aceitar_observacoes(pid: int, db: DB, u: UsuarioAtual):
     _alterou(db, p)
 
 
-@router.put("/{pid}/sem-bens", status_code=204)
-def declarar_sem_bens(pid: int, sem_bens: bool, db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
-    p.sem_bens = sem_bens
-    _alterou(db, p)
-
-
 # --------------------------------------------------- levantamento de despesas
 
 

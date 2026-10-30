@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { api, lerSessao, mensagemErro } from "../api/cliente";
+import { api, baixarArquivo, lerSessao, mensagemErro } from "../api/cliente";
 import type { LinhaNcm, PassoMemoria, Planejamento, Resultado as TResultado, ResultadoRegime, SimulacaoResumo } from "../api/tipos";
 import { Badge, Botao, Card, Erro, Tabela } from "../components/ui";
 import { brl, competenciaExtenso, dataHora, percentual, REGIMES } from "../lib/formato";
@@ -352,13 +352,6 @@ function Composicao({ r, receita, atual }: { r: TResultado; receita: number; atu
 }
 
 type Relatorio = { id: number; arquivo: string; preliminar: boolean; gerado_em: string; gerado_por_nome: string; simulacao_id: number };
-
-async function baixarArquivo(url: string, nome: string) {
-  const r = await api.get(url, { responseType: "blob" });
-  const link = URL.createObjectURL(r.data);
-  Object.assign(document.createElement("a"), { href: link, download: nome }).click();
-  URL.revokeObjectURL(link);
-}
 
 /** Revisão do texto da recomendação, emissão do PDF e lista dos relatórios já arquivados. */
 function PainelRelatorio({ sid, pid, preliminar }: { sid: number; pid: number; preliminar: boolean }) {
