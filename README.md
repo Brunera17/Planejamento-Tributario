@@ -79,8 +79,10 @@ Copie `.env.example` para `.env` na raiz e ajuste:
 | Contador | `contador` | `demo123` |
 | Analista | `analista` | `demo123` |
 
-O planejamento de demonstração (*Autopeças Demonstração Ltda*, jun–ago/2026) usa os dados agregados e anonimizados
-do caso de referência. Abra **Planejamentos → Simulações → Simular agora**.
+A carga `--demo` cria dois planejamentos:
+
+- *Autopeças Demonstração Ltda*: dados agregados e anonimizados do caso de referência, em coleta. Abra **Planejamentos → Simulações → Nova simulação**.
+- *Distribuidora Modelo de Autopeças Ltda*: exemplo fictício com 100% das informações, simulação aprovada e relatório final.
 
 ## Testes
 
@@ -107,7 +109,7 @@ cd frontend && npm test
 | Coleta: compras, devoluções, folha, composição das compras, premissas | ✅ |
 | Levantamento de despesas por competência (catálogo com classificação tributária) | ✅ (API e tela de valores; "outras despesas" e envio para conferência só pela API) |
 | Importação de NF-e XML (avulso ou .zip), saídas e entradas | ✅ (processamento síncrono) |
-| Importação do relatório de movimentação do sistema contábil (.xlsx) | ⏳ precisa de um arquivo-modelo do relatório |
+| Importação do relatório "Movimentação de Produtos" do Domínio (.xls/.xlsx), saídas e entradas, com devoluções automáticas | ✅ |
 | Motor: Simples, LP, LR, Reforma, comparativo, equilíbrio, crescimento, 11 oportunidades, pontos críticos | ✅ |
 | Memória de cálculo e simulações versionadas/desatualizadas | ✅ |
 | Progresso e pendências por bloco | ✅ |

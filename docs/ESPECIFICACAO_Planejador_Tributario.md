@@ -137,6 +137,8 @@ contador, com valor padrão na carga inicial):
 | `credito_ibs_cbs` | Sim / Não / Limitado | Tarifas do marketplace = Sim |
 | `natureza` | texto + fundamento legal | "Frete na venda: crédito (Lei 10.833/2003, art. 3º, IX)" |
 
+A folha de salários **não** é item do catálogo: fica no bloco de folha e pró-labore, que calcula os encargos. O item antigo "Folha de Pagamento" está desativado e, se tiver valor, é ignorado nos meses em que o bloco de folha foi informado, para não deduzir duas vezes no Lucro Real.
+
 O catálogo recebe os itens que aparecem nos clientes de marketplace: *Tarifas de envio*, *Tarifas de venda
 (comissão)*, *Tarifas de armazenamento*, *Tarifas de envio Full*, *Campanhas de publicidade no marketplace*,
 *Garantia* e *Embalagens*.

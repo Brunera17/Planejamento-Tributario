@@ -36,7 +36,7 @@ from app.schemas.planejamento import (
     StatusEntrada,
     ValorCompetencia,
 )
-from app.services import progresso
+from app.services import progresso, relatorio_contabil
 from app.services.entrada import PREMISSAS
 from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
@@ -353,3 +353,26 @@ async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     imp.log = "\n".join(log) or None
     _alterou(db, p)
     return {"id": imp.id, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados, "log": log}
+
+
+@router.post("/{pid}/relatorio-contabil")
+async def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
+    """Relatório "Movimentação de Produtos – ICMS – PIS – COFINS" do Domínio (.xls ou .xlsx), de saídas ou de entradas."""
+    p = obter_planejamento(db, pid)
+    nome = arquivo.filename or "relatorio.xls"
+    if not nome.lower().endswith((".xls", ".xlsx")):
+        raise ErroNegocio("Envie o relatório em .xls ou .xlsx", 415)
+    conteudo = await arquivo.read()
+    if len(conteudo) > 20 * 1024 * 1024:
+        raise ErroNegocio("Arquivo acima de 20 MB", 413)
+    try:
+        resumo = relatorio_contabil.importar(db, p, nome, conteudo, u.id)
+    except relatorio_contabil.RelatorioInvalido as e:
+        db.rollback()
+        raise ErroNegocio(str(e), 422, {"arquivo": str(e)}) from e
+    _alterou(db, p)
+    return {
+        "tipo": resumo.tipo, "empresa_relatorio": resumo.empresa_relatorio, "linhas": resumo.linhas,
+        "notas_importadas": resumo.notas_importadas, "notas_ignoradas": resumo.notas_ignoradas,
+        "valor_importado": resumo.valor_importado, "por_competencia": resumo.por_competencia, "avisos": resumo.avisos,
+    }

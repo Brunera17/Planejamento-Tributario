@@ -35,6 +35,7 @@ from app.models import (
     TipoDocumento,
     Usuario,
 )
+from app.seeds.exemplo import carregar_exemplo, concluir_exemplo
 from app.seeds.tabelas import ler
 from app.services import progresso
 from app.services.progresso import PESOS_PADRAO
@@ -104,7 +105,7 @@ def carregar_catalogo(db: Session) -> None:
         for ii, it in enumerate(g["itens"], start=1):
             _upsert(db, ItemDespesa, {"grupo_id": grupo.id, "nome": it["nome"]}, {
                 "ordem": gi * 100 + ii, "dedutivel_irpj_csll": it["d"], "credito_pis_cofins": it["pc"],
-                "credito_ibs_cbs": it["ibs"], "natureza": it.get("natureza")})
+                "credito_ibs_cbs": it["ibs"], "natureza": it.get("natureza"), "ativo": it.get("ativo", True)})
     for i, nome in enumerate(TIPOS_DOCUMENTO, start=1):
         _upsert(db, TipoDocumento, {"nome": nome}, {"ordem": i})
     for bloco, peso in PESOS_PADRAO.items():
@@ -167,7 +168,7 @@ def carregar_demo(db: Session) -> Planejamento:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--demo", action="store_true", help="carrega também o planejamento de demonstração")
+    ap.add_argument("--demo", action="store_true", help="carrega também os planejamentos de demonstração e o exemplo completo")
     args = ap.parse_args()
     with SessionLocal() as db:
         carregar_tabelas(db)
@@ -177,6 +178,10 @@ def main() -> None:
         if args.demo:
             p = carregar_demo(db)
             print(f"Planejamento de demonstração: id {p.id}")
+            exemplo = carregar_exemplo(db)
+            db.commit()
+            concluir_exemplo(db, exemplo)
+            print(f"Exemplo completo: planejamento {exemplo.id}, {exemplo.progresso}%, {exemplo.status}")
         db.commit()
     print("Carga concluída.")
 

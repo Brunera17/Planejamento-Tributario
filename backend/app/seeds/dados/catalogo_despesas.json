@@ -24,7 +24,7 @@
    {"nome": "Material de Escritório", "d": true, "pc": false, "ibs": true},
    {"nome": "Honorários Advocatícios", "d": true, "pc": false, "ibs": true},
    {"nome": "Honorários Contábeis", "d": true, "pc": false, "ibs": true},
-   {"nome": "Folha de Pagamento", "d": true, "pc": false, "ibs": false}
+   {"nome": "Folha de Pagamento", "d": true, "pc": false, "ibs": false, "ativo": false}
   ]},
   {"nome": "Despesas Gerais", "itens": [
    {"nome": "Aluguel de Imóveis", "d": true, "pc": true, "ibs": true, "natureza": "Aluguel pago a PJ: crédito (art. 3º, IV)"},

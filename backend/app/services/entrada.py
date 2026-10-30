@@ -39,8 +39,11 @@ from app.motor.tipos import (
     Regime,
 )
 from app.seeds import tabelas
+from app.services.relatorio_contabil import CFOP_COMPRA_REVENDA
 
 ZERO = Decimal("0")
+ITEM_FOLHA = "Folha de Pagamento"
+COBERTURA_MINIMA = Decimal("0.95")  # notas de compra ÷ compras informadas para usar o ICMS destacado
 
 # premissas aceitas em premissa_planejamento -> tipo
 PREMISSAS = {
@@ -124,20 +127,22 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     if faltam_compras:
         pendencias.append("Compras não informadas: " + ", ".join(faltam_compras))
 
+    # Crédito de ICMS real: só quando as notas de compra para revenda cobrem as compras informadas em todos os
+    # meses. Relatórios e XMLs parciais (comuns na escrituração) zerariam o crédito do LP/LR.
     icms_entradas = None
-    entradas_xml = db.execute(
-        select(NotaFiscal.competencia, func.sum(NotaItem.vl_icms))
+    entradas = {c: (Decimal(str(v or 0)), Decimal(str(i or 0))) for c, v, i in db.execute(
+        select(NotaFiscal.competencia, func.sum(NotaItem.vl_total), func.sum(NotaItem.vl_icms))
         .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
-        .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "ENTRADA")
-        .group_by(NotaFiscal.competencia)
-    ).all()
-    if entradas_xml and {c for c, _ in entradas_xml} >= set(comps):
-        icms_entradas = {c: Decimal(str(v or 0)) for c, v in entradas_xml}
+        .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "ENTRADA", NotaItem.cfop.in_(CFOP_COMPRA_REVENDA))
+        .group_by(NotaFiscal.competencia))}
+    if entradas and all(c in entradas and compras.get(c) and entradas[c][0] >= compras[c] * COBERTURA_MINIMA for c in comps):
+        icms_entradas = {c: entradas[c][1] for c in comps}
 
     folhas = db.scalars(select(FolhaMensal).where(FolhaMensal.planejamento_id == p.id)).all()
     folha = {f.competencia: f.folha or ZERO for f in folhas}
     pro_labore = {f.competencia: f.pro_labore or ZERO for f in folhas}
     folha_informada = any(f.folha is not None or f.pro_labore is not None for f in folhas)
+    folha_do_mes = {f.competencia for f in folhas if f.folha is not None}
 
     # despesas: itens do catálogo + outras despesas descritas
     despesas: list[Despesa] = []
@@ -149,6 +154,9 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         .where(Levantamento.planejamento_id == p.id)
     ):
         informados.add(item.id)
+        # A folha é apurada no bloco próprio, com encargos: o item antigo do catálogo não pode deduzir de novo.
+        if item.nome == ITEM_FOLHA and comp in folha_do_mes:
+            continue
         if valor:
             despesas.append(Despesa(comp, item.nome, valor, item.dedutivel_irpj_csll, item.credito_pis_cofins,
                                     item.credito_ibs_cbs))
