@@ -1,11 +1,12 @@
 """O exemplo da carga precisa chegar a 100%, sem pendências, aprovado e com PDF final."""
+from pypdf import PdfReader
 from sqlalchemy import select
 
 from decimal import Decimal
 
 from app.models import FolhaMensal, ItemDespesa, Levantamento, LevantamentoItem, RelatorioPdf, Simulacao
 from app.seeds.exemplo import carregar_exemplo, concluir_exemplo
-from app.services import progresso
+from app.services import progresso, relatorio_pdf
 from app.services.entrada import ITEM_FOLHA, montar_entrada
 
 
@@ -24,6 +25,11 @@ def test_exemplo_completo(fabrica_sessao):
         assert sim.aprovada_em is not None
         rel = db.scalar(select(RelatorioPdf).where(RelatorioPdf.planejamento_id == p.id))
         assert rel.preliminar is False
+        texto = "\n".join(pag.extract_text() for pag in PdfReader(relatorio_pdf.caminho(rel)).pages)
+        for trecho in ["Bens próprios", "Utilitário de entregas", "14/03/2023", "R$ 110.450,00", "Todos os 27 documentos",
+                       "Não se aplica: A empresa não", "exemplo-doc-1-2026-06.pdf"]:
+            assert trecho in texto, trecho
+        assert texto.count("Outras: Taxa de licença de funcionamento") == 1  # uma linha, com os três meses
 
         concluir_exemplo(db, carregar_exemplo(db))  # repetir a carga não duplica
         assert len(db.scalars(select(Simulacao).where(Simulacao.planejamento_id == p.id)).all()) == 1

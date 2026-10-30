@@ -10,7 +10,7 @@ import hashlib
 import io
 import json
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -38,6 +38,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import (
+    Bem,
+    Documento,
     GrupoDespesa,
     HistoricoStatus,
     ItemDespesa,
@@ -48,12 +50,15 @@ from app.models import (
     Planejamento,
     RelatorioPdf,
     Simulacao,
+    TipoDocumento,
     Usuario,
 )
 from app.services import progresso
 
 FUSO = ZoneInfo("America/Sao_Paulo")
 REGIMES = {"SIMPLES_NACIONAL": "Simples Nacional", "LUCRO_PRESUMIDO": "Lucro Presumido", "LUCRO_REAL": "Lucro Real"}
+TIPOS_BEM = {"VEICULOS": "Veículos", "MOVEIS_UTENSILIOS": "Móveis e utensílios",
+             "MAQUINAS_EQUIPAMENTOS": "Máquinas e equipamentos", "IMOVEL": "Imóvel"}
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 FONTES_LEGAIS = [
     "LC 123/2006 (Simples Nacional, Anexo I)",
@@ -234,6 +239,9 @@ class DadosRelatorio:
     pendencias: list[str] = field(default_factory=list)
     despesas: list[tuple[str, list[tuple[str, list[float | None]]]]] = field(default_factory=list)
     historico: list[tuple[datetime, str, str | None, str, str | None]] = field(default_factory=list)
+    bens: list[tuple[str, str, date, float]] = field(default_factory=list)
+    sem_bens: bool = False
+    documentos: list[tuple[str, list[str | None]]] = field(default_factory=list)  # None = pendente
 
 
 def recomendacao_padrao(r: dict, regime_atual: str, meses: int) -> list[str]:
@@ -299,10 +307,31 @@ def coletar(db: Session, sim: Simulacao, usuario: Usuario, recomendacao: list[st
         linhas = [(i.nome, [valores[i.id].get(c) for c in comps])
                   for i in db.scalars(select(ItemDespesa).where(ItemDespesa.grupo_id == g.id).order_by(ItemDespesa.ordem))
                   if i.id in valores and any(valores[i.id].values())]
+        outras: dict[str, list[float | None]] = {}  # mesma descrição em meses diferentes fica numa linha só
         for o in db.scalars(select(OutraDespesa).where(OutraDespesa.grupo_id == g.id, OutraDespesa.levantamento_id.in_(levs))):
-            linhas.append((f"Outras: {o.descricao}", [float(o.valor) if levs[o.levantamento_id] == c else None for c in comps]))
+            linha = outras.setdefault(o.descricao, [None] * len(comps))
+            i = comps.index(levs[o.levantamento_id])
+            linha[i] = (linha[i] or 0) + float(o.valor)
+        linhas += [(f"Outras: {desc}", valores) for desc, valores in outras.items()]
         if linhas:
             despesas.append((g.nome, linhas))
+
+    bens = [(TIPOS_BEM.get(b.tipo, b.tipo), b.descricao, b.data_aquisicao, float(b.valor))
+             for b in db.scalars(select(Bem).where(Bem.empresa_id == emp.id).order_by(Bem.data_aquisicao.desc()))]
+
+    # situação de cada documento em cada mês
+    docs = {(levs[x.levantamento_id], x.tipo_documento_id): x
+            for x in db.scalars(select(Documento).where(Documento.levantamento_id.in_(levs)))}
+
+    def situacao(doc: Documento | None) -> str | None:
+        if doc is None:
+            return None
+        if doc.nao_se_aplica:
+            return f"Não se aplica: {doc.justificativa}"
+        return doc.arquivo_nome or doc.arquivo
+
+    documentos = [(t.nome, [situacao(docs.get((c, t.id))) for c in comps])
+                  for t in db.scalars(select(TipoDocumento).order_by(TipoDocumento.ordem))]
 
     nomes = {u.id: u.nome for u in db.scalars(select(Usuario))}
     historico = [(h.data, nomes.get(h.usuario_id, "–"), h.status_de, h.status_para, h.motivo)
@@ -317,7 +346,7 @@ def coletar(db: Session, sim: Simulacao, usuario: Usuario, recomendacao: list[st
         recomendacao=recomendacao or recomendacao_padrao(r, emp.regime_tributario, len(comps)),
         progresso=pct_prog,
         pendencias=[f"{b.esperados - b.preenchidos} em {progresso.NOMES[b.codigo].lower()}" for b in blocos if b.preenchidos < b.esperados],
-        despesas=despesas, historico=historico,
+        despesas=despesas, historico=historico, bens=bens, sem_bens=p.sem_bens, documentos=documentos,
     )
 
 
@@ -653,6 +682,33 @@ def montar_pdf(d: DadosRelatorio) -> bytes:
             s.append(KeepTogether([Paragraph(t(grupo), E["h3"]),
                                    tabela(["Item"] + [mes(c) for c in d.competencias], linhas, [70 * mm] + [larg] * len(d.competencias),
                                           set(range(1, len(d.competencias) + 1)), True)]))
+
+    s.append(CondPageBreak(45 * mm))
+    s.append(anexo("Bens próprios"))
+    if d.bens:
+        s.append(tabela(["Tipo", "Descrição", "Data de aquisição", "Valor"],
+                        [[tipo, desc, dia.strftime("%d/%m/%Y"), brl(valor)] for tipo, desc, dia, valor in d.bens] +
+                        [["Total", "", "", brl(sum(b[3] for b in d.bens))]],
+                        [44 * mm, L - 104 * mm, 30 * mm, 30 * mm], {3}, True))
+    else:
+        s.append(Paragraph(t("A empresa declarou não possuir bens acima de R$ 1.200,00." if d.sem_bens
+                             else "Nenhum bem informado no levantamento."), E["corpo"]))
+
+    if d.documentos:
+        s.append(CondPageBreak(60 * mm))
+        s.append(anexo("Documentos"))
+        pendentes = sum(x is None for _, sit in d.documentos for x in sit)
+        total_docs = sum(len(sit) for _, sit in d.documentos)
+        s.append(Paragraph(t(f"{pendentes} de {total_docs} documentos pendentes." if pendentes
+                             else f"Todos os {total_docs} documentos foram enviados ou justificados."), E["apoio"]))
+        s.append(Spacer(1, 2 * mm))
+        larg = (L - 56 * mm) / len(d.competencias)
+        quadro = tabela(["Documento"] + [mes(c) for c in d.competencias],
+                        [[nome] + ["Pendente" if x is None else x for x in sit] for nome, sit in d.documentos],
+                        [56 * mm] + [larg] * len(d.competencias))
+        quadro.setStyle(TableStyle([("BACKGROUND", (j + 1, i + 1), (j + 1, i + 1), COR["aviso_fundo"])
+                                    for i, (_, sit) in enumerate(d.documentos) for j, x in enumerate(sit) if x is None]))
+        s.append(quadro)
 
     s.append(PageBreak())
     s.append(anexo("Memória de cálculo"))

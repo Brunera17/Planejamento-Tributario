@@ -11,7 +11,10 @@
         "--app-dir",
         "backend",
         "--port",
-        "8000"
+        "8000",
+        "--reload",
+        "--reload-dir",
+        "backend/app"
       ],
       "port": 8000
     },
