@@ -100,3 +100,62 @@ def test_nao_aprova_sem_passar_pela_conferencia(cliente, contador):
     with SessionLocal() as db:
         db.get(Planejamento, p.id).status = estado_original
         db.commit()
+
+
+@pytest.fixture(scope="module")
+def pid_premissas(cliente, contador):
+    emp = cliente.post("/api/empresas", headers=contador, json={
+        "razao_social": "PREMISSAS LTDA", "cnpj": "98.765.432/0001-98", "regime_tributario": "LUCRO_PRESUMIDO"}).json()
+    return cliente.post("/api/planejamentos", headers=contador, json={
+        "empresa_id": emp["id"], "competencia_inicial": "2026-09", "competencia_final": "2026-09"}).json()["id"]
+
+
+@pytest.mark.parametrize("corpo,campo", [
+    ({"rbt12_informado": "abc"}, "rbt12_informado"),
+    ({"adicoes_lr": "-5"}, "adicoes_lr"),
+    ({"pct_compras_credito_ibs_cbs": "1.5"}, "pct_compras_credito_ibs_cbs"),
+    ({"credito_frete_integral": "sim"}, "credito_frete_integral"),
+    ({"estoque_inicial": "1000"}, "estoque_final"),
+    ({"inexistente": "1"}, "inexistente"),
+])
+def test_premissa_invalida(cliente, contador, pid_premissas, corpo, campo):
+    r = cliente.put(f"/api/planejamentos/{pid_premissas}/premissas", headers=contador, json=corpo)
+    assert r.status_code == 422 and campo in r.json()["campos"]
+
+
+def test_premissas_gravam_limpam_e_exigem_contador(cliente, contador, analista, pid_premissas):
+    url = f"/api/planejamentos/{pid_premissas}/premissas"
+    assert cliente.put(url, headers=analista, json={"rbt12_informado": "1000"}).status_code == 403
+    corpo = {"rbt12_informado": "2400000.00", "estoque_inicial": "100", "estoque_final": "150", "credito_frete_integral": True}
+    assert cliente.put(url, headers=contador, json=corpo).status_code == 204
+    pr = cliente.get(f"/api/planejamentos/{pid_premissas}/coleta", headers=contador).json()["premissas"]
+    assert pr["rbt12_informado"] == "2400000.00" and pr["credito_frete_integral"] is True
+    assert cliente.put(url, headers=contador, json={"estoque_inicial": None, "estoque_final": ""}).status_code == 204
+    pr = cliente.get(f"/api/planejamentos/{pid_premissas}/coleta", headers=contador).json()["premissas"]
+    assert "estoque_inicial" not in pr and "estoque_final" not in pr
+
+
+def test_origem_das_compras_muda_credito_e_aviso(cliente, contador, pid_premissas):
+    nfe = NFE.replace("12345678000195", "98765432000198").replace("87087090", "85113020").replace("5117", "5102") \
+        .replace("NFe35260912345678000195", "NFe35260998765432000198")
+    cliente.post(f"/api/planejamentos/{pid_premissas}/nfe", headers=contador, files={"arquivo": ("n.xml", nfe.encode(), "text/xml")})
+    cliente.put(f"/api/planejamentos/{pid_premissas}/compras", headers=contador, json=[{"competencia": "2026-09", "valor": "100.00"}])
+
+    def simular():
+        sim = cliente.post(f"/api/planejamentos/{pid_premissas}/simulacoes", headers=contador).json()
+        return cliente.get(f"/api/simulacoes/{sim['id']}", headers=contador).json()["resultado"]
+
+    assumido = simular()
+    assert assumido["base"]["2026-09"]["icms_credito"] == pytest.approx(18.0)
+    assert any("não informada" in p["texto"] for p in assumido["pontos_criticos"])
+
+    r = cliente.put(f"/api/planejamentos/{pid_premissas}/composicao-compras", headers=contador, json=[
+        {"origem": "Internas", "aliquota": "0.18", "percentual": "0.5"}, {"origem": "Importados", "aliquota": "0.04", "percentual": "0.4"}])
+    assert r.status_code == 422  # soma 90%
+    r = cliente.put(f"/api/planejamentos/{pid_premissas}/composicao-compras", headers=contador, json=[
+        {"origem": "Internas", "aliquota": "0.18", "percentual": "0.5"}, {"origem": "Importados", "aliquota": "0.04", "percentual": "0.5"}])
+    assert r.status_code == 204
+
+    informado = simular()
+    assert informado["base"]["2026-09"]["icms_credito"] == pytest.approx(11.0)
+    assert not any("não informada" in p["texto"] for p in informado["pontos_criticos"])

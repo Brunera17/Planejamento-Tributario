@@ -106,7 +106,7 @@ cd frontend && npm test
 | Autenticação JWT, perfis, permissões no backend | ✅ |
 | Empresas: cadastro, importação com prévia, CNPJ numérico e alfanumérico | ✅ |
 | Planejamento, status e histórico, com envio, conferência e devolução pela tela | ✅ |
-| Coleta: compras, devoluções, folha, composição das compras, premissas | ✅ |
+| Coleta pela tela: compras, devoluções, folha, origem das compras e premissas do cálculo | ✅ |
 | Levantamento de despesas por competência (catálogo com classificação tributária) | ✅ |
 | Importação de NF-e XML (avulso ou .zip), saídas e entradas | ✅ (processamento síncrono) |
 | Importação do relatório "Movimentação de Produtos" do Domínio (.xls/.xlsx), saídas e entradas, com devoluções automáticas | ✅ |

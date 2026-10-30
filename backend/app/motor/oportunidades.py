@@ -144,9 +144,17 @@ def pontos_criticos(entrada: EntradaSimulacao, simples: ResultadoRegime) -> list
     if pr.estoque_inicial is None or pr.estoque_final is None:
         pts.append(PontoCritico("ESTOQUE", "CMV no Lucro Real calculado pelas compras do período, sem inventário "
                                            "(estoque inicial = final). Com estoque crescendo, o lucro tributável é maior."))
+    else:
+        compras = sum((entrada.compras.get(c, ZERO) for c in entrada.competencias), ZERO)
+        if pr.estoque_inicial + compras - pr.estoque_final < 0:
+            pts.append(PontoCritico("CMV_NEGATIVO", "Custo das mercadorias negativo: o estoque final é maior que o estoque inicial "
+                                                    "mais as compras. Confira os valores, pois isso aumenta o lucro no Lucro Real."))
     if entrada.icms_entradas_real is None:
-        pts.append(PontoCritico("CREDITO_ICMS", "Crédito de ICMS estimado pela composição das compras por origem "
-                                                "(sem XML de entrada)."))
+        texto = "Crédito de ICMS estimado pela composição das compras por origem (sem XML de entrada)."
+        if not entrada.composicao_informada:
+            texto = ("Origem das compras não informada: o crédito de ICMS assume 100% de compras internas. "
+                     "Se parte vier de outros estados ou for importada, o crédito é menor e o ICMS a recolher, maior.")
+        pts.append(PontoCritico("CREDITO_ICMS", texto))
     if entrada.ncms_confianca_media or entrada.ncms_indicio_incorreto:
         pts.append(PontoCritico("NCM", f"Monofásico: {len(entrada.ncms_confianca_media)} NCM(s) com confiança média e "
                                        f"{len(entrada.ncms_indicio_incorreto)} com indício de NCM incorreto."))

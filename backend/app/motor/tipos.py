@@ -165,6 +165,7 @@ class EntradaSimulacao:
     ncms_confianca_media: set[str] = field(default_factory=set)
     icms_entradas_real: dict[str, Decimal] | None = None  # ICMS destacado nos XML de entrada
     ncm_info: dict[str, InfoNcm] = field(default_factory=dict)
+    composicao_informada: bool = False  # False = origem das compras assumida (100% internas)
 
 
 # ------------------------------------------------------------------ saídas

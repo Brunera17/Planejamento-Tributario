@@ -194,6 +194,7 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         ncms_indicio_incorreto={n for n in ncms_usados if n in ncms and ncms[n].indicio_ncm_incorreto},
         ncms_confianca_media={n for n in ncms_usados if n in ncms and ncms[n].confianca == "MEDIA"},
         icms_entradas_real=icms_entradas,
+        composicao_informada=db.scalar(select(CompraOrigem.id).where(CompraOrigem.planejamento_id == p.id).limit(1)) is not None,
         ncm_info={n: InfoNcm(r.produto_exemplo, r.confianca, r.indicio_ncm_incorreto, r.requer_revisao, r.acao_recomendada,
                              r.cst_ibs_cbs, r.cclass_trib, r.beneficio_reforma)
                   for n, r in ncms.items() if n in ncms_usados},

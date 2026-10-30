@@ -183,3 +183,10 @@ def test_ncm_sem_regra_vira_pendencia():
     e = replace(e, ncm_info={k: v for k, v in e.ncm_info.items() if k != "85113020"})
     linha = next(x for x in simular(e).verificacao_ncm if x.ncm == "85113020")
     assert linha.sem_regra and linha.requer_revisao
+
+
+def test_custo_negativo_gera_ponto_critico():
+    normal = simular(montar_entrada(estoque_inicial=Decimal("1000"), estoque_final=Decimal("2000")))
+    assert "CMV_NEGATIVO" not in {p.codigo for p in normal.pontos_criticos}
+    errado = simular(montar_entrada(estoque_inicial=Decimal("0"), estoque_final=Decimal("400000")))
+    assert "CMV_NEGATIVO" in {p.codigo for p in errado.pontos_criticos}

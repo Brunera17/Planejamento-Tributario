@@ -1,7 +1,7 @@
 """Planejamentos, coleta de dados, importação de NF-e, progresso e pendências."""
 import json
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, UploadFile
 from sqlalchemy import delete, func, select, update
@@ -238,8 +238,26 @@ def gravar_composicao(pid: int, origens: list[OrigemCompra], db: DB, _: UsuarioA
     _alterou(db, p)
 
 
+def _validar_premissa(chave: str, valor) -> str:
+    """Devolve o valor em JSON, ou recusa o que quebraria a simulação."""
+    if PREMISSAS[chave] is bool:
+        if not isinstance(valor, bool):
+            raise ErroNegocio("Valor inválido", campos={chave: "use verdadeiro ou falso"})
+        return json.dumps(valor)
+    try:
+        numero = Decimal(str(valor))
+    except InvalidOperation as e:
+        raise ErroNegocio("Valor inválido", campos={chave: "precisa ser um número"}) from e
+    if not numero.is_finite() or numero < 0:
+        raise ErroNegocio("Valor inválido", campos={chave: "não pode ser negativo"})
+    if chave == "pct_compras_credito_ibs_cbs" and numero > 1:
+        raise ErroNegocio("Valor inválido", campos={chave: "precisa ficar entre 0% e 100%"})
+    return json.dumps(str(numero))
+
+
 @router.put("/{pid}/premissas", status_code=204)
 def gravar_premissas(pid: int, premissas: dict, db: DB, u: Contador):
+    """Valor vazio apaga a premissa, e o planejamento volta ao padrão."""
     p = obter_planejamento(db, pid)
     invalidas = set(premissas) - set(PREMISSAS)
     if invalidas:
@@ -247,10 +265,22 @@ def gravar_premissas(pid: int, premissas: dict, db: DB, u: Contador):
     for chave, valor in premissas.items():
         pr = db.scalar(select(PremissaPlanejamento).where(PremissaPlanejamento.planejamento_id == pid,
                                                           PremissaPlanejamento.chave == chave))
+        if valor is None or valor == "":
+            if pr:
+                db.delete(pr)
+            continue
+        texto = _validar_premissa(chave, valor)
         if pr is None:
             pr = PremissaPlanejamento(planejamento_id=pid, chave=chave, alterado_por=u.id)
             db.add(pr)
-        pr.valor, pr.alterado_por, pr.alterado_em = json.dumps(valor), u.id, datetime.now(UTC)
+        pr.valor, pr.alterado_por, pr.alterado_em = texto, u.id, datetime.now(UTC)
+    db.flush()
+    estoque = set(db.scalars(select(PremissaPlanejamento.chave).where(
+        PremissaPlanejamento.planejamento_id == pid, PremissaPlanejamento.chave.in_(("estoque_inicial", "estoque_final")))))
+    if len(estoque) == 1:
+        db.rollback()
+        raise ErroNegocio("Informe o estoque inicial e o final, ou deixe os dois vazios",
+                          campos={"estoque_inicial": "informe os dois", "estoque_final": "informe os dois"})
     _alterou(db, p)
 
 

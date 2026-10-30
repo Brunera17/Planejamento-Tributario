@@ -8,12 +8,14 @@ import { Badge, BarraProgresso, Botao, Cabecalho, CampoMoeda, Card, Erro, Ficha,
 import { brl, competenciaExtenso, dataHora, editarMoeda, formatarCnpj, lerMoeda, REGIMES } from "../lib/formato";
 import { Bens } from "./Bens";
 import { Documentos } from "./Documentos";
+import { Premissas } from "./Premissas";
 
 const ABAS = [
   { id: "coleta", rotulo: "Faturamento, compras e folha" },
   { id: "despesas", rotulo: "Despesas" },
   { id: "bens", rotulo: "Bens" },
   { id: "documentos", rotulo: "Documentos" },
+  { id: "premissas", rotulo: "Premissas" },
   { id: "pendencias", rotulo: "Pendências" },
   { id: "simulacoes", rotulo: "Simulações" },
 ];
@@ -59,6 +61,7 @@ export function Planejamento() {
       {aba === "despesas" && <Despesas pid={p.id} />}
       {aba === "bens" && <Bens pid={p.id} />}
       {aba === "documentos" && <Documentos pid={p.id} />}
+      {aba === "premissas" && <Premissas pid={p.id} />}
       {aba === "pendencias" && <Pendencias pid={p.id} />}
       {aba === "simulacoes" && <Simulacoes pid={p.id} />}
     </>
