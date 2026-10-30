@@ -9,6 +9,7 @@ import { brl, competenciaExtenso, dataHora, editarMoeda, formatarCnpj, lerMoeda,
 import { Bens } from "./Bens";
 import { Documentos } from "./Documentos";
 import { Premissas } from "./Premissas";
+import { Revisao } from "./Revisao";
 
 const ABAS = [
   { id: "coleta", rotulo: "Faturamento, compras e folha" },
@@ -16,6 +17,7 @@ const ABAS = [
   { id: "bens", rotulo: "Bens" },
   { id: "documentos", rotulo: "Documentos" },
   { id: "premissas", rotulo: "Premissas" },
+  { id: "revisao", rotulo: "Revisão de produtos" },
   { id: "pendencias", rotulo: "Pendências" },
   { id: "simulacoes", rotulo: "Simulações" },
 ];
@@ -62,6 +64,7 @@ export function Planejamento() {
       {aba === "bens" && <Bens pid={p.id} />}
       {aba === "documentos" && <Documentos pid={p.id} />}
       {aba === "premissas" && <Premissas pid={p.id} />}
+      {aba === "revisao" && <Revisao pid={p.id} />}
       {aba === "pendencias" && <Pendencias pid={p.id} />}
       {aba === "simulacoes" && <Simulacoes pid={p.id} />}
     </>
@@ -323,7 +326,7 @@ function Pendencias({ pid }: { pid: number }) {
                 <li key={i}>
                   <span className="text-alert">●</span> {x.competencia ? `${competenciaExtenso(x.competencia)}: ` : ""}
                   {b.codigo === "NCM" ? (
-                    <Link className="text-brand underline underline-offset-2" to={`/regras?ncm=${x.descricao.replace(/\D/g, "")}`}>
+                    <Link className="text-brand underline underline-offset-2" to={`/planejamentos/${pid}?aba=revisao`}>
                       {x.descricao}
                     </Link>
                   ) : (

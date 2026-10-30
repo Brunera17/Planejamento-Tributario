@@ -227,6 +227,26 @@ grava a versão usada, para que um relatório antigo continue reproduzível.
 A tabela `ncm_regra` é **compartilhada entre clientes**: um NCM classificado no planejamento do cliente de referência já vem resolvido
 para a próxima autopeças. Classificação com confiança *Média* aparece no relatório como ponto a validar.
 
+### 3.5.1 Base legal e revisão de produtos
+
+O monofásico vem dos Anexos I e II da Lei 10.485/2002 (`seeds/dados/lei_10485.json`), somente leitura. Vale a entrada
+mais específica, de posição (87.08) a código completo. O enquadramento é um de três: na lei, depende de confirmação
+(Ex tarifário ou destinação) ou fora da lei.
+
+Cada planejamento confronta os produtos vendidos com a base e segrega as inconsistências:
+
+| Inconsistência | Trava a simulação final? |
+|---|---|
+| Depende de confirmação | Sim |
+| Mesmo código com NCMs diferentes | Sim |
+| Produtos parecidos com NCMs diferentes | Sim |
+| Monofásico vendido sem CST 04 | Não (oportunidade de recuperação) |
+| CST 04 em NCM fora da lei | Não |
+
+O contador decide produto a produto, com motivo. A correção de NCM vale só para o cálculo do planejamento; o cadastro
+é corrigido pelo cliente, com a lista exportada. Fora dos casos condicionais, a decisão não pode contrariar a lei.
+Sem decisão, o cálculo usa a presunção do anexo, exceto tubos da posição 40.09, que dependem de acessórios.
+
 ### 3.6 Motor de cálculo
 
 Executa as fórmulas da seção 5 sobre os dados de um planejamento e grava uma **simulação** (versionada, imutável).

@@ -9,7 +9,6 @@ NFE = """<?xml version="1.0" encoding="UTF-8"?>
 <det nItem="1"><prod><cProd>N1</cProd><xProd>PRODUTO NOVO</xProd><NCM>87087090</NCM><CFOP>5117</CFOP>
 <qCom>1</qCom><vUnCom>500.00</vUnCom><vProd>500.00</vProd></prod><imposto><ICMS><ICMSSN102><CSOSN>102</CSOSN></ICMSSN102></ICMS></imposto></det>
 </infNFe></NFe></nfeProc>"""
-REGRA_NCM = {"ncm": "87087090", "monofasico": True, "confianca": "ALTA", "cst_ibs_cbs": "000", "cclass_trib": "000001"}
 
 
 @pytest.fixture(scope="module")
@@ -37,26 +36,20 @@ def test_outras_despesas_por_grupo(cliente, analista, pid):
     assert next(b for b in blocos if b["codigo"] == "OUTRAS_DESPESAS")["preenchidos"] == len(grupos)
 
 
-def test_ncm_e_cfop_novos_viram_pendencia_e_sao_resolvidos(cliente, contador, analista, pid):
+def test_ncm_novo_segue_a_lei_e_cfop_novo_vira_pendencia(cliente, contador, analista, pid):
     assert cliente.post(f"/api/planejamentos/{pid}/nfe", headers=contador,
                         files={"arquivo": ("n.xml", NFE.encode(), "text/xml")}).json()["importados"] == 1
-    pendentes = cliente.get("/api/tabelas/ncm/pendentes", headers=analista).json()
-    assert pendentes == [{"codigo": "87087090", "produto_exemplo": "PRODUTO NOVO", "valor": pytest.approx(500.0), "planejamentos": 1}]
     assert [c["codigo"] for c in cliente.get("/api/tabelas/cfop/pendentes", headers=analista).json()] == [5117]
 
     sim = cliente.post(f"/api/planejamentos/{pid}/simulacoes", headers=contador).json()
-    assert "NCM sem regra: 87087090" in sim["pendencias"] and "CFOP sem regra: 5117" in sim["pendencias"]
+    assert "CFOP sem regra: 5117" in sim["pendencias"] and "NCM" not in sim["pendencias"]  # 87.08 está na lei
 
-    assert cliente.put("/api/tabelas/ncm", headers=analista, json=REGRA_NCM).status_code == 403
-    assert cliente.put("/api/tabelas/ncm", headers=contador, json=REGRA_NCM).status_code == 200
+    assert cliente.put("/api/tabelas/cfop", headers=analista, json={"cfop": 5117, "natureza": "Consignação", "gera_receita": True}).status_code == 403
     assert cliente.put("/api/tabelas/cfop", headers=contador, json={
         "cfop": 5117, "natureza": "Venda em consignação", "gera_receita": True}).status_code == 200
-
-    assert cliente.get("/api/tabelas/ncm/pendentes", headers=analista).json() == []
+    assert cliente.get("/api/tabelas/cfop/pendentes", headers=analista).json() == []
     lista = cliente.get(f"/api/planejamentos/{pid}/simulacoes", headers=contador).json()
     assert lista[0]["desatualizada"] is True  # a regra nova muda o cálculo
-    blocos = cliente.get(f"/api/planejamentos/{pid}/progresso", headers=contador).json()["blocos"]
-    assert next(b for b in blocos if b["codigo"] == "NCM")["preenchidos"] == 1
     assert cliente.get(f"/api/planejamentos/{pid}", headers=contador).json()["status"] == "EM_COLETA"  # simular não pula etapas
 
 

@@ -8,6 +8,7 @@ from functools import cache
 from pathlib import Path
 
 from app.motor.classificacao import RegraCfop, RegraNcm
+from app.motor.lei_monofasico import ItemLei
 from app.motor.tipos import AnoReforma, FaixaSimples, Parametros
 
 DADOS = Path(__file__).parent / "dados"
@@ -53,3 +54,9 @@ def regras_cfop() -> dict[int, RegraCfop]:
 @cache
 def regras_ncm() -> dict[str, RegraNcm]:
     return {r["ncm"]: RegraNcm(r["ncm"], r["monofasico"], r["sujeito_st"]) for r in ler("ncm_regras.json")}
+
+
+@cache
+def lei_monofasico() -> tuple[ItemLei, ...]:
+    return tuple(ItemLei(i["anexo"], i["item"], i["codigo"], i["prefixo"], tuple(i["ex"]), i["condicao"], i["padrao"])
+                 for i in ler("lei_10485.json")["itens"])

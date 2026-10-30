@@ -48,7 +48,7 @@ def test_progresso_tem_pendencias(cliente, contador, pid):
     assert 0 < r["progresso"] < 100
     blocos = {b["codigo"]: b for b in r["blocos"]}
     assert blocos["SAIDAS"]["preenchidos"] == 3
-    assert blocos["NCM"]["preenchidos"] == blocos["NCM"]["esperados"] == 18
+    assert (blocos["NCM"]["preenchidos"], blocos["NCM"]["esperados"]) == (0, 5)  # condicionais da lei aguardam o contador
     assert blocos["FOLHA"]["preenchidos"] == 0
 
 
@@ -65,8 +65,9 @@ def test_simulacao_reproduz_planilha(cliente, analista, pid):
     assert totais["LUCRO_PRESUMIDO"] == pytest.approx(59765.84, abs=0.01)
     assert totais["LUCRO_REAL"] == pytest.approx(61192.34, abs=0.01)
     ncms = {n["ncm"]: n for n in res["verificacao_ncm"]}
-    assert len(ncms) == 18 and sum(n["requer_revisao"] for n in ncms.values()) == 8
-    assert ncms["73181500"]["acao_recomendada"].startswith("Reclassificar NCM")
+    assert len(ncms) == 18 and sum(n["requer_revisao"] for n in ncms.values()) == 5
+    assert "confirme o Ex" in ncms["40169990"]["acao_recomendada"]
+    assert ncms["73181500"]["acao_recomendada"] == "Fora dos anexos: tributação normal."
     ops = {o["codigo"]: o for o in res["oportunidades"]}
     assert ops["CPP_DAS"]["impacto"] == pytest.approx(29907.67, abs=0.01)
 

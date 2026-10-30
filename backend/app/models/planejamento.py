@@ -69,3 +69,20 @@ class HistoricoStatus(Base):
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
     motivo: Mapped[str | None] = mapped_column(Text)
     data: Mapped[Momento]
+
+
+class RevisaoProduto(Base):
+    """Decisão do contador sobre um produto do planejamento. A base legal continua intacta."""
+
+    __tablename__ = "revisao_produto"
+    __table_args__ = (UniqueConstraint("planejamento_id", "cod_produto", "ncm_nota", name="uq_revisao_produto"),)
+
+    id: Mapped[PK]
+    planejamento_id: Mapped[int] = mapped_column(ForeignKey("planejamento.id", ondelete="CASCADE"))
+    cod_produto: Mapped[str] = mapped_column(String(60), default="")  # vazio em notas agregadas por NCM
+    ncm_nota: Mapped[str] = mapped_column(String(8))
+    ncm_corrigido: Mapped[str | None] = mapped_column(String(8))
+    monofasico: Mapped[bool | None]  # decisão sobre Ex ou destinação; vazio segue a lei
+    motivo: Mapped[str] = mapped_column(Text)
+    revisado_por: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
+    revisado_em: Mapped[Momento]

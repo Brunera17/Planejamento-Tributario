@@ -52,6 +52,7 @@ class LinhaRelatorio:
     valor: Decimal
     icms: Decimal
     cst_icms: str
+    cst_pis: str | None = None
 
     @property
     def competencia(self) -> str:
@@ -137,6 +138,8 @@ def ler_relatorio(nome: str, conteudo: bytes) -> RelatorioLido:
             col[COLUNAS[rotulo]] = i
         if rotulo == "CST" and "icms" in col and "cst_icms" not in col:
             col["cst_icms"] = i
+        if rotulo == "CST" and "pis" in col and "cst_pis" not in col:
+            col["cst_pis"] = i
     faltando = {"numero", "data", "produto", "cfop", "ncm", "valor"} - col.keys()
     if faltando:
         raise RelatorioInvalido("Colunas obrigatórias ausentes: " + ", ".join(sorted(faltando)))
@@ -157,6 +160,7 @@ def ler_relatorio(nome: str, conteudo: bytes) -> RelatorioLido:
                 cfop=int(float(_texto(cel(r, "cfop")))), ncm=re.sub(r"\D", "", _texto(cel(r, "ncm")))[:8],
                 quantidade=_dec(cel(r, "qtde")), unitario=_dec(cel(r, "unitario")), valor=_dec(cel(r, "valor")),
                 icms=_dec(cel(r, "icms")), cst_icms=_texto(cel(r, "cst_icms")),
+                cst_pis=(_texto(cel(r, "cst_pis")).zfill(2) if _texto(cel(r, "cst_pis")) else None),
             ))
         else:
             numeros = [c for c in r if isinstance(c, (int, float)) and not isinstance(c, bool)]
@@ -232,7 +236,7 @@ def importar(db: Session, p: Planejamento, nome: str, conteudo: bytes, usuario_i
         db.flush()
         db.add_all(NotaItem(nota_fiscal_id=nf.id, n_item=n, cod_produto=i.cod_produto, descricao=i.descricao, ncm=i.ncm,
                             cfop=i.cfop, quantidade=i.quantidade, vl_unitario=i.unitario, vl_produtos=i.valor,
-                            vl_total=i.valor, vl_icms=i.icms) for n, i in enumerate(itens, start=1))
+                            vl_total=i.valor, vl_icms=i.icms, cst_pis=i.cst_pis) for n, i in enumerate(itens, start=1))
         resumo.notas_importadas += 1
         acc = por_comp[nf.competencia]
         acc["notas"] += 1

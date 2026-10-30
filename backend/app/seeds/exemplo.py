@@ -31,11 +31,12 @@ from app.models import (
     OutraDespesa,
     Planejamento,
     PremissaPlanejamento,
+    RevisaoProduto,
     TipoDocumento,
     Usuario,
 )
 from app.seeds.tabelas import ler
-from app.services import progresso, relatorio_pdf, simulacao
+from app.services import progresso, relatorio_pdf, revisao_produtos, simulacao
 
 CNPJ = "34567890000130"
 FATOR = Decimal("0.85")
@@ -139,6 +140,11 @@ def carregar_exemplo(db: Session) -> Planejamento:
                 Bem(empresa_id=emp.id, tipo="MOVEIS_UTENSILIOS", descricao="Estantes do depósito", data_aquisicao=date(2024, 8, 2), valor=Decimal("14300.00")),
                 Bem(empresa_id=emp.id, tipo="MAQUINAS_EQUIPAMENTOS", descricao="Empilhadeira manual", data_aquisicao=date(2025, 1, 20), valor=Decimal("6250.00"))])
     p.observacoes_aceitas_por, p.observacoes_aceitas_em = contador.id, datetime(2026, 9, 10, 14, 0, tzinfo=UTC)
+    db.flush()
+    for pr in revisao_produtos.analisar(db, p):
+        if pr.pendente:
+            db.add(RevisaoProduto(planejamento_id=p.id, cod_produto=pr.cod_produto, ncm_nota=pr.ncm_nota, monofasico=pr.monofasico,
+                                  motivo="Exemplo: condição conferida na nota do fornecedor", revisado_por=contador.id))
     db.flush()
     progresso.atualizar(db, p)
     return p

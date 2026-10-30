@@ -61,3 +61,4 @@ class NotaItem(Base):
     vl_produtos: Mapped[Valor]
     vl_total: Mapped[Valor]
     vl_icms: Mapped[Decimal] = mapped_column(Dinheiro, default=0)
+    cst_pis: Mapped[str | None] = mapped_column(String(2))

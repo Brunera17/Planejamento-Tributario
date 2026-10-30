@@ -1,0 +1,680 @@
+{
+ "norma": "Lei 10.485/2002, Anexos I e II",
+ "fonte": "https://www2.camara.leg.br/legin/fed/lei/2002/lei-10485-3-julho-2002-464514-normaatualizada-pl.html",
+ "consultado_em": "2026-10-30",
+ "aviso": "Códigos na redação da lei. A nomenclatura NCM muda com o tempo: conferir a correlação com a TIPI vigente.",
+ "itens": [
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "4016.10.10",
+   "prefixo": "40161010",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8483.20.00",
+   "prefixo": "84832000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "4016.99.90",
+   "prefixo": "40169990",
+   "ex": [
+    "03",
+    "05"
+   ],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8483.30",
+   "prefixo": "848330",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "68.13",
+   "prefixo": "6813",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8483.40",
+   "prefixo": "848340",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "7007.11.00",
+   "prefixo": "70071100",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8483.50",
+   "prefixo": "848350",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "7007.21.00",
+   "prefixo": "70072100",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8505.20",
+   "prefixo": "850520",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "7009.10.00",
+   "prefixo": "70091000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8507.10.00",
+   "prefixo": "85071000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "7320.10.00",
+   "prefixo": "73201000",
+   "ex": [
+    "01"
+   ],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "85.11",
+   "prefixo": "8511",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8301.20.00",
+   "prefixo": "83012000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8512.20",
+   "prefixo": "851220",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8302.30.00",
+   "prefixo": "83023000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8512.30.00",
+   "prefixo": "85123000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8407.33.90",
+   "prefixo": "84073390",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8512.40",
+   "prefixo": "851240",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8407.34.90",
+   "prefixo": "84073490",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8512.90.00",
+   "prefixo": "85129000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8408.20",
+   "prefixo": "840820",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8527.2",
+   "prefixo": "85272",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8409.91",
+   "prefixo": "840991",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8536.50.90",
+   "prefixo": "85365090",
+   "ex": [
+    "01"
+   ],
+   "condicao": null,
+   "padrao": true,
+   "nota": "Redação dada pelo Decreto 6.006/2006"
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8409.99",
+   "prefixo": "840999",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8539.10",
+   "prefixo": "853910",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8413.30",
+   "prefixo": "841330",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8544.30.00",
+   "prefixo": "85443000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8413.91.00",
+   "prefixo": "84139100",
+   "ex": [
+    "01"
+   ],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8706.00",
+   "prefixo": "870600",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8414.80.21",
+   "prefixo": "84148021",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "87.07",
+   "prefixo": "8707",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8414.80.22",
+   "prefixo": "84148022",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "87.08",
+   "prefixo": "8708",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8415.20",
+   "prefixo": "841520",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "9029.20.10",
+   "prefixo": "90292010",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8421.23.00",
+   "prefixo": "84212300",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "9029.90.10",
+   "prefixo": "90299010",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8421.31.00",
+   "prefixo": "84213100",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "9030.39.21",
+   "prefixo": "90303921",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8431.41.00",
+   "prefixo": "84314100",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "9031.80.40",
+   "prefixo": "90318040",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8431.42.00",
+   "prefixo": "84314200",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "9032.89.2",
+   "prefixo": "9032892",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8433.90.90",
+   "prefixo": "84339090",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "9104.00.00",
+   "prefixo": "91040000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8481.80.99",
+   "prefixo": "84818099",
+   "ex": [
+    "01",
+    "02"
+   ],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "9401.20.00",
+   "prefixo": "94012000",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "I",
+   "item": null,
+   "codigo": "8483.10",
+   "prefixo": "848310",
+   "ex": [],
+   "condicao": null,
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 1,
+   "codigo": "40.09",
+   "prefixo": "4009",
+   "ex": [],
+   "condicao": "Tubos de borracha vulcanizada não endurecida da posição 40.09, com acessórios, próprias para máquinas e veículos autopropulsados das posições 84.29, 8433.20, 8433.30.00, 8433.40.00, 8433.5, 87.01, 87.02, 87.03, 87.04, 87.05 e 87.06",
+   "padrao": false,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 2,
+   "codigo": "84.31",
+   "prefixo": "8431",
+   "ex": [],
+   "condicao": "Partes da posição 84.31, reconhecíveis como exclusiva ou principalmente destinadas às máquinas e aparelhos das posições 84.29",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 3,
+   "codigo": "8408.90.90",
+   "prefixo": "84089090",
+   "ex": [],
+   "condicao": "Motores do código 8408.90.90, próprios para máquinas dos códigos 84.29, 8433.20, 8433.30.00, 8433.40.00 e 8433.5",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 4,
+   "codigo": "8412.21.10",
+   "prefixo": "84122110",
+   "ex": [],
+   "condicao": "Cilindros hidráulicos do código 8412.21.10, próprios para máquinas dos códigos 84.29, 8433.20, 8433.30.00, 8433.40.00 e 8433.5",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 5,
+   "codigo": "8412.21.90",
+   "prefixo": "84122190",
+   "ex": [],
+   "condicao": "Outros motores hidráulicos de movimento retilíneo (cilindros) do código 8412.21.90, próprios para máquinas dos códigos 84.29, 8433.20, 8433.30.00, 8433.40.00 e 8433.5",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 6,
+   "codigo": "8412.31.10",
+   "prefixo": "84123110",
+   "ex": [],
+   "condicao": "Cilindros pneumáticos do código 8412.31.10, próprios para produtos dos códigos 8701.20.00, 87.02 e 87.04",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 7,
+   "codigo": "8413.60.19",
+   "prefixo": "84136019",
+   "ex": [],
+   "condicao": "Bombas volumétricas rotativas do código 8413.60.19, próprias para produtos dos códigos 84.29, 8433.20, 8433.30.00, 8433.40.00, 8433.5, 8701.20.00, 87.02 e 87.04",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 8,
+   "codigo": "8414.80.19",
+   "prefixo": "84148019",
+   "ex": [],
+   "condicao": "Compressores de ar do código 8414.80.19, próprios para produtos dos códigos 8701.20.00, 87.02 e 87.04",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 9,
+   "codigo": "8414.90.39",
+   "prefixo": "84149039",
+   "ex": [],
+   "condicao": "Caixas de ventilação para veículos autopropulsados, classificadas no código 8414.90.39",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 10,
+   "codigo": "8432.90.00",
+   "prefixo": "84329000",
+   "ex": [],
+   "condicao": "Partes classificadas no código 8432.90.00, de máquinas das posições 8432.40.00 e 8432.80.00",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 11,
+   "codigo": "8481.10.00",
+   "prefixo": "84811000",
+   "ex": [],
+   "condicao": "Válvulas redutoras de pressão classificadas no código 8481.10.00, próprias para máquinas e veículos autopropulsados dos códigos 84.29, 8433.20, 8433.30.00, 8433.40.00, 8433.5, 87.01, 87.02, 87.03, 87.04, 87.05 e 87.06",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 12,
+   "codigo": "8481.20.90",
+   "prefixo": "84812090",
+   "ex": [],
+   "condicao": "Válvulas para transmissões óleo-hidráulicas ou pneumáticas classificadas no código 8481.20.90, próprias para máquinas dos códigos 84.29, 8433.20, 8433.30.00, 8433.40.00 e 8433.5",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 13,
+   "codigo": "8481.80.92",
+   "prefixo": "84818092",
+   "ex": [],
+   "condicao": "Válvulas solenóides classificadas no código 8481.80.92, próprias para máquinas e veículos autopropulsados das posições 84.29, 8433.20, 8433.30.00, 8433.40.00, 8433.5, 87.01, 87.02, 87.03, 87.04, 87.05 e 87.06",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 14,
+   "codigo": "8483.60.1",
+   "prefixo": "8483601",
+   "ex": [],
+   "condicao": "Embreagens de fricção do código 8483.60.1, próprias para máquinas dos códigos 84.29, 8433.20, 8433.30.00, 8433.40.00 e 8433.5",
+   "padrao": true,
+   "nota": null
+  },
+  {
+   "anexo": "II",
+   "item": 15,
+   "codigo": "8501.10.19",
+   "prefixo": "85011019",
+   "ex": [],
+   "condicao": "Outros motores de corrente contínua do código 8501.10.19, próprios para acionamento elétrico de vidros de veículos autopropulsados",
+   "padrao": true,
+   "nota": null
+  }
+ ]
+}
