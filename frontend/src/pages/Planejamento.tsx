@@ -5,7 +5,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import type { Bloco, Catalogo, Planejamento as TPlanejamento, SimulacaoResumo } from "../api/tipos";
 import { Badge, BarraProgresso, Botao, Cabecalho, CampoMoeda, Card, Erro, Ficha, Tabela } from "../components/ui";
-import { brl, competenciaExtenso, dataHora, formatarCnpj, REGIMES } from "../lib/formato";
+import { brl, competenciaExtenso, dataHora, editarMoeda, formatarCnpj, lerMoeda, REGIMES } from "../lib/formato";
 import { Bens } from "./Bens";
 import { Documentos } from "./Documentos";
 
@@ -41,6 +41,7 @@ export function Planejamento() {
           ]}
         />
       </Cabecalho>
+      <AcoesStatus p={p} />
       <nav className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border" role="tablist">
         {ABAS.map((a) => (
           <button
@@ -217,7 +218,8 @@ function Coleta({ pid }: { pid: number }) {
   );
 }
 
-type LevantamentoDados = { status: string | null; itens: Record<string, number> };
+type OutraDespesa = { grupo_id: number; descricao: string; valor: number };
+type LevantamentoDados = { status: string | null; itens: Record<string, number>; grupos_sem_outras: number[]; outras: OutraDespesa[] };
 
 function Despesas({ pid }: { pid: number }) {
   const atualizar = useAtualizar(pid);
@@ -250,12 +252,25 @@ function Despesas({ pid }: { pid: number }) {
     onError: (e) => setErro(mensagemErro(e)),
   });
 
+  const gravarOutras = useMutation({
+    mutationFn: (corpo: { outras: OutraDespesa[]; grupos_sem_outras: number[] }) => api.put(`/planejamentos/${pid}/levantamentos/${atual}`, corpo),
+    onSuccess: () => {
+      setErro(null);
+      qc.invalidateQueries({ queryKey: ["levantamento", pid, atual] });
+      atualizar();
+    },
+    onError: (e) => setErro(mensagemErro(e)),
+  });
+
   if (!atual || !lev) return <p>Carregando…</p>;
   const valor = (id: number) => lev.itens[String(id)];
-  const total = catalogo.reduce((s, g) => s + g.itens.filter((i) => i.ativo).reduce((t, i) => t + (valor(i.id) ?? 0), 0), 0);
+  const editavel = !lev.status || lev.status === "EM_PREENCHIMENTO";
+  const outrasDo = (id: number) => lev.outras.filter((o) => o.grupo_id === id).reduce((t, o) => t + Number(o.valor), 0);
+  const total = catalogo.reduce((s, g) => s + outrasDo(g.id) + g.itens.filter((i) => i.ativo).reduce((t, i) => t + (valor(i.id) ?? 0), 0), 0);
 
   return (
     <div className="space-y-4">
+      <Observacoes pid={pid} />
       <div className="flex flex-wrap items-center gap-2 text-sm">
         Competência:
         {comps.map((c) => (
@@ -266,18 +281,20 @@ function Despesas({ pid }: { pid: number }) {
         <span className="ml-auto font-semibold">Total da competência: {brl(total)}</span>
       </div>
       <Erro mensagem={erro} />
+      {!editavel && <p className="text-sm text-text-muted">Este mês foi enviado para conferência e está só para consulta. Para alterar, o contador devolve o planejamento para a coleta.</p>}
       {catalogo.map((g) => {
-        const subtotal = g.itens.filter((i) => i.ativo).reduce((t, i) => t + (valor(i.id) ?? 0), 0);
+        const subtotal = outrasDo(g.id) + g.itens.filter((i) => i.ativo).reduce((t, i) => t + (valor(i.id) ?? 0), 0);
         return (
           <Card key={g.id} titulo={g.nome} acoes={<span className="num text-sm font-semibold">Subtotal {brl(subtotal)}</span>}>
             <div className="grid gap-x-6 gap-y-1 md:grid-cols-2">
               {g.itens.filter((i) => i.ativo).map((i) => (
                 <label key={`${atual}-${i.id}`} className="flex items-center justify-between gap-2 border-b border-surface/50 py-1 text-sm">
                   <span>{i.nome}</span>
-                  <CampoMoeda rotulo={i.nome} valor={valor(i.id)} onChange={(v) => gravar.mutate({ item_despesa_id: i.id, valor: v })} />
+                  <CampoMoeda rotulo={i.nome} valor={valor(i.id)} desabilitado={!editavel} onChange={(v) => gravar.mutate({ item_despesa_id: i.id, valor: v })} />
                 </label>
               ))}
             </div>
+            <OutrasDespesas key={`${atual}-${g.id}`} grupoId={g.id} lev={lev} editavel={editavel} salvar={(corpo) => gravarOutras.mutate(corpo)} />
           </Card>
         );
       })}
@@ -301,8 +318,14 @@ function Pendencias({ pid }: { pid: number }) {
             <ul className="max-h-48 space-y-0.5 overflow-auto text-sm">
               {b.pendencias.map((x, i) => (
                 <li key={i}>
-                  <span className="text-alert">●</span> {x.competencia ? `${competenciaExtenso(x.competencia)} — ` : ""}
-                  {x.descricao}
+                  <span className="text-alert">●</span> {x.competencia ? `${competenciaExtenso(x.competencia)}: ` : ""}
+                  {b.codigo === "NCM" ? (
+                    <Link className="text-brand underline underline-offset-2" to={`/regras?ncm=${x.descricao.replace(/\D/g, "")}`}>
+                      {x.descricao}
+                    </Link>
+                  ) : (
+                    x.descricao
+                  )}
                 </li>
               ))}
             </ul>
@@ -394,6 +417,246 @@ function ResumoImportacao({ resumos, fechar }: { resumos: ResumoRelatorio[]; fec
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+type DadosObservacoes = { textos: string[]; aceitas_em: string | null; aceitas_por: string | null };
+
+/** Orientações da planilha do escritório: precisam ser confirmadas antes de enviar para conferência. */
+function Observacoes({ pid }: { pid: number }) {
+  const atualizar = useAtualizar(pid);
+  const qc = useQueryClient();
+  const [erro, setErro] = useState<string | null>(null);
+  const { data } = useQuery({
+    queryKey: ["observacoes", pid],
+    queryFn: async () => (await api.get<DadosObservacoes>(`/planejamentos/${pid}/observacoes`)).data,
+  });
+  const aceitar = useMutation({
+    mutationFn: () => api.post(`/planejamentos/${pid}/observacoes/aceite`),
+    onSuccess: () => {
+      setErro(null);
+      qc.invalidateQueries({ queryKey: ["observacoes", pid] });
+      atualizar();
+    },
+    onError: (e) => setErro(mensagemErro(e)),
+  });
+  if (!data) return null;
+
+  return (
+    <Card titulo="Observações">
+      <ul className="max-w-[80ch] list-disc space-y-1 pl-5 text-sm">
+        {data.textos.map((t) => (
+          <li key={t}>{t}</li>
+        ))}
+      </ul>
+      <div className="mt-3">
+        <Erro mensagem={erro} />
+        {data.aceitas_em ? (
+          <p className="text-sm text-success-ink">
+            ✔ Leitura confirmada por {data.aceitas_por} em {dataHora(data.aceitas_em)}.
+          </p>
+        ) : (
+          <Botao onClick={() => aceitar.mutate()} disabled={aceitar.isPending}>
+            Confirmar leitura
+          </Botao>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/** "Possui outras despesas?" do grupo. Só conta como respondido com "não" ou com ao menos uma linha salva. */
+function OutrasDespesas({
+  grupoId,
+  lev,
+  editavel,
+  salvar,
+}: {
+  grupoId: number;
+  lev: LevantamentoDados;
+  editavel: boolean;
+  salvar: (corpo: { outras: OutraDespesa[]; grupos_sem_outras: number[] }) => void;
+}) {
+  const salvas = lev.outras.filter((o) => o.grupo_id === grupoId);
+  const respondeuNao = lev.grupos_sem_outras.includes(grupoId);
+  const [resposta, setResposta] = useState<"SIM" | "NAO" | null>(salvas.length ? "SIM" : respondeuNao ? "NAO" : null);
+  const [linhas, setLinhas] = useState(salvas.length ? salvas.map((o) => ({ descricao: o.descricao, valor: editarMoeda(Number(o.valor)) })) : [{ descricao: "", valor: "" }]);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function gravar(semOutras: boolean, novas: OutraDespesa[]) {
+    const demaisSem = lev.grupos_sem_outras.filter((g) => g !== grupoId);
+    salvar({
+      outras: [...lev.outras.filter((o) => o.grupo_id !== grupoId), ...novas],
+      grupos_sem_outras: semOutras ? [...demaisSem, grupoId] : demaisSem,
+    });
+  }
+
+  function responder(r: "SIM" | "NAO") {
+    setErro(null);
+    setResposta(r);
+    if (r === "NAO") gravar(true, []);
+  }
+
+  function salvarLinhas() {
+    const novas = linhas.map((l) => ({ grupo_id: grupoId, descricao: l.descricao.trim(), valor: lerMoeda(l.valor) }));
+    if (novas.some((l) => l.descricao.length < 2 || l.valor == null)) return setErro("Cada linha precisa de descrição e valor");
+    setErro(null);
+    gravar(false, novas as OutraDespesa[]);
+  }
+
+  const alterada = JSON.stringify(linhas.map((l) => [l.descricao.trim(), lerMoeda(l.valor)])) !== JSON.stringify(salvas.map((o) => [o.descricao, Number(o.valor)]));
+
+  return (
+    <div className="mt-3 border-t border-surface pt-3 text-sm">
+      <fieldset className="flex flex-wrap items-center gap-4" disabled={!editavel}>
+        <legend className="float-left mr-2 font-medium">Possui outras despesas?</legend>
+        <label className="flex items-center gap-1.5">
+          <input type="radio" name={`outras-${grupoId}`} checked={resposta === "NAO"} onChange={() => responder("NAO")} />
+          Não
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input type="radio" name={`outras-${grupoId}`} checked={resposta === "SIM"} onChange={() => responder("SIM")} />
+          Sim
+        </label>
+        {resposta === null && <span className="text-alert-ink">! Sem resposta</span>}
+      </fieldset>
+      {resposta === "SIM" && (
+        <div className="mt-2 space-y-2">
+          {linhas.map((l, i) => (
+            <div key={i} className="flex flex-wrap items-center gap-2">
+              <input
+                aria-label="Descrição da despesa"
+                placeholder="Descreva a despesa"
+                maxLength={200}
+                disabled={!editavel}
+                className="min-w-56 flex-1 rounded border border-border bg-white px-2 py-1"
+                value={l.descricao}
+                onChange={(e) => setLinhas(linhas.map((x, j) => (j === i ? { ...x, descricao: e.target.value } : x)))}
+              />
+              <input
+                aria-label="Valor da despesa"
+                inputMode="decimal"
+                placeholder="0,00"
+                disabled={!editavel}
+                className="num w-32 rounded border border-border bg-white px-2 py-1"
+                value={l.valor}
+                onChange={(e) => setLinhas(linhas.map((x, j) => (j === i ? { ...x, valor: e.target.value.replace(/[^\d.,]/g, "") } : x)))}
+              />
+              {editavel && linhas.length > 1 && (
+                <button type="button" className="text-alert underline underline-offset-2" onClick={() => setLinhas(linhas.filter((_, j) => j !== i))}>
+                  Remover
+                </button>
+              )}
+            </div>
+          ))}
+          <Erro mensagem={erro} />
+          {editavel && (
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" className="text-brand underline underline-offset-2" onClick={() => setLinhas([...linhas, { descricao: "", valor: "" }])}>
+                Adicionar linha
+              </button>
+              <Botao type="button" variante="secundario" onClick={salvarLinhas}>
+                Salvar outras despesas
+              </Botao>
+              {alterada && <span className="text-warning-ink">Alterações ainda não salvas</span>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ESTADOS: Record<string, string> = {
+  EM_COLETA: "Quando os dados estiverem prontos, envie para o contador conferir.",
+  EM_CONFERENCIA: "Aguardando a conferência do contador. Os meses estão só para consulta.",
+  PRONTO_PARA_SIMULAR: "Conferência concluída. Gere uma nova simulação na aba Simulações.",
+  SIMULADO: "Simulação gerada. O contador revisa o resultado e aprova.",
+  APROVADO: "Planejamento aprovado.",
+};
+
+/** Barra do fluxo: mostra a etapa atual e só oferece as ações que o perfil pode fazer. */
+function AcoesStatus({ p }: { p: TPlanejamento }) {
+  const qc = useQueryClient();
+  const contador = lerSessao()?.usuario.perfil === "CONTADOR";
+  const [devolvendo, setDevolvendo] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const { data: historico = [] } = useQuery({
+    queryKey: ["historico", p.id, p.status],
+    queryFn: async () => (await api.get<{ para: string; motivo: string | null; usuario: string | null }[]>(`/planejamentos/${p.id}/historico`)).data,
+  });
+  const mudar = useMutation({
+    mutationFn: (corpo: { status: string; motivo?: string }) => api.post(`/planejamentos/${p.id}/status`, corpo),
+    onSuccess: () => {
+      setErro(null);
+      setDevolvendo(false);
+      setMotivo("");
+      qc.invalidateQueries();
+    },
+    onError: (e) => setErro(mensagemErro(e)),
+  });
+
+  function enviar() {
+    if (p.progresso < 100 && !window.confirm(`Os dados estão em ${p.progresso}%. Enviar para conferência mesmo assim?`)) return;
+    mudar.mutate({ status: "EM_CONFERENCIA" });
+  }
+
+  const ultimo = historico[historico.length - 1];
+  const devolvido = p.status === "EM_COLETA" && ultimo?.para === "EM_COLETA" && ultimo.motivo && ultimo.motivo !== "Criação";
+  const podeDevolver = contador && p.status !== "EM_COLETA";
+
+  return (
+    <div className="space-y-2">
+      {devolvido && (
+        <p className="rounded border border-warning bg-warning-soft px-3 py-2 text-sm text-warning-ink">
+          <strong>Devolvido por {ultimo.usuario}:</strong> {ultimo.motivo}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-text-muted">{ESTADOS[p.status]}</span>
+        <div className="ml-auto flex flex-wrap gap-2">
+          {podeDevolver && !devolvendo && (
+            <Botao variante="secundario" onClick={() => setDevolvendo(true)}>
+              {p.status === "EM_CONFERENCIA" ? "Devolver para a coleta" : "Reabrir a coleta"}
+            </Botao>
+          )}
+          {p.status === "EM_COLETA" && (
+            <Botao onClick={enviar} disabled={mudar.isPending}>
+              Enviar para conferência
+            </Botao>
+          )}
+          {p.status === "EM_CONFERENCIA" && contador && (
+            <Botao onClick={() => mudar.mutate({ status: "PRONTO_PARA_SIMULAR" })} disabled={mudar.isPending}>
+              Confirmar conferência
+            </Botao>
+          )}
+        </div>
+      </div>
+      <Erro mensagem={erro} />
+      {devolvendo && (
+        <Card titulo="Por que está voltando para a coleta?">
+          <textarea
+            autoFocus
+            rows={2}
+            maxLength={500}
+            aria-label="Motivo"
+            placeholder="Diga o que precisa ser ajustado"
+            className="w-full rounded border border-border bg-white px-2 py-1.5 text-sm"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+          />
+          <div className="mt-2 flex gap-2">
+            <Botao disabled={motivo.trim().length < 3 || mudar.isPending} onClick={() => mudar.mutate({ status: "EM_COLETA", motivo: motivo.trim() })}>
+              Devolver para a coleta
+            </Botao>
+            <Botao variante="secundario" onClick={() => setDevolvendo(false)}>
+              Cancelar
+            </Botao>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

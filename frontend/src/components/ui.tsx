@@ -107,15 +107,18 @@ export function CampoMoeda({
   valor,
   onChange,
   rotulo,
+  desabilitado,
 }: {
   valor: number | null | undefined;
   onChange: (v: number | null) => void;
   rotulo: string;
+  desabilitado?: boolean;
 }) {
   const [texto, setTexto] = useState(editarMoeda(valor));
   return (
     <input
       aria-label={rotulo}
+      disabled={desabilitado}
       inputMode="decimal"
       className={`num w-32 rounded border px-2 py-1 text-sm ${valor == null ? "border-alert/60" : "border-border"}`}
       placeholder="não informado"

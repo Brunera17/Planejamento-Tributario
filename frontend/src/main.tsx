@@ -12,6 +12,7 @@ import { Empresas } from "./pages/Empresas";
 import { Login } from "./pages/Login";
 import { Planejamento } from "./pages/Planejamento";
 import { Planejamentos } from "./pages/Planejamentos";
+import { Regras } from "./pages/Regras";
 import { Resultado } from "./pages/Resultado";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
@@ -38,6 +39,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="planejamentos/:id" element={<Planejamento />} />
             <Route path="simulacoes/:id" element={<Resultado />} />
             <Route path="empresas" element={<Empresas />} />
+            <Route path="regras" element={<Regras />} />
           </Route>
         </Routes>
       </BrowserRouter>

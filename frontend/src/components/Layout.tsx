@@ -6,6 +6,7 @@ const MENU = [
   { para: "/", rotulo: "Visão geral" },
   { para: "/planejamentos", rotulo: "Planejamentos" },
   { para: "/empresas", rotulo: "Empresas" },
+  { para: "/regras", rotulo: "Regras de NCM e CFOP" },
 ];
 
 export function Layout() {

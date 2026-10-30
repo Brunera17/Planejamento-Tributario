@@ -74,7 +74,8 @@ def executar(db: Session, p: Planejamento, usuario_id: int) -> Simulacao:
                                     prioridade=o.prioridade, acao=o.acao)
                for o in r.oportunidades)
 
-    if p.status != "SIMULADO":
+    # simular durante a coleta é permitido, mas não pula a conferência
+    if p.status == "PRONTO_PARA_SIMULAR":
         db.add(HistoricoStatus(planejamento_id=p.id, status_de=p.status, status_para="SIMULADO",
                                usuario_id=usuario_id, motivo=f"Simulação v{versao}"))
         p.status = "SIMULADO"
@@ -88,6 +89,8 @@ def aprovar(db: Session, sim: Simulacao, usuario_id: int) -> Simulacao:
     if sim.tipo != "FINAL":
         raise ErroNegocio("Somente simulações sem pendências podem ser aprovadas", campos={"pendencias": sim.pendencias or ""})
     p = db.get(Planejamento, sim.planejamento_id)
+    if p.status != "SIMULADO":
+        raise ErroNegocio("Envie os dados para conferência, confirme a conferência e simule de novo antes de aprovar")
     sim.aprovada_por = usuario_id
     sim.aprovada_em = datetime.now(UTC)
     db.add(HistoricoStatus(planejamento_id=p.id, status_de=p.status, status_para="APROVADO", usuario_id=usuario_id,

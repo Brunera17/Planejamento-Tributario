@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, UploadFile
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual, obter_planejamento
@@ -25,6 +25,7 @@ from app.models import (
     OutraDespesa,
     Planejamento,
     PremissaPlanejamento,
+    Usuario,
 )
 from app.schemas.planejamento import (
     FolhaCompetencia,
@@ -42,6 +43,16 @@ from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
 
 router = APIRouter(prefix="/planejamentos", tags=["Planejamentos e coleta"])
+
+# status do planejamento -> status dos levantamentos mensais (fora de "em preenchimento", o mês fica só para consulta)
+STATUS_LEVANTAMENTO = {"EM_COLETA": "EM_PREENCHIMENTO", "EM_CONFERENCIA": "ENVIADO", "PRONTO_PARA_SIMULAR": "CONFERIDO"}
+
+OBSERVACOES = [
+    "Todas as despesas, notas fiscais, comprovantes, contas bancárias e bens devem obrigatoriamente estar registrados "
+    "no CNPJ (não é permitido usar o CPF dos sócios).",
+    "É muito importante que o empresário mantenha o inventário de estoque atualizado (no mínimo uma contagem por ano).",
+    "As despesas dedutíveis e os custos só podem ser utilizados com documentos válidos (nota fiscal, cupom fiscal, faturas etc.).",
+]
 
 TRANSICOES = {  # (de, para) -> exige contador?
     ("EM_COLETA", "EM_CONFERENCIA"): False,
@@ -116,11 +127,17 @@ def alterar_status(pid: int, dados: StatusEntrada, db: DB, u: UsuarioAtual):
         raise ErroNegocio(f"Transição {p.status} → {dados.status} não permitida", campos={"status": "inválido"})
     if TRANSICOES[chave] and u.perfil != "CONTADOR":
         raise ErroNegocio("Somente o contador pode fazer esta transição", 403)
+    if dados.status == "EM_CONFERENCIA" and p.observacoes_aceitas_em is None:
+        raise ErroNegocio("Confirme a leitura das observações, na aba Despesas, antes de enviar para conferência", 409)
     if dados.status == "EM_COLETA" and not dados.motivo:
         raise ErroNegocio("Informe o motivo da devolução", campos={"motivo": "obrigatório"})
     db.add(HistoricoStatus(planejamento_id=p.id, status_de=p.status, status_para=dados.status, usuario_id=u.id,
                            motivo=dados.motivo))
     p.status = dados.status
+    valores = {"status": STATUS_LEVANTAMENTO[dados.status]}
+    if dados.status == "EM_CONFERENCIA":
+        valores["enviado_em"] = datetime.now(UTC)
+    db.execute(update(Levantamento).where(Levantamento.planejamento_id == pid).values(**valores))
     db.commit()
     return _saida(p)
 
@@ -128,9 +145,10 @@ def alterar_status(pid: int, dados: StatusEntrada, db: DB, u: UsuarioAtual):
 @router.get("/{pid}/historico")
 def historico(pid: int, db: DB, _: UsuarioAtual):
     obter_planejamento(db, pid)
-    return [{"de": h.status_de, "para": h.status_para, "usuario_id": h.usuario_id, "motivo": h.motivo, "data": h.data}
+    nomes = {x.id: x.nome for x in db.scalars(select(Usuario))}
+    return [{"de": h.status_de, "para": h.status_para, "usuario": nomes.get(h.usuario_id), "motivo": h.motivo, "data": h.data}
             for h in db.scalars(select(HistoricoStatus).where(HistoricoStatus.planejamento_id == pid)
-                                .order_by(HistoricoStatus.data))]
+                                .order_by(HistoricoStatus.data, HistoricoStatus.id))]
 
 
 @router.get("/{pid}/progresso", response_model=ProgressoSaida)
@@ -236,11 +254,21 @@ def gravar_premissas(pid: int, premissas: dict, db: DB, u: Contador):
     _alterou(db, p)
 
 
+@router.get("/{pid}/observacoes")
+def ver_observacoes(pid: int, db: DB, _: UsuarioAtual):
+    p = obter_planejamento(db, pid)
+    quem = db.get(Usuario, p.observacoes_aceitas_por) if p.observacoes_aceitas_por else None
+    return {"textos": OBSERVACOES, "aceitas_em": p.observacoes_aceitas_em, "aceitas_por": quem.nome if quem else None}
+
+
 @router.post("/{pid}/observacoes/aceite", status_code=204)
 def aceitar_observacoes(pid: int, db: DB, u: UsuarioAtual):
+    """O aceite não entra no cálculo: atualiza o progresso sem desatualizar as simulações."""
     p = obter_planejamento(db, pid)
     p.observacoes_aceitas_por, p.observacoes_aceitas_em = u.id, datetime.now(UTC)
-    _alterou(db, p)
+    db.flush()
+    progresso.atualizar(db, p)
+    db.commit()
 
 
 # --------------------------------------------------- levantamento de despesas

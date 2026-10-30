@@ -109,6 +109,12 @@ def test_transicao_de_status(cliente, contador, analista):
         "empresa_id": emp["id"], "competencia_inicial": "2026-07", "competencia_final": "2026-09"}).json()
     r = cliente.post(f"/api/planejamentos/{p['id']}/status", headers=analista, json={"status": "PRONTO_PARA_SIMULAR"})
     assert r.status_code == 422
+    r = cliente.post(f"/api/planejamentos/{p['id']}/status", headers=analista, json={"status": "EM_CONFERENCIA"})
+    assert r.status_code == 409 and "observações" in r.json()["erro"]
+    assert cliente.get(f"/api/planejamentos/{p['id']}/observacoes", headers=analista).json()["aceitas_em"] is None
+    assert cliente.post(f"/api/planejamentos/{p['id']}/observacoes/aceite", headers=analista).status_code == 204
+    obs = cliente.get(f"/api/planejamentos/{p['id']}/observacoes", headers=analista).json()
+    assert len(obs["textos"]) == 3 and obs["aceitas_por"] == "Analista Demonstração"
     assert cliente.post(f"/api/planejamentos/{p['id']}/status", headers=analista,
                         json={"status": "EM_CONFERENCIA"}).status_code == 200
     assert cliente.post(f"/api/planejamentos/{p['id']}/status", headers=analista,
@@ -143,3 +149,12 @@ def test_dashboard(cliente, analista):
     d = cliente.get("/api/dashboard", headers=analista).json()
     assert d["empresas_ativas"] >= 2
     assert d["economia_anual_estimada"] > 0
+
+
+def test_aceite_conta_no_progresso_e_nao_desatualiza_simulacao(cliente, contador, pid):
+    sim = cliente.post(f"/api/planejamentos/{pid}/simulacoes", headers=contador).json()
+    assert cliente.post(f"/api/planejamentos/{pid}/observacoes/aceite", headers=contador).status_code == 204
+    blocos = cliente.get(f"/api/planejamentos/{pid}/progresso", headers=contador).json()["blocos"]
+    assert next(b for b in blocos if b["codigo"] == "OBSERVACOES")["preenchidos"] == 1
+    lista = cliente.get(f"/api/planejamentos/{pid}/simulacoes", headers=contador).json()
+    assert next(s for s in lista if s["id"] == sim["id"])["desatualizada"] is False

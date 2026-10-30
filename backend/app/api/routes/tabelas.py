@@ -4,12 +4,26 @@ from decimal import Decimal
 
 from fastapi import APIRouter
 from pydantic import Field
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual
 from app.core.erros import NaoEncontrado
-from app.models import CfopRegra, GrupoDespesa, ItemDespesa, NcmRegra, ParametroTributario, ReformaCronograma, SimplesFaixa
+from app.models import (
+    CfopRegra,
+    GrupoDespesa,
+    ItemDespesa,
+    NcmRegra,
+    NotaFiscal,
+    NotaItem,
+    ParametroTributario,
+    Planejamento,
+    ReformaCronograma,
+    SimplesFaixa,
+)
 from app.schemas.comum import Esquema
+from app.services import progresso
+from app.services.simulacao import marcar_desatualizada
 
 router = APIRouter(prefix="/tabelas", tags=["Tabelas legais"])
 
@@ -42,6 +56,24 @@ class ItemDespesaEntrada(Esquema):
     credito_ibs_cbs: bool
     natureza: str | None = None
     ativo: bool = True
+
+
+def _reavaliar_planejamentos(db: Session, coluna, valor) -> None:
+    """A regra mudou: os planejamentos que usam o código recalculam o progresso e suas simulações ficam desatualizadas."""
+    ids = db.scalars(select(NotaFiscal.planejamento_id).join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
+                     .where(coluna == valor).distinct()).all()
+    for pid in ids:
+        progresso.atualizar(db, db.get(Planejamento, pid))
+        marcar_desatualizada(db, pid)
+
+
+def _pendentes(db: Session, coluna, regra) -> list[dict]:
+    """Códigos usados em notas de saída que ainda não têm regra, com a receita afetada."""
+    return [{"codigo": c, "produto_exemplo": d, "valor": v, "planejamentos": n} for c, d, v, n in db.execute(
+        select(coluna, func.max(NotaItem.descricao), func.sum(NotaItem.vl_total), func.count(func.distinct(NotaFiscal.planejamento_id)))
+        .join(NotaFiscal, NotaFiscal.id == NotaItem.nota_fiscal_id)
+        .where(NotaFiscal.tipo == "SAIDA", coluna.not_in(select(regra)))
+        .group_by(coluna).order_by(func.sum(NotaItem.vl_total).desc()))]
 
 
 def _linhas(objs) -> list[dict]:
@@ -84,8 +116,20 @@ def salvar_cfop(dados: CfopEntrada, db: DB, _: Contador):
     r = db.get(CfopRegra, dados.cfop) or CfopRegra(cfop=dados.cfop)
     r.natureza, r.gera_receita = dados.natureza, dados.gera_receita
     db.add(r)
+    db.flush()
+    _reavaliar_planejamentos(db, NotaItem.cfop, dados.cfop)
     db.commit()
     return _linhas([r])[0]
+
+
+@router.get("/ncm/pendentes")
+def ncms_pendentes(db: DB, _: UsuarioAtual):
+    return _pendentes(db, NotaItem.ncm, NcmRegra.ncm)
+
+
+@router.get("/cfop/pendentes")
+def cfops_pendentes(db: DB, _: UsuarioAtual):
+    return _pendentes(db, NotaItem.cfop, CfopRegra.cfop)
 
 
 @router.get("/ncm")
@@ -100,6 +144,8 @@ def salvar_ncm(dados: NcmEntrada, db: DB, u: Contador):
         setattr(r, k, v)
     r.aprovado_por, r.aprovado_em = u.id, datetime.now(UTC)
     db.add(r)
+    db.flush()
+    _reavaliar_planejamentos(db, NotaItem.ncm, dados.ncm)
     db.commit()
     return _linhas([r])[0]
 
