@@ -41,7 +41,7 @@ def test_emite_arquiva_e_baixa(cliente, contador, sim):
     conteudo = texto(baixado.content)
     for trecho in ["Lucro Presumido tem a menor carga", "R$ 59.765,84", "R$ 63.688,26", "PRELIMINAR",
                    "Página 1 de", "Optar pelo Lucro Presumido em janeiro.", "Memória de cálculo", "Fontes legais",
-                   "Verificação por NCM", "8 de 18 NCMs precisam de revisão", "8708.80.00",
+                   "Verificação por NCM", "5 de 18 NCMs precisam de revisão",
                    "Bens próprios", "Nenhum bem informado", "27 de 27 documentos pendentes", "Pendente",
                    "11.222.333/0001-81"]:
         assert trecho in conteudo, trecho

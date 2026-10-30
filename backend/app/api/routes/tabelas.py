@@ -1,5 +1,4 @@
 """Tabelas legais: leitura para todos; escrita só para o contador."""
-from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter
@@ -13,7 +12,6 @@ from app.models import (
     CfopRegra,
     GrupoDespesa,
     ItemDespesa,
-    NcmRegra,
     NotaFiscal,
     NotaItem,
     ParametroTributario,
@@ -21,27 +19,14 @@ from app.models import (
     ReformaCronograma,
     SimplesFaixa,
 )
+from app.motor.lei_monofasico import avaliar
 from app.schemas.comum import Esquema
+from app.seeds import tabelas
+from app.seeds.tabelas import ler
 from app.services import progresso
 from app.services.simulacao import marcar_desatualizada
 
 router = APIRouter(prefix="/tabelas", tags=["Tabelas legais"])
-
-
-class NcmEntrada(Esquema):
-    ncm: str = Field(pattern=r"^\d{8}$")
-    monofasico: bool
-    confianca: str = Field(default="ALTA", pattern="^(ALTA|MEDIA)$")
-    sujeito_st: bool = False
-    indicio_ncm_incorreto: bool = False
-    requer_revisao: bool = False
-    acao_recomendada: str | None = None
-    cst_ibs_cbs: str | None = Field(default=None, pattern=r"^\d{3}$")
-    cclass_trib: str | None = Field(default=None, pattern=r"^\d{6}$")
-    beneficio_reforma: str | None = None
-    fundamento: str | None = None
-    produto_exemplo: str | None = None
-    observacao: str | None = None
 
 
 class CfopEntrada(Esquema):
@@ -122,32 +107,19 @@ def salvar_cfop(dados: CfopEntrada, db: DB, _: Contador):
     return _linhas([r])[0]
 
 
-@router.get("/ncm/pendentes")
-def ncms_pendentes(db: DB, _: UsuarioAtual):
-    return _pendentes(db, NotaItem.ncm, NcmRegra.ncm)
+@router.get("/lei-monofasico")
+def lei_monofasico(_: UsuarioAtual, ncm: str | None = None):
+    """Base legal, somente leitura. Com `ncm`, informa também o enquadramento do código."""
+    base = ler("lei_10485.json")
+    if ncm:
+        a = avaliar(ncm, tabelas.lei_monofasico())
+        base = {**base, "consulta": {"ncm": ncm, "enquadramento": a.enquadramento.value, "motivo": a.motivo, "fundamento": a.fundamento}}
+    return base
 
 
 @router.get("/cfop/pendentes")
 def cfops_pendentes(db: DB, _: UsuarioAtual):
     return _pendentes(db, NotaItem.cfop, CfopRegra.cfop)
-
-
-@router.get("/ncm")
-def ncms(db: DB, _: UsuarioAtual):
-    return _linhas(db.scalars(select(NcmRegra).order_by(NcmRegra.ncm)))
-
-
-@router.put("/ncm")
-def salvar_ncm(dados: NcmEntrada, db: DB, u: Contador):
-    r = db.get(NcmRegra, dados.ncm) or NcmRegra(ncm=dados.ncm)
-    for k, v in dados.model_dump().items():
-        setattr(r, k, v)
-    r.aprovado_por, r.aprovado_em = u.id, datetime.now(UTC)
-    db.add(r)
-    db.flush()
-    _reavaliar_planejamentos(db, NotaItem.ncm, dados.ncm)
-    db.commit()
-    return _linhas([r])[0]
 
 
 @router.get("/catalogo-despesas")

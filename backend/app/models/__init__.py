@@ -17,7 +17,7 @@ from .coleta import (
     TipoDocumento,
 )
 from .nfe import ImportacaoNfe, NotaFiscal, NotaItem
-from .planejamento import HistoricoStatus, Planejamento, PremissaPlanejamento
+from .planejamento import HistoricoStatus, Planejamento, PremissaPlanejamento, RevisaoProduto
 from .simulacao import MemoriaCalculo, OportunidadeRegistro, RelatorioPdf, Simulacao, SimulacaoResultado
 from .tabelas import CfopRegra, NcmRegra, ParametroTributario, ReformaCronograma, SimplesFaixa
 
@@ -26,6 +26,6 @@ __all__ = [
     "GrupoDespesa", "HistoricoStatus", "ImportacaoEmpresa", "ImportacaoNfe", "ItemDespesa", "Levantamento",
     "LevantamentoGrupo", "LevantamentoItem", "MemoriaCalculo", "NcmRegra", "NotaFiscal", "NotaItem",
     "OportunidadeRegistro", "OutraDespesa", "ParametroTributario", "PesoProgresso", "Planejamento",
-    "PremissaPlanejamento", "ReformaCronograma", "RelatorioPdf", "SimplesFaixa", "Simulacao",
+    "PremissaPlanejamento", "ReformaCronograma", "RelatorioPdf", "RevisaoProduto", "SimplesFaixa", "Simulacao",
     "SimulacaoResultado", "TipoDocumento", "Usuario",
 ]

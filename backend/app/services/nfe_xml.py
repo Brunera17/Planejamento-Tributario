@@ -25,6 +25,7 @@ class ItemLido:
     vl_produtos: Decimal
     vl_total: Decimal
     vl_icms: Decimal
+    cst_pis: str | None = None
 
 
 @dataclass
@@ -79,6 +80,8 @@ def ler_xml(conteudo: bytes) -> NotaLida:
         vicms = ZERO
         if icms is not None and len(icms):
             vicms = _dec(icms[0], "n:vICMS")
+        pis = det.find("n:imposto/n:PIS", NS)
+        cst_pis = _txt(pis[0], "n:CST") if pis is not None and len(pis) else ""
         nota.itens.append(ItemLido(
             n_item=int(det.get("nItem", "0")),
             cod_produto=_txt(prod, "n:cProd"),
@@ -90,6 +93,7 @@ def ler_xml(conteudo: bytes) -> NotaLida:
             vl_produtos=vprod,
             vl_total=total,
             vl_icms=vicms,
+            cst_pis=cst_pis or None,
         ))
     return nota
 

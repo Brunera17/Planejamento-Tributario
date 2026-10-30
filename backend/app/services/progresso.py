@@ -21,20 +21,19 @@ from app.models import (
     Levantamento,
     LevantamentoGrupo,
     LevantamentoItem,
-    NcmRegra,
     NotaFiscal,
-    NotaItem,
     PesoProgresso,
     Planejamento,
     TipoDocumento,
 )
+from app.services import revisao_produtos
 
 PESOS_PADRAO = {
     "SAIDAS": 20, "DESPESAS": 20, "COMPRAS": 15, "NCM": 10, "FOLHA": 10,
     "DOCUMENTOS": 10, "OUTRAS_DESPESAS": 5, "BENS": 5, "OBSERVACOES": 5,
 }
 NOMES = {
-    "SAIDAS": "Saídas (faturamento)", "DESPESAS": "Despesas", "COMPRAS": "Compras", "NCM": "Classificação de NCM",
+    "SAIDAS": "Saídas (faturamento)", "DESPESAS": "Despesas", "COMPRAS": "Compras", "NCM": "Revisão de produtos",
     "FOLHA": "Folha e pró-labore", "DOCUMENTOS": "Documentos", "OUTRAS_DESPESAS": "Outras despesas",
     "BENS": "Bens próprios", "OBSERVACOES": "Observações",
 }
@@ -109,11 +108,11 @@ def calcular(db: Session, p: Planejamento) -> tuple[int, list[Bloco]]:
         b["FOLHA"].ok() if f and f.folha is not None else b["FOLHA"].falta(c, "Folha de salários")
         b["FOLHA"].ok() if f and f.pro_labore is not None else b["FOLHA"].falta(c, "Pró-labore")
 
-    ncms = set(db.scalars(select(NotaItem.ncm).join(NotaFiscal).where(
-        NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA").distinct()))
-    com_regra = set(db.scalars(select(NcmRegra.ncm).where(NcmRegra.ncm.in_(ncms)))) if ncms else set()
-    for n in sorted(ncms):
-        b["NCM"].ok() if n in com_regra else b["NCM"].falta(None, f"NCM {n} sem regra")
+    for pr in revisao_produtos.analisar(db, p):
+        if pr.pendente:
+            b["NCM"].falta(None, f"{pr.descricao or pr.ncm_nota} (NCM {pr.ncm_nota})")
+        elif pr.revisado:
+            b["NCM"].ok()
 
     tem_bem = db.scalar(select(Bem.id).where(Bem.empresa_id == p.empresa_id).limit(1)) is not None
     b["BENS"].ok() if tem_bem or p.sem_bens else b["BENS"].falta(None, "Cadastrar bens ou declarar que não possui")

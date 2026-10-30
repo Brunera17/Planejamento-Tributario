@@ -29,6 +29,7 @@ from app.models import (
     SimplesFaixa,
 )
 from app.motor.classificacao import ItemBruto, RegraCfop, RegraNcm, classificar
+from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.motor.tipos import (
     AnoReforma,
     Despesa,
@@ -39,6 +40,7 @@ from app.motor.tipos import (
     Regime,
 )
 from app.seeds import tabelas
+from app.services import revisao_produtos
 from app.services.relatorio_contabil import CFOP_COMPRA_REVENDA
 
 ZERO = Decimal("0")
@@ -90,34 +92,62 @@ def premissas_do_planejamento(db: Session, p: Planejamento) -> Premissas:
     return Premissas(regime_atual=Regime(p.empresa.regime_tributario), **valores)
 
 
+def _info_ncm(produtos: list[revisao_produtos.Produto]) -> dict[str, InfoNcm]:
+    """Verificação por NCM do planejamento: vem da lei e da revisão, nunca de anotações de outro cliente."""
+    grupos: dict[str, list[revisao_produtos.Produto]] = {}
+    for x in produtos:
+        grupos.setdefault(x.ncm, []).append(x)
+    info = {}
+    for ncm, lista in grupos.items():
+        pendentes = [x for x in lista if x.pendente]
+        a = lista[0].avaliacao
+        if pendentes:
+            acao = f"{len(pendentes)} produto(s) aguardando revisão: {a.motivo}"
+        elif any(x.revisado for x in lista):
+            acao = "Revisado pelo contador."
+        else:
+            acao = "Sem ressalva na lei." if a.enquadramento != Enquadramento.NAO_LISTADO else "Fora dos anexos: tributação normal."
+        info[ncm] = InfoNcm(lista[0].descricao, "MEDIA" if a.enquadramento == Enquadramento.CONDICIONAL else "ALTA", False, bool(pendentes),
+                            acao, "000", "000001", "Não – alíquota padrão")
+    return info
+
+
 def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     comps = p.competencias()
     referencia = date.fromisoformat(p.competencia_inicial + "-01")
     pendencias: list[str] = []
 
-    # saídas agregadas por competência / NCM / CFOP / UF de destino (o motor é linear por item)
+    # saídas agregadas por competência / produto / NCM / CFOP / UF de destino (o motor é linear por item)
     linhas = db.execute(
-        select(NotaFiscal.competencia, NotaItem.ncm, NotaItem.cfop, NotaFiscal.uf_destinatario,
+        select(NotaFiscal.competencia, NotaItem.cod_produto, NotaItem.ncm, NotaItem.cfop, NotaFiscal.uf_destinatario,
                func.sum(NotaItem.vl_total))
         .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
         .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA",
                NotaFiscal.competencia.in_(comps))
-        .group_by(NotaFiscal.competencia, NotaItem.ncm, NotaItem.cfop, NotaFiscal.uf_destinatario)
+        .group_by(NotaFiscal.competencia, NotaItem.cod_produto, NotaItem.ncm, NotaItem.cfop, NotaFiscal.uf_destinatario)
     ).all()
-    brutos = [ItemBruto(c, ncm, cfop, uf, Decimal(str(v))) for c, ncm, cfop, uf, v in linhas]
+
+    # o monofásico vem da lei; a revisão do contador decide Ex, destinação e correção de NCM
+    produtos = revisao_produtos.analisar(db, p)
+    por_produto = {(x.cod_produto, x.ncm_nota): x for x in produtos}
+    brutos = []
+    for c, cod, ncm, cfop, uf, v in linhas:
+        pr = por_produto.get((cod or "", ncm))
+        decidido = pr.monofasico if pr and pr.revisao else None
+        brutos.append(ItemBruto(c, pr.ncm if pr else ncm, cfop, uf, Decimal(str(v)), monofasico=decidido))
+
     regras_cfop = {r.cfop: RegraCfop(r.cfop, r.gera_receita) for r in db.scalars(select(CfopRegra))}
-    ncms = {r.ncm: r for r in db.scalars(select(NcmRegra))}
-    regras_ncm = {n: RegraNcm(n, r.monofasico, r.sujeito_st) for n, r in ncms.items()}
+    st = {r.ncm: r.sujeito_st for r in db.scalars(select(NcmRegra))}
+    regras_ncm = {b.ncm: RegraNcm(b.ncm, avaliar(b.ncm, tabelas.lei_monofasico()).monofasico_presumido, st.get(b.ncm, False)) for b in brutos}
     cls = classificar(brutos, regras_cfop, regras_ncm, p.empresa.uf)
     if cls.cfops_sem_regra:
         pendencias.append("CFOP sem regra: " + ", ".join(map(str, sorted(cls.cfops_sem_regra))))
-    if cls.ncms_sem_regra:
-        pendencias.append("NCM sem regra: " + ", ".join(sorted(cls.ncms_sem_regra)))
+    pendentes = [x for x in produtos if x.pendente]
+    if pendentes:
+        pendencias.append(f"{len(pendentes)} produto(s) aguardando revisão do contador")
     sem_saidas = [c for c in comps if not any(i.competencia == c for i in cls.itens)]
     if sem_saidas:
         pendencias.append("Competências sem notas de saída: " + ", ".join(sem_saidas))
-
-    ncms_usados = {i.ncm for i in cls.itens}
 
     def mensal(modelo) -> dict[str, Decimal]:
         return {m.competencia: m.valor for m in db.scalars(select(modelo).where(modelo.planejamento_id == p.id))}
@@ -191,12 +221,9 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         premissas=premissas_do_planejamento(db, p),
         folha_informada=folha_informada,
         despesas_nao_informadas=nao_informadas,
-        ncms_indicio_incorreto={n for n in ncms_usados if n in ncms and ncms[n].indicio_ncm_incorreto},
-        ncms_confianca_media={n for n in ncms_usados if n in ncms and ncms[n].confianca == "MEDIA"},
+        ncms_confianca_media={x.ncm for x in produtos if x.avaliacao.enquadramento == Enquadramento.CONDICIONAL and not x.revisado},
         icms_entradas_real=icms_entradas,
         composicao_informada=db.scalar(select(CompraOrigem.id).where(CompraOrigem.planejamento_id == p.id).limit(1)) is not None,
-        ncm_info={n: InfoNcm(r.produto_exemplo, r.confianca, r.indicio_ncm_incorreto, r.requer_revisao, r.acao_recomendada,
-                             r.cst_ibs_cbs, r.cclass_trib, r.beneficio_reforma)
-                  for n, r in ncms.items() if n in ncms_usados},
+        ncm_info=_info_ncm(produtos),
     )
     return EntradaMontada(entrada, pendencias)

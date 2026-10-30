@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, UploadFile
+from fastapi.responses import Response
+from pydantic import Field
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
@@ -25,6 +27,7 @@ from app.models import (
     OutraDespesa,
     Planejamento,
     PremissaPlanejamento,
+    RevisaoProduto,
     Usuario,
 )
 from app.schemas.planejamento import (
@@ -37,7 +40,10 @@ from app.schemas.planejamento import (
     StatusEntrada,
     ValorCompetencia,
 )
-from app.services import progresso, relatorio_contabil
+from app.services import progresso, relatorio_contabil, revisao_produtos
+from app.motor.lei_monofasico import Enquadramento, avaliar
+from app.schemas.comum import Esquema
+from app.seeds import tabelas
 from app.services.entrada import PREMISSAS
 from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
@@ -427,3 +433,61 @@ async def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: 
         "notas_importadas": resumo.notas_importadas, "notas_ignoradas": resumo.notas_ignoradas,
         "valor_importado": resumo.valor_importado, "por_competencia": resumo.por_competencia, "avisos": resumo.avisos,
     }
+
+
+# ------------------------------------------------------------------ revisão de produtos
+
+
+class RevisaoEntrada(Esquema):
+    cod_produto: str = Field(default="", max_length=60)
+    ncm_nota: str = Field(pattern=r"^\d{8}$")
+    ncm_corrigido: str | None = Field(default=None, pattern=r"^\d{8}$")
+    monofasico: bool | None = None
+    motivo: str = Field(min_length=5, max_length=500)
+
+
+@router.get("/{pid}/revisao")
+def ver_revisao(pid: int, db: DB, _: UsuarioAtual):
+    produtos = revisao_produtos.analisar(db, obter_planejamento(db, pid))
+    return {"resumo": revisao_produtos.resumo(produtos), "produtos": revisao_produtos.serializar(db, produtos)}
+
+
+@router.get("/{pid}/revisao/exportar")
+def exportar_revisao(pid: int, db: DB, _: UsuarioAtual):
+    p = obter_planejamento(db, pid)
+    texto = revisao_produtos.exportar_csv(revisao_produtos.analisar(db, p))
+    return Response("\ufeff" + texto, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="REVISAO_{p.empresa.cnpj}.csv"'})
+
+
+@router.put("/{pid}/revisao", status_code=204)
+def revisar_produto(pid: int, dados: RevisaoEntrada, db: DB, u: Contador):
+    p = obter_planejamento(db, pid)
+    produtos = revisao_produtos.analisar(db, p)
+    if not any(x.cod_produto == dados.cod_produto and x.ncm_nota == dados.ncm_nota for x in produtos):
+        raise NaoEncontrado("Produto")
+    ncm = dados.ncm_corrigido or dados.ncm_nota
+    condicional = avaliar(ncm, tabelas.lei_monofasico()).enquadramento == Enquadramento.CONDICIONAL
+    if condicional and dados.monofasico is None:
+        raise ErroNegocio("Este NCM depende de Ex ou destinação: informe se o produto é monofásico",
+                          campos={"monofasico": "obrigatório"})
+    r = db.scalar(select(RevisaoProduto).where(RevisaoProduto.planejamento_id == pid, RevisaoProduto.cod_produto == dados.cod_produto,
+                                               RevisaoProduto.ncm_nota == dados.ncm_nota))
+    if r is None:
+        r = RevisaoProduto(planejamento_id=pid, cod_produto=dados.cod_produto, ncm_nota=dados.ncm_nota, revisado_por=u.id)
+        db.add(r)
+    # fora dos condicionais quem decide é a lei: a revisão não pode contrariá-la
+    r.ncm_corrigido = dados.ncm_corrigido if dados.ncm_corrigido != dados.ncm_nota else None
+    r.monofasico = dados.monofasico if condicional else None
+    r.motivo, r.revisado_por, r.revisado_em = dados.motivo.strip(), u.id, datetime.now(UTC)
+    _alterou(db, p)
+
+
+@router.delete("/{pid}/revisao/{revisao_id}", status_code=204)
+def desfazer_revisao(pid: int, revisao_id: int, db: DB, _: Contador):
+    p = obter_planejamento(db, pid)
+    r = db.get(RevisaoProduto, revisao_id)
+    if r is None or r.planejamento_id != pid:
+        raise NaoEncontrado("Revisão")
+    db.delete(r)
+    _alterou(db, p)

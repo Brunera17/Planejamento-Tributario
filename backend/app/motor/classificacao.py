@@ -28,6 +28,7 @@ class ItemBruto:
     uf_destino: str | None
     valor: Decimal
     ref: str | None = None
+    monofasico: bool | None = None  # decisão do contador; vazio segue a regra do NCM
 
 
 @dataclass
@@ -74,7 +75,7 @@ def classificar(
             cfop=b.cfop,
             ambito=ambito,
             gera_receita=rc.gera_receita if rc else False,
-            monofasico=rn.monofasico if rn else False,
+            monofasico=b.monofasico if b.monofasico is not None else (rn.monofasico if rn else False),
             sujeito_st=rn.sujeito_st if rn else False,
             valor=b.valor,
             ref=b.ref,

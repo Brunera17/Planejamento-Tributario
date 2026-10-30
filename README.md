@@ -117,7 +117,8 @@ cd frontend && npm test
 | Exportação Excel | ✅ |
 | Relatório PDF (ReportLab): veredito, composição da carga, Reforma, oportunidades, recomendação editável, anexos, marca PRELIMINAR, arquivamento com SHA-256 | ✅ |
 | Bens próprios e documentos (envio de arquivos, "não se aplica" com justificativa) | ✅ |
-| Tela de regras de NCM e CFOP (classificação de códigos novos) | ✅ |
+| Base legal (Lei 10.485/2002) e regras de CFOP | ✅ |
+| Revisão de produtos: confronto com a lei, inconsistências e correção pelo contador | ✅ |
 | Tela das demais tabelas legais (Anexo I, parâmetros, Reforma) | ⏳ rotas prontas, tela pendente |
 | Processamento em segundo plano para importações grandes | ⏳ |
 
