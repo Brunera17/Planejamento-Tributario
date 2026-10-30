@@ -27,7 +27,7 @@ export function Layout() {
           <div className="text-sm text-white/70">tributário</div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 md:flex-col" aria-label="Principal">
-          {MENU.map((m) => (
+          {[...MENU, ...(sessao?.usuario.perfil === "CONTADOR" ? [{ para: "/usuarios", rotulo: "Usuários" }] : [])].map((m) => (
             <NavLink
               key={m.para}
               to={m.para}

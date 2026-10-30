@@ -17,6 +17,8 @@ export type Empresa = {
   razao_social: string;
   cnpj: string;
   regime_tributario: string;
+  anexo_simples: string | null;
+  atividade: string;
   uf: string;
   cnae: string | null;
   representante_legal: string | null;

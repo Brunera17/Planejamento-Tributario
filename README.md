@@ -105,6 +105,7 @@ cd frontend && npm test
 |---|---|
 | Autenticação JWT, perfis, permissões no backend | ✅ |
 | Empresas: cadastro, importação com prévia, CNPJ numérico e alfanumérico | ✅ |
+| Usuários: criação, edição, troca de senha e desativação pela tela | ✅ |
 | Planejamento, status e histórico, com envio, conferência e devolução pela tela | ✅ |
 | Coleta pela tela: compras, devoluções, folha, origem das compras e premissas do cálculo | ✅ |
 | Levantamento de despesas por competência (catálogo com classificação tributária) | ✅ |

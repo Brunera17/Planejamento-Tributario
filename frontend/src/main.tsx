@@ -14,6 +14,7 @@ import { Planejamento } from "./pages/Planejamento";
 import { Planejamentos } from "./pages/Planejamentos";
 import { Regras } from "./pages/Regras";
 import { Resultado } from "./pages/Resultado";
+import { Usuarios } from "./pages/Usuarios";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
@@ -40,6 +41,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="simulacoes/:id" element={<Resultado />} />
             <Route path="empresas" element={<Empresas />} />
             <Route path="regras" element={<Regras />} />
+            <Route path="usuarios" element={<Usuarios />} />
           </Route>
         </Routes>
       </BrowserRouter>

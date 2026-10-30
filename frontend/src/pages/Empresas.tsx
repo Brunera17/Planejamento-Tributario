@@ -3,28 +3,101 @@ import { useState } from "react";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import type { Empresa } from "../api/tipos";
+import { FormEmpresa } from "../components/FormEmpresa";
 import { Botao, Cabecalho, Card, Erro, Tabela } from "../components/ui";
-import { formatarCnpj, REGIMES } from "../lib/formato";
+import { formatarCnpj, formatarTelefone, REGIMES } from "../lib/formato";
 
 type LinhaPrevia = { linha: number; dados: Record<string, string>; situacao: string; erros: string[]; avisos: string[] };
 
 export function Empresas() {
   const contador = lerSessao()?.usuario.perfil === "CONTADOR";
-  const { data = [] } = useQuery({ queryKey: ["empresas"], queryFn: async () => (await api.get<Empresa[]>("/empresas")).data });
+  const qc = useQueryClient();
+  const [inativas, setInativas] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [editando, setEditando] = useState<Empresa | "nova" | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const { data = [] } = useQuery({
+    queryKey: ["empresas", inativas],
+    queryFn: async () => (await api.get<Empresa[]>("/empresas", { params: { ativas: !inativas } })).data,
+  });
+  const atualizar = {
+    onSuccess: () => {
+      setErro(null);
+      qc.invalidateQueries({ queryKey: ["empresas"] });
+    },
+    onError: (e: unknown) => setErro(mensagemErro(e)),
+  };
+  const remover = useMutation({ mutationFn: (id: number) => api.delete(`/empresas/${id}`), ...atualizar });
+  const reativar = useMutation({ mutationFn: (id: number) => api.post(`/empresas/${id}/reativar`), ...atualizar });
+  const ativas = data.filter((e) => e.ativo).length;
+
   return (
     <>
-      <Cabecalho titulo="Empresas" descricao="Cadastro das empresas atendidas. A importação aceita a planilha do escritório (.xlsx ou .csv)." />
-      {contador && <Importacao />}
-      <Card titulo={`${data.length} ${data.length === 1 ? "empresa ativa" : "empresas ativas"}`} semPadding>
-        <Tabela cabecalho={["Razão social", "CNPJ", "Regime", "UF", "Representante", "Telefone"]}>
+      <Cabecalho
+        titulo="Empresas"
+        descricao="Empresas atendidas pelo escritório. Importe a planilha para cadastrar várias de uma vez."
+        acoes={
+          contador && (
+            <>
+              <Botao variante="secundario" onClick={() => setImportando(!importando)} aria-expanded={importando}>
+                Importar planilha
+              </Botao>
+              <Botao onClick={() => setEditando("nova")}>Nova empresa</Botao>
+            </>
+          )
+        }
+      />
+      <Erro mensagem={erro} />
+      {editando && <FormEmpresa key={editando === "nova" ? 0 : editando.id} empresa={editando === "nova" ? null : editando} fechar={() => setEditando(null)} />}
+      {importando && <Importacao />}
+      <Card
+        titulo={`${ativas} ${ativas === 1 ? "empresa ativa" : "empresas ativas"}`}
+        semPadding
+        acoes={
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={inativas} onChange={(e) => setInativas(e.target.checked)} />
+            Mostrar inativas
+          </label>
+        }
+      >
+        <Tabela cabecalho={["Razão social", "CNPJ", "Regime", "UF", "Representante", "Telefone", ""]}>
           {data.map((e) => (
-            <tr key={e.id}>
-              <td className="px-4 py-2 font-medium">{e.razao_social}</td>
+            <tr key={e.id} className={e.ativo ? "" : "text-text-muted"}>
+              <td className="px-4 py-2 font-medium">
+                {e.razao_social}
+                {!e.ativo && <span className="ml-1.5 font-normal">(inativa)</span>}
+              </td>
               <td className="px-2 py-2">{formatarCnpj(e.cnpj)}</td>
               <td className="px-2 py-2">{REGIMES[e.regime_tributario]}</td>
               <td className="px-2 py-2">{e.uf}</td>
               <td className="px-2 py-2">{e.representante_legal ?? "—"}</td>
-              <td className="px-2 py-2">{e.telefone ?? "—"}</td>
+              <td className="whitespace-nowrap px-2 py-2">{formatarTelefone(e.telefone)}</td>
+              <td className="whitespace-nowrap px-4 py-2 text-right">
+                {contador && e.ativo && (
+                  <>
+                    <button
+                      className="text-brand underline underline-offset-2"
+                      onClick={() => {
+                        setEditando(e);
+                        window.scrollTo({ top: 0 });
+                      }}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="ml-3 text-alert underline underline-offset-2"
+                      onClick={() => window.confirm(`Remover ${e.razao_social}? Com planejamentos, ela fica inativa; sem planejamentos, é excluída com seus bens.`) && remover.mutate(e.id)}
+                    >
+                      Remover
+                    </button>
+                  </>
+                )}
+                {contador && !e.ativo && (
+                  <button className="text-brand underline underline-offset-2" onClick={() => reativar.mutate(e.id)}>
+                    Reativar
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
         </Tabela>

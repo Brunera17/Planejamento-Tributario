@@ -38,6 +38,11 @@ export function formatarCnpj(c: string) {
   return c.length === 14 ? `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}` : c;
 }
 
+export function formatarTelefone(t: string | null) {
+  if (!t) return "—";
+  return t.length === 10 || t.length === 11 ? `(${t.slice(0, 2)}) ${t.slice(2, -4)}-${t.slice(-4)}` : t;
+}
+
 /** Data e hora locais. O SQLite devolve datas sem fuso (gravadas em UTC); o PostgreSQL devolve com fuso. */
 export function dataHora(iso: string) {
   const comFuso = /([zZ]|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`;

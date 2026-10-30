@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.utils.validacao import UFS, cnpj_valido, normalizar_cnpj, somente_digitos
 
@@ -30,9 +30,16 @@ class LoginSaida(Esquema):
 
 class UsuarioEntrada(Esquema):
     nome: str = Field(min_length=2, max_length=120)
-    usuario: str = Field(min_length=3, max_length=60)
-    senha: str = Field(min_length=6)
+    usuario: str = Field(min_length=3, max_length=60, pattern=r"^[A-Za-z0-9._-]+$")
+    senha: str = Field(min_length=8, max_length=72)
     perfil: Perfil
+
+
+class UsuarioEdicao(Esquema):
+    nome: str = Field(min_length=2, max_length=120)
+    perfil: Perfil
+    ativo: bool
+    senha: str | None = Field(default=None, min_length=8, max_length=72)  # vazio mantém a senha atual
 
 
 class EmpresaEntrada(Esquema):
@@ -60,6 +67,22 @@ class EmpresaEntrada(Esquema):
             raise ValueError("UF inválida")
         return v.upper()
 
+    @field_validator("cnae")
+    @classmethod
+    def _cnae(cls, v: str | None) -> str | None:
+        if not v:
+            return None
+        d = somente_digitos(v)
+        if len(d) != 7:
+            raise ValueError("CNAE deve ter 7 dígitos")
+        return d
+
+    @model_validator(mode="after")
+    def _anexo(self):
+        if self.regime_tributario == "SIMPLES_NACIONAL" and not self.anexo_simples:
+            self.anexo_simples = "I"
+        return self
+
     @field_validator("telefone")
     @classmethod
     def _tel(cls, v: str | None) -> str | None:
@@ -71,11 +94,15 @@ class EmpresaEntrada(Esquema):
         return d
 
 
-class EmpresaSaida(EmpresaEntrada):
+class EmpresaSaida(Esquema):
     id: int
+    razao_social: str
+    cnpj: str
+    regime_tributario: RegimeStr
+    anexo_simples: str | None
+    uf: str
+    cnae: str | None
+    atividade: str
+    representante_legal: str | None
+    telefone: str | None
     ativo: bool
-
-    @field_validator("cnpj")
-    @classmethod
-    def _cnpj(cls, v: str) -> str:  # já validado na gravação
-        return v

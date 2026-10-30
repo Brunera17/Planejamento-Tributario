@@ -2,10 +2,10 @@ from fastapi import APIRouter
 from sqlalchemy import select
 
 from app.api.deps import DB, Contador, UsuarioAtual
-from app.core.erros import ErroNegocio
+from app.core.erros import ErroNegocio, NaoEncontrado
 from app.core.seguranca import conferir_senha, criar_token, gerar_hash
 from app.models import Usuario
-from app.schemas.cadastro import LoginEntrada, LoginSaida, UsuarioEntrada, UsuarioSaida
+from app.schemas.cadastro import LoginEntrada, LoginSaida, UsuarioEdicao, UsuarioEntrada, UsuarioSaida
 
 router = APIRouter(tags=["Autenticação e usuários"])
 
@@ -39,5 +39,20 @@ def criar_usuario(dados: UsuarioEntrada, db: DB, _: Contador):
         raise ErroNegocio("Login já cadastrado", 409, {"usuario": "já existe"})
     u = Usuario(nome=dados.nome, usuario=dados.usuario, senha_hash=gerar_hash(dados.senha), perfil=dados.perfil)
     db.add(u)
+    db.commit()
+    return u
+
+
+@router.put("/usuarios/{usuario_id}", response_model=UsuarioSaida)
+def editar_usuario(usuario_id: int, dados: UsuarioEdicao, db: DB, atual: Contador):
+    u = db.get(Usuario, usuario_id)
+    if u is None:
+        raise NaoEncontrado("Usuário")
+    # impedir o próprio bloqueio garante que sempre reste um contador ativo
+    if u.id == atual.id and (not dados.ativo or dados.perfil != "CONTADOR"):
+        raise ErroNegocio("Você não pode desativar o próprio usuário nem deixar o perfil de contador", 409)
+    u.nome, u.perfil, u.ativo = dados.nome, dados.perfil, dados.ativo
+    if dados.senha:
+        u.senha_hash = gerar_hash(dados.senha)
     db.commit()
     return u

@@ -24,7 +24,7 @@ def registrar_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validacao(_: Request, e: RequestValidationError):
-        campos = {".".join(str(p) for p in err["loc"] if p != "body"): err["msg"] for err in e.errors()}
+        campos = {".".join(str(p) for p in err["loc"] if p != "body"): err["msg"].removeprefix("Value error, ") for err in e.errors()}
         return JSONResponse({"erro": "Dados inválidos", "campos": campos}, status_code=422)
 
     @app.exception_handler(StarletteHTTPException)
