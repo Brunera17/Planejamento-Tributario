@@ -40,7 +40,7 @@ from app.schemas.planejamento import (
     StatusEntrada,
     ValorCompetencia,
 )
-from app.services import premissas_auto, progresso, relatorio_contabil, revisao_produtos
+from app.services import estoque_st, premissas_auto, progresso, relatorio_contabil, revisao_produtos
 from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
@@ -71,11 +71,12 @@ TRANSICOES = {  # (de, para) -> exige contador?
 
 
 def _saida(p: Planejamento) -> PlanejamentoSaida:
+    faltam, recebidos_em = progresso.documentos_recebidos(Session.object_session(p), p)
     return PlanejamentoSaida(
         id=p.id, empresa_id=p.empresa_id, razao_social=p.empresa.razao_social, cnpj=p.empresa.cnpj,
         regime_tributario=p.empresa.regime_tributario, competencia_inicial=p.competencia_inicial,
         competencia_final=p.competencia_final, status=p.status, progresso=p.progresso, sem_bens=p.sem_bens,
-        criado_em=p.criado_em)
+        criado_em=p.criado_em, documentos_faltando=faltam, documentos_recebidos_em=recebidos_em)
 
 
 def _alterou(db: Session, p: Planejamento) -> None:
@@ -402,10 +403,17 @@ async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
             imp.ignorados += 1
             log.append(f"NF {n.numero}: competência {n.competencia} fora do período")
             continue
-        if db.scalar(select(NotaFiscal.id).where(NotaFiscal.planejamento_id == pid,
-                                                 NotaFiscal.chave_acesso == n.chave_acesso)):
+        existente = db.scalar(select(NotaFiscal.id).where(NotaFiscal.planejamento_id == pid, NotaFiscal.chave_acesso == n.chave_acesso))
+        if existente:
             imp.ignorados += 1
-            log.append(f"NF {n.numero}: já importada")
+            # notas importadas antes de o sistema ler o ICMS-ST: a nova importação completa a base da ST
+            com_st = {i.n_item: i for i in n.itens if i.bc_st}
+            completados = 0
+            for item in db.scalars(select(NotaItem).where(NotaItem.nota_fiscal_id == existente, NotaItem.bc_st.is_(None))):
+                if item.n_item in com_st:
+                    item.bc_st, item.vl_icms_st = com_st[item.n_item].bc_st, com_st[item.n_item].vl_icms_st
+                    completados += 1
+            log.append(f"NF {n.numero}: já importada" + (f"; base do ICMS-ST completada em {completados} item(ns)" if completados else ""))
             continue
         if n.cnpj_emitente == p.empresa.cnpj and n.tipo_nf == 1:
             tipo = "SAIDA"
@@ -508,3 +516,46 @@ def desfazer_revisao(pid: int, revisao_id: int, db: DB, _: Contador):
         raise NaoEncontrado("Revisão")
     db.delete(r)
     _alterou(db, p)
+
+
+# ------------------------------------------------------------------ estoque que saiu da ST
+
+
+class EstoqueStEntrada(Esquema):
+    valor: Decimal | None = Field(default=None, ge=0, description="Custo do estoque das mercadorias excluídas na véspera da exclusão")
+
+
+def _estoque_st(db: Session, p: Planejamento) -> dict | None:
+    e = estoque_st.calcular(db, p)
+    if e is None:
+        return None
+    return {
+        "corte": e.corte, "norma": e.norma, "segmentos": e.segmentos, "ncms": e.ncms, "regime_rpa": e.regime_rpa,
+        "estoque": e.estoque, "taxa": e.taxa, "credito": e.credito, "inicio_uso": e.inicio_uso, "sem_base": e.sem_base,
+        "parcelas": [{"competencia": c, "valor": v} for c, v in e.parcelas()],
+        "entradas": [vars(x) for x in sorted(e.entradas, key=lambda x: x.data, reverse=True)],
+        "fundamento": estoque_st.FUNDAMENTO,
+    }
+
+
+@router.get("/{pid}/estoque-st")
+def ver_estoque_st(pid: int, db: DB, _: UsuarioAtual):
+    """Crédito estimado do ICMS-ST do estoque das mercadorias que saíram da ST (null se nenhuma saiu)."""
+    return _estoque_st(db, obter_planejamento(db, pid))
+
+
+@router.put("/{pid}/estoque-st")
+def gravar_estoque_st(pid: int, dados: EstoqueStEntrada, db: DB, u: UsuarioAtual):
+    p = obter_planejamento(db, pid)
+    pr = db.scalar(select(PremissaPlanejamento).where(PremissaPlanejamento.planejamento_id == pid,
+                                                      PremissaPlanejamento.chave == estoque_st.CHAVE))
+    if dados.valor is None:
+        if pr:
+            db.delete(pr)
+    else:
+        if pr is None:
+            pr = PremissaPlanejamento(planejamento_id=pid, chave=estoque_st.CHAVE, alterado_por=u.id)
+            db.add(pr)
+        pr.valor, pr.alterado_por, pr.alterado_em = json.dumps(str(dados.valor)), u.id, datetime.now(UTC)
+    _alterou(db, p)
+    return _estoque_st(db, p)

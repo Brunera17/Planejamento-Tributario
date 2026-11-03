@@ -6,7 +6,7 @@ const MENU = [
   { para: "/", rotulo: "Visão geral" },
   { para: "/planejamentos", rotulo: "Planejamentos" },
   { para: "/empresas", rotulo: "Empresas" },
-  { para: "/regras", rotulo: "Base legal e CFOP" },
+  { para: "/regras", rotulo: "Base legal" },
 ];
 
 export function Layout() {

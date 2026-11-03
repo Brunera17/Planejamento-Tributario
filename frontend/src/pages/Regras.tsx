@@ -5,6 +5,9 @@ import { useSearchParams } from "react-router-dom";
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import { Botao, Cabecalho, Card, Erro, LegendaObrigatorio, Modal, Obrigatorio, Tabela } from "../components/ui";
 import { brl } from "../lib/formato";
+import { Normas } from "./Normas";
+import { Reforma } from "./Reforma";
+import { SubstituicaoTributaria } from "./SubstituicaoTributaria";
 
 type RegraCfop = { cfop: number; natureza: string; gera_receita: boolean };
 type ItemLei = {
@@ -43,7 +46,7 @@ export function Regras() {
   const [cfop, setCfop] = useState<RegraCfop | null>(null);
   const [busca, setBusca] = useState("");
   const [params, setParams] = useSearchParams();
-  const aba = params.get("aba") === "cfop" ? "cfop" : "ncm";
+  const aba = (["normas", "st", "cfop", "reforma"] as const).find((a) => a === params.get("aba")) ?? "ncm";
 
   const { data: base } = useQuery({
     queryKey: ["base-legal"],
@@ -80,8 +83,8 @@ export function Regras() {
   return (
     <>
       <Cabecalho
-        titulo="Base legal e CFOP"
-        descricao="Os produtos de cada planejamento são confrontados com esta base. Inconsistências e correções ficam na aba Revisão de produtos do planejamento."
+        titulo="Base legal"
+        descricao="Leis e tabelas que o cálculo usa em todos os planejamentos: ICMS, PIS e COFINS, CBS e IBS. Quando a lei mudar, atualize aqui com a fonte."
         acoes={aba === "cfop" && contador && <Botao onClick={() => setCfop({ cfop: 0, natureza: "", gera_receita: true })}>Novo CFOP</Botao>}
       />
 
@@ -89,11 +92,14 @@ export function Regras() {
 
       <nav className="flex gap-1 border-b border-border" role="tablist">
         {[
-          { id: "ncm", rotulo: "NCM (Lei 10.485/2002)" },
+          { id: "ncm", rotulo: "Monofásico (Lei 10.485/2002)" },
+          { id: "st", rotulo: "Substituição tributária (ICMS)" },
           {
             id: "cfop",
             rotulo: cfopPendentes.length ? `CFOP (${cfopPendentes.length} sem regra)` : "CFOP",
           },
+          { id: "reforma", rotulo: "Reforma Tributária" },
+          { id: "normas", rotulo: "Normas" },
         ].map((a) => (
           <button
             key={a.id}
@@ -107,6 +113,10 @@ export function Regras() {
           </button>
         ))}
       </nav>
+
+      {aba === "normas" && <Normas />}
+      {aba === "st" && <SubstituicaoTributaria />}
+      {aba === "reforma" && <Reforma />}
 
       {aba === "cfop" && cfopPendentes.length > 0 && (
         <Card titulo="CFOP sem regra" semPadding>

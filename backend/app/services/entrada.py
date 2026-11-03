@@ -32,6 +32,7 @@ from app.motor.classificacao import ItemBruto, RegraCfop, RegraNcm, classificar
 from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.motor.tipos import (
     AnoReforma,
+    CreditoEstoqueSt,
     Despesa,
     EntradaSimulacao,
     FaixaSimples,
@@ -40,7 +41,7 @@ from app.motor.tipos import (
     Regime,
 )
 from app.seeds import tabelas
-from app.services import premissas_auto, revisao_produtos
+from app.services import estoque_st, premissas_auto, revisao_produtos, substituicao
 from app.services.relatorio_contabil import CFOP_COMPRA_REVENDA
 
 ZERO = Decimal("0")
@@ -134,11 +135,15 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     # o monofásico vem da lei; a revisão do contador decide Ex, destinação e correção de NCM
     produtos = revisao_produtos.analisar(db, p)
     por_produto = {(x.cod_produto, x.ncm_nota): x for x in produtos}
+    # a ST vem da tabela da Base legal, com vigência: a mesma mercadoria pode sair da ST no meio do período
+    st_vigente = substituicao.carregar(db, p.empresa.uf)
     brutos = []
     for c, cod, ncm, cfop, uf, v in linhas:
         pr = por_produto.get((cod or "", ncm))
         decidido = pr.monofasico if pr and pr.revisao else None
-        brutos.append(ItemBruto(c, pr.ncm if pr else ncm, cfop, uf, Decimal(str(v)), monofasico=decidido))
+        ncm_final = pr.ncm if pr else ncm
+        st = None if st_vigente.vazia else st_vigente.vigente(ncm_final, c) is not None
+        brutos.append(ItemBruto(c, ncm_final, cfop, uf, Decimal(str(v)), monofasico=decidido, sujeito_st=st))
 
     regras_cfop = {r.cfop: RegraCfop(r.cfop, r.gera_receita) for r in db.scalars(select(CfopRegra))}
     st = {r.ncm: r.sujeito_st for r in db.scalars(select(NcmRegra))}
@@ -231,5 +236,13 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         composicao_informada=db.scalar(select(CompraOrigem.id).where(CompraOrigem.planejamento_id == p.id).limit(1)) is not None
         or auto.composicao is not None,
         ncm_info=_info_ncm(produtos),
+        estoque_st=_credito_estoque_st(db, p),
     )
     return EntradaMontada(entrada, pendencias)
+
+
+def _credito_estoque_st(db: Session, p: Planejamento) -> CreditoEstoqueSt | None:
+    e = estoque_st.calcular(db, p)
+    if e is None or not e.credito:
+        return None
+    return CreditoEstoqueSt(e.credito, f"{e.corte:%d/%m/%Y}", e.inicio_uso, e.regime_rpa, e.norma)

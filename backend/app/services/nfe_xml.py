@@ -29,6 +29,9 @@ class ItemLido:
     orig_icms: str | None = None  # 0 nacional; 1, 2, 3 e 8 importados ou com conteúdo importado acima de 40%
     cst_icms: str | None = None  # CST (regime normal) ou CSOSN (Simples) do ICMS
     aliq_icms: Decimal | None = None  # pICMS destacado
+    # ICMS-ST: retido pelo próprio fornecedor (vBCST/vICMSST) ou em etapa anterior (vBCSTRet/vICMSSTRet, CST 60 e CSOSN 500)
+    bc_st: Decimal | None = None
+    vl_icms_st: Decimal | None = None
 
 
 @dataclass
@@ -84,13 +87,17 @@ def ler_xml(conteudo: bytes) -> NotaLida:
         vprod = _dec(prod, "n:vProd")
         total = vprod - _dec(prod, "n:vDesc") + _dec(prod, "n:vFrete") + _dec(prod, "n:vSeg") + _dec(prod, "n:vOutro")
         icms = det.find("n:imposto/n:ICMS", NS)
-        vicms, orig, cst_icms, aliq = ZERO, None, None, None
+        vicms, orig, cst_icms, aliq, bc_st, icms_st = ZERO, None, None, None, None, None
         if icms is not None and len(icms):
             g = icms[0]
             vicms = _dec(g, "n:vICMS")
             orig = _txt(g, "n:orig") or None
             cst_icms = _txt(g, "n:CST") or _txt(g, "n:CSOSN") or None
             aliq = _dec(g, "n:pICMS") / 100 if _txt(g, "n:pICMS") else None
+            for base, valor in (("n:vBCST", "n:vICMSST"), ("n:vBCSTRet", "n:vICMSSTRet")):
+                if _txt(g, base):
+                    bc_st, icms_st = _dec(g, base), _dec(g, valor)
+                    break
         pis = det.find("n:imposto/n:PIS", NS)
         cst_pis = _txt(pis[0], "n:CST") if pis is not None and len(pis) else ""
         nota.itens.append(ItemLido(
@@ -108,6 +115,8 @@ def ler_xml(conteudo: bytes) -> NotaLida:
             orig_icms=orig,
             cst_icms=cst_icms,
             aliq_icms=aliq,
+            bc_st=bc_st,
+            vl_icms_st=icms_st,
         ))
     return nota
 

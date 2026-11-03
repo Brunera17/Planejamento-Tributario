@@ -30,6 +30,8 @@ class PlanejamentoSaida(Esquema):
     progresso: int
     sem_bens: bool
     criado_em: datetime
+    documentos_faltando: int
+    documentos_recebidos_em: datetime | None  # quando o último documento que faltava foi enviado
 
 
 class StatusEntrada(Esquema):

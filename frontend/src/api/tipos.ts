@@ -10,6 +10,8 @@ export type Planejamento = {
   progresso: number;
   sem_bens: boolean;
   criado_em: string;
+  documentos_faltando: number;
+  documentos_recebidos_em: string | null;
 };
 
 export type Empresa = {
@@ -24,6 +26,7 @@ export type Empresa = {
   representante_legal: string | null;
   telefone: string | null;
   ativo: boolean;
+  criado_em: string | null;
 };
 
 export type Bloco = {

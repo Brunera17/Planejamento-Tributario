@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import { Botao, Card, Erro, Obrigatorio } from "../components/ui";
 import { brl, editarMoeda, lerMoeda, percentual } from "../lib/formato";
+import { EstoqueSt } from "./EstoqueSt";
 
 type Origem = { origem: string; aliquota: number; percentual: number };
 type Automatica = { valor: string | number | boolean; fonte: string };
@@ -64,6 +65,7 @@ export function Premissas({ pid }: { pid: number }) {
   return (
     <div className="space-y-4">
       <OrigemCompras pid={pid} coleta={data} interna={interna} />
+      <EstoqueSt pid={pid} />
       <FormPremissas pid={pid} coleta={data} />
     </div>
   );

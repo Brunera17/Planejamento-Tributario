@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -106,3 +107,4 @@ class EmpresaSaida(Esquema):
     representante_legal: str | None
     telefone: str | None
     ativo: bool
+    criado_em: datetime | None

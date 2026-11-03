@@ -67,3 +67,5 @@ class NotaItem(Base):
     orig_icms: Mapped[str | None] = mapped_column(String(1))
     cst_icms: Mapped[str | None] = mapped_column(String(3))
     aliq_icms: Mapped[Decimal | None] = mapped_column(Aliquota)
+    bc_st: Mapped[Decimal | None] = mapped_column(Dinheiro)  # base da ST retida (vBCST ou vBCSTRet)
+    vl_icms_st: Mapped[Decimal | None] = mapped_column(Dinheiro)

@@ -45,6 +45,7 @@ export function formatarTelefone(t: string | null) {
 
 /** Data e hora locais. O SQLite devolve datas sem fuso (gravadas em UTC); o PostgreSQL devolve com fuso. */
 export function dataHora(iso: string) {
-  const comFuso = /([zZ]|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`;
-  return new Date(comFuso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  return new Date(comFuso(iso)).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
+
+const comFuso = (iso: string) => (/([zZ]|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`);

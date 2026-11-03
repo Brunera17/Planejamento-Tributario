@@ -25,12 +25,14 @@ from app.models import (
     Levantamento,
     LevantamentoItem,
     NcmRegra,
+    Norma,
     NotaFiscal,
     NotaItem,
     ParametroTributario,
     PesoProgresso,
     Planejamento,
     ReformaCronograma,
+    RegraSt,
     SimplesFaixa,
     TipoDocumento,
     Usuario,
@@ -77,6 +79,13 @@ def _upsert(db: Session, modelo, chave: dict, valores: dict):
     return obj
 
 
+def _incluir_se_falta(db: Session, modelo, chave: dict, valores: dict):
+    """Para tabelas que o contador mantém pela tela: a carga só cria o que falta e nunca desfaz um ajuste."""
+    obj = db.scalar(select(modelo).filter_by(**chave))
+    if obj is None:
+        db.add(modelo(**chave, **valores))
+
+
 def carregar_tabelas(db: Session) -> None:
     s = ler("simples_anexo1.json")
     inicio = date.fromisoformat(s["vigencia_inicio"])
@@ -84,18 +93,35 @@ def carregar_tabelas(db: Session) -> None:
         _upsert(db, SimplesFaixa, {"anexo": s["anexo"], "faixa": f["faixa"], "vigencia_inicio": inicio},
                 {k: Decimal(v) for k, v in f.items() if k != "faixa"})
     for p in ler("parametros.json"):
-        _upsert(db, ParametroTributario, {"chave": p["chave"], "vigencia_inicio": date(2000, 1, 1)},
+        _incluir_se_falta(db, ParametroTributario, {"chave": p["chave"], "vigencia_inicio": date(2000, 1, 1)},
                 {"valor": Decimal(p["valor"]), "descricao": p["descricao"], "fundamento": p["fundamento"]})
-    for a in ler("reforma_cronograma.json")["anos"]:
-        _upsert(db, ReformaCronograma, {"ano": a["ano"]},
-                {"cbs": Decimal(a["cbs"]), "ibs": Decimal(a["ibs"]), "fator_icms": Decimal(a["fator_icms"]),
-                 "situacao": a["situacao"]})
+    reforma = ler("reforma_cronograma.json")
+    for a in reforma["anos"]:
+        _incluir_se_falta(db, ReformaCronograma, {"ano": a["ano"]},
+                          {"cbs": Decimal(a["cbs"]), "ibs": Decimal(a["ibs"]), "fator_icms": Decimal(a["fator_icms"]),
+                           "situacao": a["situacao"], "fonte": reforma["fonte"][:300]})
     for c in ler("cfop_regras.json"):
-        _upsert(db, CfopRegra, {"cfop": c["cfop"]}, {"natureza": c["natureza"], "gera_receita": c["gera_receita"]})
+        _incluir_se_falta(db, CfopRegra, {"cfop": c["cfop"]}, {"natureza": c["natureza"], "gera_receita": c["gera_receita"]})
     for n in ler("ncm_regras.json"):
         _upsert(db, NcmRegra, {"ncm": n["ncm"]}, {k: n[k] for k in (
             "monofasico", "confianca", "sujeito_st", "indicio_ncm_incorreto", "fundamento", "produto_exemplo",
             "observacao", "requer_revisao", "acao_recomendada", "cst_ibs_cbs", "cclass_trib", "beneficio_reforma")})
+    carregar_normas(db)
+
+
+def carregar_normas(db: Session) -> None:
+    """Biblioteca de normas e a tabela de ST por NCM. O contador mantém as duas pela tela: a carga só inclui o que falta."""
+    for n in ler("normas.json")["normas"]:
+        _incluir_se_falta(db, Norma, {"codigo": n["codigo"]}, {k: v for k, v in n.items() if k != "codigo"})
+    db.flush()
+    ids = {n.codigo: n.id for n in db.scalars(select(Norma))}
+    st = ler("st_sp.json")
+    for r in st["regras"]:
+        _incluir_se_falta(db, RegraSt, {"uf": st["uf"], "ncm": r["ncm"], "item": r["item"], "segmento": r["segmento"].capitalize()}, {
+            "cest": r["cest"], "descricao": r["descricao"], "excecoes": ",".join(r["excecoes"]) or None,
+            "vigencia_inicio": date.fromisoformat(r["vigencia_inicio"] or "2000-01-01"),
+            "vigencia_fim": date.fromisoformat(r["vigencia_fim"]) if r["vigencia_fim"] else None,
+            "norma_id": ids.get("portaria-cat-68-2019"), "revogada_por_id": ids.get(r["revogada_por"])})
 
 
 def carregar_catalogo(db: Session) -> None:

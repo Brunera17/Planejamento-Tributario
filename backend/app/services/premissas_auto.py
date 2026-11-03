@@ -13,7 +13,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import CompraMensal, CompraOrigem, NcmRegra, NotaFiscal, NotaItem, ParametroTributario, Planejamento, PremissaPlanejamento
+from app.models import CompraMensal, CompraOrigem, NotaFiscal, NotaItem, ParametroTributario, Planejamento, PremissaPlanejamento
+from app.services import substituicao
 from app.services.relatorio_contabil import CFOP_COMPRA_REVENDA
 
 ZERO = Decimal("0")
@@ -147,31 +148,42 @@ def derivar(db: Session, p: Planejamento) -> Automaticas:
 
     # ---- saídas: ICMS-ST pelo NCM e pelo CST, e venda a consumidor final
     saidas = db.execute(
-        select(NotaItem.ncm, NotaItem.cfop, NotaItem.cst_icms, NotaItem.vl_total, NotaFiscal.uf_destinatario, NotaFiscal.consumidor_final)
+        select(NotaItem.ncm, NotaItem.cfop, NotaItem.cst_icms, NotaItem.vl_total, NotaFiscal.uf_destinatario, NotaFiscal.consumidor_final,
+               NotaFiscal.competencia)
         .join(NotaFiscal, NotaItem.nota_fiscal_id == NotaFiscal.id)
         .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA", NotaFiscal.competencia.in_(comps))
     ).all()
     internas = [s for s in saidas if (s.uf_destinatario == uf if s.uf_destinatario else str(s.cfop).startswith("5"))]
     if internas:
-        # A nota decide: CST/CSOSN de ST na venda prova a ST no período. A base de NCM não tem vigência
-        # (a ST de autopeças mudou ao longo dos anos), então sozinha ela só aponta o indício ao contador.
+        # A nota decide: CST/CSOSN de ST na venda prova a ST no período. A tabela de ST da Base legal tem vigência
+        # por NCM: aponta o indício quando a nota não traz o CST e avisa a nota que destaca ST depois que ela acabou.
+        tabela = substituicao.carregar(db, uf)
         total = sum((Decimal(str(s.vl_total)) for s in internas), ZERO)
         com_st = [s for s in internas if eh_st(s.cst_icms)]
         sem_cst = [s for s in internas if eh_st(s.cst_icms) is None]
+        avisos = []
         if com_st:
             valor_st = sum((Decimal(str(s.vl_total)) for s in com_st), ZERO)
             ncms = sorted({s.ncm for s in com_st})
             out.premissas["aplicar_st_vendas_internas"] = Derivada(
                 True, f"{len(ncms)} NCM vendidos no estado saíram com CST de substituição tributária ({_fmt_ncms(ncms)}): "
                       f"{_brl(valor_st)}, {_pct(valor_st / total)} das vendas internas")
+            encerradas = {}
+            for s in com_st:
+                r = tabela.encerrada(s.ncm, s.competencia)
+                if r:
+                    encerradas.setdefault((r.fim, r.revogada_por), set()).add(s.ncm)
+            for (fim, norma), ncms_fim in sorted(encerradas.items(), key=lambda x: x[0][0]):
+                avisos.append(f"{len(ncms_fim)} NCM saíram com CST de ST depois do fim da ST em {fim:%d/%m/%Y}"
+                              f"{f' ({norma})' if norma else ''}: {_fmt_ncms(sorted(ncms_fim))}. Confira o cadastro fiscal desses produtos.")
         elif not sem_cst and total > 0:
             out.premissas["aplicar_st_vendas_internas"] = Derivada(False, "Nenhuma venda no estado saiu com CST de substituição tributária")
         else:
-            base_st = {r.ncm for r in db.scalars(select(NcmRegra).where(NcmRegra.sujeito_st))}
-            ncms = sorted({s.ncm for s in sem_cst if s.ncm in base_st})
+            ncms = sorted({s.ncm for s in sem_cst if tabela.vigente(s.ncm, s.competencia)})
             if ncms:
-                out.indicio_st = (f"{len(ncms)} NCM vendidos no estado constam na base de ST ({_fmt_ncms(ncms)}), mas as notas não trazem "
-                                  "o CST. Confirme se a ST valia no período.")
+                avisos.append(f"{len(ncms)} NCM vendidos no estado estavam na substituição tributária no período ({_fmt_ncms(ncms)}), "
+                              "mas as notas não trazem o CST. Confirme se a venda saiu com ST.")
+        out.indicio_st = " ".join(avisos) or None
 
     com_ind = [(s.consumidor_final, Decimal(str(s.vl_total))) for s in saidas if s.consumidor_final is not None]
     total = sum((v for _, v in com_ind), ZERO)

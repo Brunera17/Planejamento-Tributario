@@ -15,6 +15,7 @@ def empresa(cliente, contador):
 def test_cria_empresa_normalizada(empresa):
     assert (empresa["cnpj"], empresa["cnae"], empresa["telefone"], empresa["anexo_simples"]) == \
         ("04252011000110", "4530703", "2133334444", "I")
+    assert empresa["criado_em"]  # data de cadastro na lista
 
 
 @pytest.mark.parametrize("campo,valor", [("cnae", "123"), ("uf", "ZZ"), ("telefone", "1234"), ("cnpj", "11111111111111")])

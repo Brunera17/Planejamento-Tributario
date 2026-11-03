@@ -14,7 +14,7 @@ from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import OportunidadeRegistro, Planejamento, RelatorioPdf, Simulacao, Usuario
 from app.motor import engine
 from app.schemas.comum import Esquema
-from app.services import exportacao_excel, relatorio_pdf
+from app.services import apresentacao_pptx, exportacao_excel, relatorio_pdf
 from app.services import simulacao as servico
 from app.services.entrada import montar_entrada
 from app.services.serializacao import para_json
@@ -107,6 +107,17 @@ def excel(sid: int, db: DB, _: Contador):
     nome = f"PLANEJAMENTO_{p.empresa.cnpj}_{p.competencia_inicial}_{p.competencia_final}_v{s.versao}.xlsx"
     return Response(exportacao_excel.gerar(s, p),
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}"'})
+
+
+@router.get("/simulacoes/{sid}/apresentacao")
+def apresentacao(sid: int, db: DB, u: Contador):
+    """Apresentação do planejamento para o cliente, com gráficos editáveis no PowerPoint."""
+    s = _simulacao(db, sid)
+    p = db.get(Planejamento, s.planejamento_id)
+    nome = f"APRESENTACAO_{p.empresa.cnpj}_{p.competencia_inicial}_{p.competencia_final}_v{s.versao}.pptx"
+    return Response(apresentacao_pptx.gerar(db, s, u),
+                    media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     headers={"Content-Disposition": f'attachment; filename="{nome}"'})
 
 

@@ -1,8 +1,8 @@
 """Tabelas legais versionadas por vigência (mantidas pelo contador)."""
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -53,6 +53,25 @@ class ReformaCronograma(Base):
     ibs: Mapped[Decimal] = mapped_column(Aliquota)
     fator_icms: Mapped[Decimal] = mapped_column(Aliquota)
     situacao: Mapped[str | None] = mapped_column(String(200))
+    fonte: Mapped[str | None] = mapped_column(String(300))  # norma ou ato que fixou os valores
+    alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    alterado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ReformaHistorico(Base):
+    """Valores que um ano do cronograma tinha antes de cada alteração (a lei muda; o histórico explica as simulações antigas)."""
+
+    __tablename__ = "reforma_historico"
+
+    id: Mapped[PK]
+    ano: Mapped[int]
+    cbs: Mapped[Decimal] = mapped_column(Aliquota)
+    ibs: Mapped[Decimal] = mapped_column(Aliquota)
+    fator_icms: Mapped[Decimal] = mapped_column(Aliquota)
+    fonte: Mapped[str | None] = mapped_column(String(300))
+    substituido_por_fonte: Mapped[str] = mapped_column(String(300))
+    alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    alterado_em: Mapped[Momento]
 
 
 class CfopRegra(Base):
@@ -81,3 +100,43 @@ class NcmRegra(Base):
     observacao: Mapped[str | None] = mapped_column(Text)
     aprovado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     aprovado_em: Mapped[Momento]
+
+
+class Norma(Base):
+    """Biblioteca de normas: o resumo, o link do texto oficial e onde a norma entra no cálculo."""
+
+    __tablename__ = "norma"
+
+    id: Mapped[PK]
+    codigo: Mapped[str] = mapped_column(String(40), unique=True)  # chave estável usada pela carga e pelas regras
+    titulo: Mapped[str] = mapped_column(String(160))  # "Lei Complementar 87/1996"
+    apelido: Mapped[str | None] = mapped_column(String(80))  # "Lei Kandir"
+    esfera: Mapped[str] = mapped_column(String(10))  # FEDERAL, ESTADUAL, CONVENIO
+    uf: Mapped[str | None] = mapped_column(String(2))
+    tributos: Mapped[str] = mapped_column(String(60))  # "ICMS" ou "PIS,COFINS"
+    resumo: Mapped[str] = mapped_column(Text)
+    uso_no_calculo: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(String(300))
+    situacao: Mapped[str] = mapped_column(String(10), default="VIGENTE")  # VIGENTE, ALTERADA, REVOGADA
+    alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    alterado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RegraSt(Base, Vigencia):
+    """Mercadoria na substituição tributária do ICMS, por NCM (prefixo), com a vigência e a norma."""
+
+    __tablename__ = "regra_st"
+    __table_args__ = (Index("ix_regra_st_uf_ncm", "uf", "ncm"),)
+
+    id: Mapped[PK]
+    uf: Mapped[str] = mapped_column(String(2))
+    ncm: Mapped[str] = mapped_column(String(8))  # posição, subposição ou código: vale para todo NCM que começa assim
+    excecoes: Mapped[str | None] = mapped_column(String(200))  # códigos fora da regra, separados por vírgula
+    cest: Mapped[str | None] = mapped_column(String(9))
+    segmento: Mapped[str] = mapped_column(String(80))
+    item: Mapped[str | None] = mapped_column(String(10))
+    descricao: Mapped[str] = mapped_column(Text)
+    norma_id: Mapped[int | None] = mapped_column(ForeignKey("norma.id"))  # onde a mercadoria está listada
+    revogada_por_id: Mapped[int | None] = mapped_column(ForeignKey("norma.id"))
+    alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    alterado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

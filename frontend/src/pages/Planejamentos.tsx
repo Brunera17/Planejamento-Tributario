@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import type { Empresa, Planejamento } from "../api/tipos";
 import { Badge, BarraProgresso, Botao, Cabecalho, Card, Erro, LegendaObrigatorio, Modal, Obrigatorio, Tabela } from "../components/ui";
-import { competenciaExtenso, formatarCnpj, REGIMES, STATUS } from "../lib/formato";
+import { competenciaExtenso, dataHora, formatarCnpj, REGIMES, STATUS } from "../lib/formato";
 
 export function Planejamentos() {
   const contador = lerSessao()?.usuario.perfil === "CONTADOR";
@@ -49,7 +49,7 @@ export function Planejamentos() {
         }
         titulo={`${data.length} ${data.length === 1 ? "planejamento" : "planejamentos"}`}
       >
-        <Tabela cabecalho={["Empresa", "CNPJ", "Regime atual", "Período", "Progresso", "Status"]}>
+        <Tabela cabecalho={["Empresa", "CNPJ", "Regime atual", "Período", "Documentos recebidos", "Progresso", "Status"]}>
           {data.map((p) => (
             <tr key={p.id} className="cursor-pointer" onClick={() => navegar(`/planejamentos/${p.id}`)}>
               <td className="px-4 py-2">
@@ -61,6 +61,15 @@ export function Planejamentos() {
               <td className="px-2 py-2">{REGIMES[p.regime_tributario]}</td>
               <td className="px-2 py-2">
                 {competenciaExtenso(p.competencia_inicial)} a {competenciaExtenso(p.competencia_final)}
+              </td>
+              <td className="whitespace-nowrap px-2 py-2">
+                {p.documentos_recebidos_em ? (
+                  <span title="Quando o último documento que faltava foi enviado">{dataHora(p.documentos_recebidos_em)}</span>
+                ) : (
+                  <Link className="text-text-muted underline-offset-2 hover:underline" to={`/planejamentos/${p.id}?aba=documentos`} onClick={(e) => e.stopPropagation()}>
+                    {p.documentos_faltando === 1 ? "Falta 1" : `Faltam ${p.documentos_faltando}`}
+                  </Link>
+                )}
               </td>
               <td className="px-2 py-2">
                 <Link to={`/planejamentos/${p.id}?aba=pendencias`} title="Ver o que falta" onClick={(e) => e.stopPropagation()}>

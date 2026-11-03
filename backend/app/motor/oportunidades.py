@@ -130,6 +130,17 @@ def avaliar_oportunidades(
             "REFORMA_POR_FORA", "Reforma – opção pelo IBS/CBS por fora do DAS", None, "BAIXA",
             "Não recomendada para vendas a consumidor final (B2C), que não aproveitam crédito."))
 
+    e = entrada.estoque_st
+    if e is not None:
+        ano, mes = e.inicio_uso.split("-")
+        uso = (f"em 12 parcelas mensais lançadas como outros créditos na apuração do ICMS, a partir de {mes}/{ano}" if e.regime_rpa
+               else f"abatido do ICMS do DAS no PGDAS-D a partir de {mes}/{ano}, com o saldo passando para os meses seguintes")
+        ops.append(Oportunidade(
+            "CREDITO_ESTOQUE_ST", "Crédito do ICMS-ST do estoque (fim da ST)", e.credito, "ALTA",
+            f"Mercadorias saíram da ST{f' pela {e.norma}' if e.norma else ''}. O ICMS-ST pago no estoque de {e.corte} vira crédito, {uso} "
+            "(Portaria CAT 28/2020). Levantar o inventário dessa data, montar o relatório por item com as notas de entrada mais recentes "
+            "e escriturar o inventário (Bloco H, para quem entrega a EFD). Valor estimado pelas notas de entrada com ST."))
+
     if receita == 0:
         return []
     return ops

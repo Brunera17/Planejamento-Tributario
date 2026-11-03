@@ -5,7 +5,7 @@ import { api, lerSessao, mensagemErro } from "../api/cliente";
 import type { Empresa } from "../api/tipos";
 import { FormEmpresa } from "../components/FormEmpresa";
 import { Botao, Cabecalho, Card, EnvioArquivo, Erro, Modal, Tabela, useConfirmacao } from "../components/ui";
-import { formatarCnpj, formatarTelefone, REGIMES } from "../lib/formato";
+import { dataHora, formatarCnpj, formatarTelefone, REGIMES } from "../lib/formato";
 
 type LinhaPrevia = { linha: number; dados: Record<string, string>; situacao: string; erros: string[]; avisos: string[] };
 
@@ -77,7 +77,7 @@ export function Empresas() {
           </label>
         }
       >
-        <Tabela cabecalho={["Razão social", "CNPJ", "Regime", "UF", "Representante", "Telefone", ""]}>
+        <Tabela cabecalho={["Razão social", "CNPJ", "Regime", "UF", "Representante", "Telefone", "Cadastro", ""]}>
           {data.map((e) => (
             <tr key={e.id} className={e.ativo ? "" : "text-text-muted"}>
               <td className="px-4 py-2 font-medium">
@@ -89,6 +89,7 @@ export function Empresas() {
               <td className="px-2 py-2">{e.uf}</td>
               <td className="px-2 py-2">{e.representante_legal ?? "—"}</td>
               <td className="whitespace-nowrap px-2 py-2">{formatarTelefone(e.telefone)}</td>
+              <td className="num whitespace-nowrap px-2 py-2">{e.criado_em ? dataHora(e.criado_em) : "—"}</td>
               <td className="px-4 py-2">
                 <div className="flex justify-end gap-1.5">
                   {contador && e.ativo && (

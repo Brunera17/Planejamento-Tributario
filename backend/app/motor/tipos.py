@@ -146,6 +146,17 @@ class InfoNcm:
 
 
 @dataclass(frozen=True)
+class CreditoEstoqueSt:
+    """Crédito do ICMS-ST do estoque quando a mercadoria sai da substituição tributária (estimado pelas entradas)."""
+
+    credito: Decimal
+    corte: str  # dd/mm/aaaa: estoque levantado no fim deste dia
+    inicio_uso: str  # AAAA-MM
+    regime_rpa: bool
+    norma: str | None
+
+
+@dataclass(frozen=True)
 class EntradaSimulacao:
     competencias: list[str]
     itens: list[ItemSaida]
@@ -166,6 +177,7 @@ class EntradaSimulacao:
     icms_entradas_real: dict[str, Decimal] | None = None  # ICMS destacado nos XML de entrada
     ncm_info: dict[str, InfoNcm] = field(default_factory=dict)
     composicao_informada: bool = False  # False = origem das compras assumida (100% internas)
+    estoque_st: CreditoEstoqueSt | None = None
 
 
 # ------------------------------------------------------------------ saídas

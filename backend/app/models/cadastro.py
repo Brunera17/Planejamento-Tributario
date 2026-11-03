@@ -1,11 +1,13 @@
 """Usuários e empresas."""
 
-from sqlalchemy import CheckConstraint, ForeignKey, String
+from datetime import datetime
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
 
-from .comum import PK, Momento
+from .comum import PK, Momento, agora
 
 
 class Usuario(Base):
@@ -39,6 +41,8 @@ class Empresa(Base):
     representante_legal: Mapped[str | None] = mapped_column(String(120))
     telefone: Mapped[str | None] = mapped_column(String(11))
     ativo: Mapped[bool] = mapped_column(default=True)
+    # vazio só nas empresas cadastradas antes da coluna sem planejamento para dar a data
+    criado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=agora)
 
 
 class ImportacaoEmpresa(Base):

@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -131,3 +132,15 @@ def calcular(db: Session, p: Planejamento) -> tuple[int, list[Bloco]]:
 def atualizar(db: Session, p: Planejamento) -> int:
     p.progresso, _ = calcular(db, p)
     return p.progresso
+
+
+def documentos_recebidos(db: Session, p: Planejamento) -> tuple[int, datetime | None]:
+    """Quantos documentos faltam no período e, com todos enviados (ou marcados "não se aplica"), quando chegou o último."""
+    esperados = len(p.competencias()) * db.scalar(select(func.count(TipoDocumento.id)))
+    enviados, ultimo = db.execute(
+        select(func.count(Documento.id), func.max(Documento.enviado_em))
+        .join(Levantamento, Levantamento.id == Documento.levantamento_id)
+        .where(Levantamento.planejamento_id == p.id, Levantamento.competencia.in_(p.competencias()))
+    ).one()
+    faltam = max(esperados - enviados, 0)
+    return faltam, (ultimo if faltam == 0 and esperados else None)

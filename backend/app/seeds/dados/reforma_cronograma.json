@@ -1,12 +1,12 @@
 {
- "fonte": "EC 132/2023 e LC 214/2025 – alíquotas de referência projetadas: CBS 8,8%, IBS 17,7%",
+ "fonte": "CBS: alíquota de referência de 11,3% calculada pelo TCU (Acórdão 2933/2026-Plenário, 28/10/2026), a ser fixada por resolução do Senado; em 2027 e 2028, reduzida em 0,1 ponto (LC 214/2025, art. 347). IBS: 0,1% em 2027 e 2028 (art. 344) e projeção de 17,7% no modelo definitivo",
  "anos": [
-  {"ano": 2027, "cbs": "0.087", "ibs": "0.001",  "fator_icms": "1",   "situacao": "CBS plena; PIS/COFINS (e monofásico) extintos; IBS-teste 0,1%"},
-  {"ano": 2028, "cbs": "0.087", "ibs": "0.001",  "fator_icms": "1",   "situacao": "Idem 2027"},
-  {"ano": 2029, "cbs": "0.088", "ibs": "0.0177", "fator_icms": "0.9", "situacao": "ICMS −10% • IBS 10%"},
-  {"ano": 2030, "cbs": "0.088", "ibs": "0.0354", "fator_icms": "0.8", "situacao": "ICMS −20% • IBS 20%"},
-  {"ano": 2031, "cbs": "0.088", "ibs": "0.0531", "fator_icms": "0.7", "situacao": "ICMS −30% • IBS 30%"},
-  {"ano": 2032, "cbs": "0.088", "ibs": "0.0708", "fator_icms": "0.6", "situacao": "ICMS −40% • IBS 40%"},
-  {"ano": 2033, "cbs": "0.088", "ibs": "0.177",  "fator_icms": "0",   "situacao": "Modelo definitivo – ICMS extinto"}
+  {"ano": 2027, "cbs": "0.112", "ibs": "0.001",  "fator_icms": "1",   "situacao": "CBS plena; PIS/COFINS (e monofásico) extintos; IBS-teste 0,1%"},
+  {"ano": 2028, "cbs": "0.112", "ibs": "0.001",  "fator_icms": "1",   "situacao": "Idem 2027"},
+  {"ano": 2029, "cbs": "0.113", "ibs": "0.0177", "fator_icms": "0.9", "situacao": "ICMS −10% • IBS 10%"},
+  {"ano": 2030, "cbs": "0.113", "ibs": "0.0354", "fator_icms": "0.8", "situacao": "ICMS −20% • IBS 20%"},
+  {"ano": 2031, "cbs": "0.113", "ibs": "0.0531", "fator_icms": "0.7", "situacao": "ICMS −30% • IBS 30%"},
+  {"ano": 2032, "cbs": "0.113", "ibs": "0.0708", "fator_icms": "0.6", "situacao": "ICMS −40% • IBS 40%"},
+  {"ano": 2033, "cbs": "0.113", "ibs": "0.177",  "fator_icms": "0",   "situacao": "Modelo definitivo – ICMS extinto"}
  ]
 }

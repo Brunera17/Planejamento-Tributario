@@ -29,6 +29,7 @@ class ItemBruto:
     valor: Decimal
     ref: str | None = None
     monofasico: bool | None = None  # decisão do contador; vazio segue a regra do NCM
+    sujeito_st: bool | None = None  # pela tabela de ST com vigência; vazio segue a regra do NCM
 
 
 @dataclass
@@ -76,7 +77,7 @@ def classificar(
             ambito=ambito,
             gera_receita=rc.gera_receita if rc else False,
             monofasico=b.monofasico if b.monofasico is not None else (rn.monofasico if rn else False),
-            sujeito_st=rn.sujeito_st if rn else False,
+            sujeito_st=b.sujeito_st if b.sujeito_st is not None else (rn.sujeito_st if rn else False),
             valor=b.valor,
             ref=b.ref,
         ))

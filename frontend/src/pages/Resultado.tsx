@@ -35,15 +35,20 @@ export function Resultado() {
     onError: (e) => setErro(mensagemErro(e)),
   });
 
-  async function baixarExcel() {
+  const [gerando, setGerando] = useState(false);
+
+  async function baixar(rota: "excel" | "apresentacao", padrao: string) {
+    setGerando(true);
     try {
-      const r = await api.get(`/simulacoes/${id}/excel`, { responseType: "blob" });
-      const nome = /filename="(.+)"/.exec(r.headers["content-disposition"] ?? "")?.[1] ?? "planejamento.xlsx";
+      const r = await api.get(`/simulacoes/${id}/${rota}`, { responseType: "blob" });
+      const nome = /filename="(.+)"/.exec(r.headers["content-disposition"] ?? "")?.[1] ?? padrao;
       const url = URL.createObjectURL(r.data);
       Object.assign(document.createElement("a"), { href: url, download: nome }).click();
       URL.revokeObjectURL(url);
     } catch (e) {
       setErro(mensagemErro(e));
+    } finally {
+      setGerando(false);
     }
   }
 
@@ -67,8 +72,11 @@ export function Resultado() {
         <Badge status={s.tipo} />
         {contador && (
           <div className="ml-auto flex gap-2">
-            <Botao variante="secundario" onClick={baixarExcel}>
+            <Botao variante="secundario" disabled={gerando} onClick={() => baixar("excel", "planejamento.xlsx")}>
               Exportar Excel
+            </Botao>
+            <Botao variante="secundario" disabled={gerando} onClick={() => baixar("apresentacao", "apresentacao.pptx")}>
+              Apresentação para o cliente
             </Botao>
             <Botao variante="secundario" onClick={() => setRelatorio(!relatorio)} aria-expanded={relatorio}>
               Relatório PDF
@@ -306,13 +314,21 @@ function Composicao({ r, receita, atual }: { r: TResultado; receita: number; atu
   const valorGrupo = (reg: ResultadoRegime, tributos: string[]) =>
     reg.tributos.filter((t) => t.competencia == null && tributos.includes(t.tributo)).reduce((s, t) => s + t.valor, 0);
 
+  const acimaDaReceita = regimes.filter((c) => c.aliquota_efetiva > 1);
+
   return (
     <div className="mt-7">
+      {acimaDaReceita.length > 0 && (
+        <p className="mb-4 rounded border border-warning bg-warning-soft px-3 py-2 text-sm text-warning-ink">
+          A carga do {acimaDaReceita.map((c) => REGIMES[c.regime]).join(" e do ")} passa de 100% da receita líquida ({brl(receita)}). Isso costuma
+          indicar faturamento incompleto ou folha, compras e despesas fora de escala: confira os dados antes de usar este resultado.
+        </p>
+      )}
       <div className="space-y-4">
         {regimes.map((c) => {
           const melhor = c.regime === r.melhor_regime;
           return (
-            <div key={c.regime} className="grid gap-x-4 gap-y-1 md:grid-cols-[11rem_1fr_15rem] md:items-center">
+            <div key={c.regime} className="grid gap-x-4 gap-y-1 md:grid-cols-[11rem_minmax(0,1fr)_auto] md:items-center">
               <div className="font-medium">
                 {REGIMES[c.regime]}
                 {c.regime === atual && <span className="ml-1.5 text-sm font-normal text-text-muted">(atual)</span>}
@@ -322,17 +338,20 @@ function Composicao({ r, receita, atual }: { r: TResultado; receita: number; atu
                 role="img"
                 aria-label={`${REGIMES[c.regime]}: ${GRUPOS.map((g) => `${g.nome} ${brl(valorGrupo(detalhe[c.regime], g.tributos))}`).join(", ")}`}
               >
-                <div className="barra-carga flex h-full" style={{ width: `${(c.total / maior) * 100}%` }}>
+                {/* largura mínima: um regime muito mais barato não pode sumir da comparação */}
+                <div className="barra-carga flex h-full min-w-1.5" style={{ width: `${maior > 0 ? (c.total / maior) * 100 : 0}%` }}>
                   {GRUPOS.map((g) => {
                     const v = valorGrupo(detalhe[c.regime], g.tributos);
-                    return v > 0 ? <div key={g.nome} className={`${g.cor} h-full border-r border-white last:border-0`} style={{ width: `${(v / c.total) * 100}%` }} title={`${g.nome}: ${brl(v)}`} /> : null;
+                    // fatia estreita sem divisória: a borda branca de 1px apagaria a cor
+                    const divisoria = maior > 0 && v / maior >= 0.03 ? "border-r border-white last:border-0" : "";
+                    return v > 0 ? <div key={g.nome} className={`${g.cor} h-full ${divisoria}`} style={{ width: `${(v / c.total) * 100}%` }} title={`${g.nome}: ${brl(v)}`} /> : null;
                   })}
                 </div>
               </div>
-              <div className="flex items-baseline justify-between gap-3 md:justify-end">
+              <div className="grid grid-cols-[7.5rem_5.5rem_7.5rem] items-baseline gap-x-3 whitespace-nowrap md:pl-1">
                 <span className={`num text-[1.07rem] font-semibold ${melhor ? "text-success-ink" : ""}`}>{brl(c.total)}</span>
-                <span className="num w-14 text-sm text-text-muted">{percentual(c.aliquota_efetiva)}</span>
-                <span className="num w-24 text-sm">{melhor ? <span className="font-medium text-success-ink">menor carga</span> : `+${brl(c.diferenca_melhor)}`}</span>
+                <span className="num text-sm text-text-muted">{percentual(c.aliquota_efetiva)}</span>
+                <span className="num text-sm">{melhor ? <span className="font-medium text-success-ink">menor carga</span> : `+ ${brl(c.diferenca_melhor)}`}</span>
               </div>
             </div>
           );

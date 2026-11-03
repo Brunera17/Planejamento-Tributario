@@ -109,3 +109,19 @@ def test_mes_conferido_nao_aceita_alteracao(cliente, fabrica_sessao, contador):
     assert enviar(cliente, contador, p.id, "a.pdf", PDF, comp="2026-06").status_code == 409
     d = cliente.get(f"/api/planejamentos/{p.id}/documentos", headers=contador).json()
     assert d["competencias"][0] == {"competencia": "2026-06", "editavel": False}
+
+
+def test_lista_mostra_quando_chegaram_todos_os_documentos(cliente, contador):
+    emp = cliente.post("/api/empresas", headers=contador, json={
+        "razao_social": "DOCS COMPLETOS LTDA", "cnpj": "60.701.190/0001-04", "regime_tributario": "LUCRO_REAL"}).json()
+    p = cliente.post("/api/planejamentos", headers=contador, json={
+        "empresa_id": emp["id"], "competencia_inicial": "2026-03", "competencia_final": "2026-03"}).json()
+    tipos = cliente.get(f"/api/planejamentos/{p['id']}/documentos", headers=contador).json()["tipos"]
+    assert p["documentos_faltando"] == len(tipos) and p["documentos_recebidos_em"] is None
+
+    for t in tipos:
+        r = cliente.put(f"/api/planejamentos/{p['id']}/documentos/2026-03/{t['id']}/nao-se-aplica", headers=contador,
+                        json={"justificativa": "Não se aplica à empresa"})
+        assert r.status_code == 204, r.text
+    item = next(x for x in cliente.get("/api/planejamentos", headers=contador).json() if x["id"] == p["id"])
+    assert item["documentos_faltando"] == 0 and item["documentos_recebidos_em"]

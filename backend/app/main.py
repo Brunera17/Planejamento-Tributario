@@ -13,7 +13,8 @@ def criar_app() -> FastAPI:
         description="Compara Simples Nacional, Lucro Presumido e Lucro Real, inclusive na transição da Reforma.",
     )
     app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_lista, allow_credentials=True,
-                       allow_methods=["*"], allow_headers=["*"])
+                       allow_methods=["*"], allow_headers=["*"],
+                       expose_headers=["Content-Disposition"])  # nome do arquivo nos downloads (Excel, apresentação)
     registrar_handlers(app)
     for r in (auth, empresas, tabelas, planejamentos, bens_documentos, simulacoes, dashboard):
         app.include_router(r.router, prefix="/api")

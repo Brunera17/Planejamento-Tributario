@@ -9,10 +9,16 @@ import pytest
 
 from app.motor import simular
 from app.motor.classificacao import ItemBruto, classificar
-from app.motor.tipos import Despesa, EntradaSimulacao, InfoNcm, Premissas, Regime
+from app.motor.tipos import AnoReforma, Despesa, EntradaSimulacao, InfoNcm, Premissas, Regime
 from app.seeds import tabelas
 
 FIXTURE = tabelas.DADOS / "caso_referencia.json"
+# A planilha foi feita com a CBS projetada de 8,8% (8,7% em 2027 e 2028). O cronograma oficial muda com a lei
+# (resolução do Senado, cálculo do TCU); o teste fica com o da planilha para continuar conferindo o cálculo.
+REFORMA_DA_PLANILHA = [AnoReforma(ano, Decimal(cbs), Decimal(ibs), Decimal(icms)) for ano, cbs, ibs, icms in (
+    (2027, "0.087", "0.001", "1"), (2028, "0.087", "0.001", "1"), (2029, "0.088", "0.0177", "0.9"),
+    (2030, "0.088", "0.0354", "0.8"), (2031, "0.088", "0.0531", "0.7"), (2032, "0.088", "0.0708", "0.6"),
+    (2033, "0.088", "0.177", "0"))]
 CENTAVO = Decimal("0.01")
 
 
@@ -35,7 +41,7 @@ def montar_entrada(**premissas) -> EntradaSimulacao:
         despesas=despesas,
         folha={}, pro_labore={},
         faixas_simples=list(tabelas.faixas_simples()),
-        reforma=list(tabelas.reforma()),
+        reforma=REFORMA_DA_PLANILHA,
         parametros=tabelas.parametros(),
         premissas=Premissas(regime_atual=Regime.SIMPLES_NACIONAL, **premissas),
         ncms_indicio_incorreto={n["ncm"] for n in ncm if n["indicio_ncm_incorreto"]},
