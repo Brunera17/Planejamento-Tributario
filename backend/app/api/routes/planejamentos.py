@@ -413,6 +413,9 @@ async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
                 if item.n_item in com_st:
                     item.bc_st, item.vl_icms_st = com_st[item.n_item].bc_st, com_st[item.n_item].vl_icms_st
                     completados += 1
+            nota = db.get(NotaFiscal, existente)
+            if nota.dest_contribuinte is None and n.dest_contribuinte is not None:
+                nota.dest_contribuinte = n.dest_contribuinte  # notas de antes da leitura do indIEDest (DIFAL)
             log.append(f"NF {n.numero}: já importada" + (f"; base do ICMS-ST completada em {completados} item(ns)" if completados else ""))
             continue
         if n.cnpj_emitente == p.empresa.cnpj and n.tipo_nf == 1:
@@ -426,7 +429,8 @@ async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
         nf = NotaFiscal(planejamento_id=pid, importacao_id=imp.id, chave_acesso=n.chave_acesso, numero=n.numero,
                         data_emissao=n.data_emissao, competencia=n.competencia, tipo=tipo,
                         uf_emitente=n.uf_emitente, uf_destinatario=n.uf_destinatario,
-                        crt_emitente=n.crt_emitente, consumidor_final=n.consumidor_final)
+                        crt_emitente=n.crt_emitente, consumidor_final=n.consumidor_final,
+                        dest_contribuinte=n.dest_contribuinte)
         db.add(nf)
         db.flush()
         db.add_all(NotaItem(nota_fiscal_id=nf.id, **vars(i)) for i in n.itens)

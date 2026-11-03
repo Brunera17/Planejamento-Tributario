@@ -4,7 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from .tipos import Ambito, ItemSaida
+from .icms import aliquota_interestadual
+from .tipos import Ambito, DestinoDifal, ItemSaida
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,8 @@ class ItemBruto:
     ref: str | None = None
     monofasico: bool | None = None  # decisão do contador; vazio segue a regra do NCM
     sujeito_st: bool | None = None  # pela tabela de ST com vigência; vazio segue a regra do NCM
+    origem: str | None = None  # origem da mercadoria (orig do ICMS): 1, 2, 3 e 8 vão a 4% para outro estado
+    difal: DestinoDifal | None = None  # venda a não contribuinte de outro estado, com a alíquota do destino
 
 
 @dataclass
@@ -80,6 +83,8 @@ def classificar(
             sujeito_st=b.sujeito_st if b.sujeito_st is not None else (rn.sujeito_st if rn else False),
             valor=b.valor,
             ref=b.ref,
+            aliq_interestadual=aliquota_interestadual(uf_empresa, b.uf_destino, b.origem) if ambito == Ambito.INTERESTADUAL else None,
+            difal=b.difal if ambito == Ambito.INTERESTADUAL else None,
         ))
     return out
 

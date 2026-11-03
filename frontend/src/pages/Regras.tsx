@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import { Botao, Cabecalho, Card, Erro, LegendaObrigatorio, Modal, Obrigatorio, Tabela } from "../components/ui";
 import { brl } from "../lib/formato";
+import { AliquotasUf } from "./AliquotasUf";
 import { Normas } from "./Normas";
 import { Reforma } from "./Reforma";
 import { SubstituicaoTributaria } from "./SubstituicaoTributaria";
@@ -46,7 +47,7 @@ export function Regras() {
   const [cfop, setCfop] = useState<RegraCfop | null>(null);
   const [busca, setBusca] = useState("");
   const [params, setParams] = useSearchParams();
-  const aba = (["normas", "st", "cfop", "reforma"] as const).find((a) => a === params.get("aba")) ?? "ncm";
+  const aba = (["normas", "st", "uf", "cfop", "reforma"] as const).find((a) => a === params.get("aba")) ?? "ncm";
 
   const { data: base } = useQuery({
     queryKey: ["base-legal"],
@@ -94,6 +95,7 @@ export function Regras() {
         {[
           { id: "ncm", rotulo: "Monofásico (Lei 10.485/2002)" },
           { id: "st", rotulo: "Substituição tributária (ICMS)" },
+          { id: "uf", rotulo: "ICMS por estado (DIFAL)" },
           {
             id: "cfop",
             rotulo: cfopPendentes.length ? `CFOP (${cfopPendentes.length} sem regra)` : "CFOP",
@@ -116,6 +118,7 @@ export function Regras() {
 
       {aba === "normas" && <Normas />}
       {aba === "st" && <SubstituicaoTributaria />}
+      {aba === "uf" && <AliquotasUf />}
       {aba === "reforma" && <Reforma />}
 
       {aba === "cfop" && cfopPendentes.length > 0 && (

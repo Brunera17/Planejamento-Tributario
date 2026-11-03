@@ -645,11 +645,11 @@ def montar_pdf(d: DadosRelatorio) -> bytes:
                ("receita_monofasica", "Receita monofásica"), ("receita_interna", "Vendas internas"),
                ("receita_interestadual", "Vendas interestaduais"), ("remessas_sem_receita", "Remessas sem receita"),
                ("compras", "Compras"), ("despesas", "Despesas"), ("icms_debito", "ICMS débito"), ("icms_credito", "ICMS crédito"),
-               ("icms_a_recolher", "ICMS a recolher")]
+               ("icms_difal", "DIFAL e FCP"), ("icms_a_recolher", "ICMS a recolher")]
     cols = d.competencias + ["TOTAL"]
     larg = (L - 44 * mm) / len(cols)
     s.append(tabela(["Item"] + [mes(c) for c in d.competencias] + ["Período"],
-                    [[rot] + [brl(r["base"][c][k]) for c in cols] for k, rot in rotulos],
+                    [[rot] + [brl(r["base"][c].get(k, 0)) for c in cols] for k, rot in rotulos],
                     [44 * mm] + [larg] * len(cols), numericas=set(range(1, len(cols) + 1))))
 
     ncms = r.get("verificacao_ncm") or []

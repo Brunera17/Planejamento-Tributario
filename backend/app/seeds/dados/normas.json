@@ -14,6 +14,30 @@
    "situacao": "VIGENTE"
   },
   {
+   "codigo": "ec-87-2015",
+   "titulo": "Emenda Constitucional 87/2015",
+   "apelido": "DIFAL do comércio eletrônico",
+   "esfera": "FEDERAL",
+   "uf": null,
+   "tributos": "ICMS",
+   "resumo": "Na venda a consumidor final não contribuinte de outro estado, o estado de origem fica com a alíquota interestadual e o de destino com a diferença até a sua alíquota interna (DIFAL), recolhida pelo remetente. Para o Simples, a exigência foi afastada pelo STF (ADI 5464, cláusula nona do Convênio ICMS 93/2015).",
+   "uso_no_calculo": "DIFAL das vendas a não contribuinte de outro estado no Lucro Presumido e no Lucro Real; o Simples não recolhe.",
+   "url": "https://www.planalto.gov.br/ccivil_03/constituicao/emendas/emc/emc87.htm",
+   "situacao": "VIGENTE"
+  },
+  {
+   "codigo": "lc190-2022",
+   "titulo": "Lei Complementar 190/2022",
+   "apelido": "Lei do DIFAL",
+   "esfera": "FEDERAL",
+   "uf": null,
+   "tributos": "ICMS",
+   "resumo": "Regulamenta o DIFAL na LC 87/1996: o imposto do destino é calculado sobre o valor da operação no destino, com o próprio ICMS na base (base dupla), e o remetente recolhe ao estado do consumidor final não contribuinte.",
+   "uso_no_calculo": "Fórmula do DIFAL: base = (valor − ICMS interestadual) ÷ (1 − alíquota do destino); DIFAL = base × alíquota do destino − ICMS interestadual.",
+   "url": "https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp190.htm",
+   "situacao": "VIGENTE"
+  },
+  {
    "codigo": "conv-icms-142-2018",
    "titulo": "Convênio ICMS 142/2018",
    "apelido": null,
@@ -57,7 +81,7 @@
    "uf": "SP",
    "tributos": "ICMS",
    "resumo": "Alíquotas do ICMS em São Paulo. Nas operações internas a regra é 18% (art. 52, I); as exceções de 7%, 12% e 25% estão nos arts. 53 a 55. As interestaduais seguem as Resoluções do Senado 22/1989 (12% e 7%) e 13/2012 (4% para importados).",
-   "uso_no_calculo": "Alíquota interna (18%) e interestadual (12%) dos parâmetros, usadas no débito de ICMS do Lucro Presumido e do Lucro Real.",
+   "uso_no_calculo": "Alíquota interna de 18% no débito de ICMS do Lucro Presumido e do Lucro Real. Nas vendas para outro estado, a alíquota é definida por item: 4% para mercadoria importada (origem 1, 2, 3 ou 8), 7% do Sul e Sudeste para Norte, Nordeste, Centro-Oeste e ES, e 12% nos demais casos.",
    "url": "https://legislacao.fazenda.sp.gov.br/Paginas/art052.aspx",
    "situacao": "VIGENTE"
   },

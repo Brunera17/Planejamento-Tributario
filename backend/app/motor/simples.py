@@ -93,7 +93,8 @@ def calcular_simples(
     icms_fora_das = ZERO
     if acima_sublimite:
         # acima do sublimite o ICMS é recolhido por fora do DAS, no regime normal
-        icms_fora_das = icms_normal.total_a_recolher
+        # sem o DIFAL: o optante do Simples não o recolhe nas vendas a não contribuinte (ADI 5464)
+        icms_fora_das = icms_normal.total_a_recolher - icms_normal.total_difal
         memoria.registrar("Simples", "ICMS fora do DAS (RBT12 acima do sublimite)", "ICMS a recolher no regime normal",
                           icms_fora_das, fundamento="LC 123/2006, art. 13-A")
 

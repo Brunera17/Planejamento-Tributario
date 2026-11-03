@@ -36,6 +36,16 @@ class Ambito(str, Enum):
 
 
 @dataclass(frozen=True)
+class DestinoDifal:
+    """Venda a consumidor final não contribuinte de outro estado: o remetente recolhe a diferença ao destino."""
+
+    uf: str
+    aliquota: Decimal  # alíquota interna do destino, sem FCP
+    fcp: Decimal = Decimal("0")
+    base_dupla: bool = True
+
+
+@dataclass(frozen=True)
 class ItemSaida:
     """Item de NF-e de saída (ou grupo de itens com as mesmas características)."""
 
@@ -48,6 +58,8 @@ class ItemSaida:
     sujeito_st: bool
     valor: Decimal  # valor total do item (vProd + acréscimos − descontos)
     ref: str | None = None  # id do nota_item, para rastreabilidade
+    aliq_interestadual: Decimal | None = None  # 4%, 7% ou 12% pela origem e pelo destino; None usa o parâmetro
+    difal: DestinoDifal | None = None
 
 
 @dataclass(frozen=True)

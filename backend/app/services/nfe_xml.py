@@ -46,6 +46,7 @@ class NotaLida:
     uf_destinatario: str | None
     crt_emitente: str | None = None  # 1 e 4 = Simples Nacional; 2 e 3 = regime normal
     consumidor_final: bool | None = None  # indFinal
+    dest_contribuinte: bool | None = None  # indIEDest 1 = contribuinte; 2 (isento) e 9 ou destinatário com CPF = não contribuinte
     itens: list[ItemLido] = field(default_factory=list)
 
     @property
@@ -61,6 +62,13 @@ def _txt(no, caminho: str, padrao: str = "") -> str:
 def _dec(no, caminho: str) -> Decimal:
     v = _txt(no, caminho)
     return Decimal(v) if v else ZERO
+
+
+def _contribuinte(inf) -> bool | None:
+    ind = _txt(inf, "n:dest/n:indIEDest")
+    if ind:
+        return ind == "1"
+    return False if _txt(inf, "n:dest/n:CPF") else None
 
 
 def ler_xml(conteudo: bytes) -> NotaLida:
@@ -81,6 +89,7 @@ def ler_xml(conteudo: bytes) -> NotaLida:
         uf_destinatario=_txt(inf, "n:dest/n:enderDest/n:UF") or None,
         crt_emitente=_txt(inf, "n:emit/n:CRT") or None,
         consumidor_final=(_txt(ide, "n:indFinal") == "1") if _txt(ide, "n:indFinal") else None,
+        dest_contribuinte=_contribuinte(inf),
     )
     for det in inf.findall("n:det", NS):
         prod = det.find("n:prod", NS)

@@ -63,6 +63,7 @@ def _resumo_base(bases, icms, pc_lr) -> dict[str, dict[str, Decimal]]:
             "despesas": b.despesas,
             "icms_debito": icms.debito[c],
             "icms_credito": icms.credito[c],
+            "icms_difal": icms.difal[c],
             "icms_a_recolher": icms.a_recolher[c],
             "pis_cofins_lr_debito": pc_lr.debito[c],
             "pis_cofins_lr_credito": pc_lr.credito[c],

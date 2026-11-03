@@ -1,0 +1,229 @@
+{
+ "fonte": "Alíquotas internas gerais (modais) do ICMS em 2026, conferidas em tabelas publicadas em 2026 (Jettax, Fiscal.io). Base dupla por padrão (LC 190/2022, art. 13, § 1º, X e § 3º). FCP só onde vale na regra geral; o FCP por produto não está na tabela.",
+ "aliquotas": [
+  {
+   "uf": "AC",
+   "aliquota": "0.19",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "AL",
+   "aliquota": "0.19",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": "2026-03-31",
+   "fonte": "Alíquota modal até 31/03/2026"
+  },
+  {
+   "uf": "AL",
+   "aliquota": "0.205",
+   "fcp": "0",
+   "vigencia_inicio": "2026-04-01",
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal a partir de 1º/04/2026 (lei estadual de dezembro de 2025)"
+  },
+  {
+   "uf": "AM",
+   "aliquota": "0.20",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "AP",
+   "aliquota": "0.18",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "BA",
+   "aliquota": "0.205",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "CE",
+   "aliquota": "0.20",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "DF",
+   "aliquota": "0.20",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "ES",
+   "aliquota": "0.17",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "GO",
+   "aliquota": "0.19",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "MA",
+   "aliquota": "0.23",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "MG",
+   "aliquota": "0.18",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "MS",
+   "aliquota": "0.17",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "MT",
+   "aliquota": "0.17",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "PA",
+   "aliquota": "0.19",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "PB",
+   "aliquota": "0.20",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "PE",
+   "aliquota": "0.205",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "PI",
+   "aliquota": "0.225",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "PR",
+   "aliquota": "0.195",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "RJ",
+   "aliquota": "0.20",
+   "fcp": "0.02",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual); FECP de 2% na regra geral (carga de 22%)"
+  },
+  {
+   "uf": "RN",
+   "aliquota": "0.20",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "RO",
+   "aliquota": "0.195",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "RR",
+   "aliquota": "0.20",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "RS",
+   "aliquota": "0.17",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "SC",
+   "aliquota": "0.17",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "SE",
+   "aliquota": "0.19",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "SP",
+   "aliquota": "0.18",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  },
+  {
+   "uf": "TO",
+   "aliquota": "0.20",
+   "fcp": "0",
+   "vigencia_inicio": null,
+   "vigencia_fim": null,
+   "fonte": "Alíquota modal 2026 (lei estadual)"
+  }
+ ]
+}

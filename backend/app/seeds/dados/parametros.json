@@ -18,5 +18,5 @@
  {"chave": "encargos_folha", "valor": "0.278", "descricao": "Encargos patronais sobre a folha (CPP 20% + RAT + Terceiros)", "fundamento": "Lei 8.212/1991"},
  {"chave": "inss_pro_labore", "valor": "0.20", "descricao": "INSS patronal sobre o pró-labore", "fundamento": "Lei 8.212/1991, art. 22, III"},
  {"chave": "aliq_icms_interna", "valor": "0.18", "descricao": "Alíquota interna de ICMS (SP – autopeças)", "fundamento": "RICMS/SP"},
- {"chave": "aliq_icms_interestadual", "valor": "0.12", "descricao": "Alíquota interestadual média (origem S/SE)", "fundamento": "Res. Senado 22/1989"}
+ {"chave": "aliq_icms_interestadual", "valor": "0.12", "descricao": "Alíquota interestadual quando a nota não traz a UF de destino", "fundamento": "Res. Senado 22/1989; por item: 4% importados (Res. 13/2012), 7% ou 12% pelo destino"}
 ]

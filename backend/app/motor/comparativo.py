@@ -104,7 +104,7 @@ def simular_crescimento(
         return []
     mono = sum((b.receita_monofasica for b in bases.values()), ZERO) / receita
     st = sum((i.receita_liquida for i in itens if i.st_interna), ZERO) / receita
-    icms_normal = icms.total_a_recolher / receita
+    icms_normal = (icms.total_a_recolher - icms.total_difal) / receita  # o Simples acima do sublimite não recolhe DIFAL
     aliq_lp = presumido.total / receita
     aliq_lr = real.total / receita
     if valores is None:

@@ -10,6 +10,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
+    AliquotaUf,
     CfopRegra,
     CompraMensal,
     CompraOrigem,
@@ -33,6 +34,7 @@ from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.motor.tipos import (
     AnoReforma,
     CreditoEstoqueSt,
+    DestinoDifal,
     Despesa,
     EntradaSimulacao,
     FaixaSimples,
@@ -125,11 +127,12 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     # saídas agregadas por competência / produto / NCM / CFOP / UF de destino (o motor é linear por item)
     linhas = db.execute(
         select(NotaFiscal.competencia, NotaItem.cod_produto, NotaItem.ncm, NotaItem.cfop, NotaFiscal.uf_destinatario,
-               func.sum(NotaItem.vl_total))
+               NotaItem.orig_icms, NotaFiscal.consumidor_final, NotaFiscal.dest_contribuinte, func.sum(NotaItem.vl_total))
         .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
         .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA",
                NotaFiscal.competencia.in_(comps))
-        .group_by(NotaFiscal.competencia, NotaItem.cod_produto, NotaItem.ncm, NotaItem.cfop, NotaFiscal.uf_destinatario)
+        .group_by(NotaFiscal.competencia, NotaItem.cod_produto, NotaItem.ncm, NotaItem.cfop, NotaFiscal.uf_destinatario,
+                  NotaItem.orig_icms, NotaFiscal.consumidor_final, NotaFiscal.dest_contribuinte)
     ).all()
 
     # o monofásico vem da lei; a revisão do contador decide Ex, destinação e correção de NCM
@@ -138,12 +141,14 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     # a ST vem da tabela da Base legal, com vigência: a mesma mercadoria pode sair da ST no meio do período
     st_vigente = substituicao.carregar(db, p.empresa.uf)
     brutos = []
-    for c, cod, ncm, cfop, uf, v in linhas:
+    destinos = aliquotas_destino(db)
+    for c, cod, ncm, cfop, uf, origem, final, contribuinte, v in linhas:
         pr = por_produto.get((cod or "", ncm))
         decidido = pr.monofasico if pr and pr.revisao else None
         ncm_final = pr.ncm if pr else ncm
         st = None if st_vigente.vazia else st_vigente.vigente(ncm_final, c) is not None
-        brutos.append(ItemBruto(c, ncm_final, cfop, uf, Decimal(str(v)), monofasico=decidido, sujeito_st=st))
+        brutos.append(ItemBruto(c, ncm_final, cfop, uf, Decimal(str(v)), monofasico=decidido, sujeito_st=st,
+                                origem=origem, difal=_difal(destinos, p.empresa.uf, uf, c, final, contribuinte)))
 
     regras_cfop = {r.cfop: RegraCfop(r.cfop, r.gera_receita) for r in db.scalars(select(CfopRegra))}
     st = {r.ncm: r.sujeito_st for r in db.scalars(select(NcmRegra))}
@@ -239,6 +244,24 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         estoque_st=_credito_estoque_st(db, p),
     )
     return EntradaMontada(entrada, pendencias)
+
+
+def aliquotas_destino(db: Session) -> dict[str, list[AliquotaUf]]:
+    por_uf: dict[str, list[AliquotaUf]] = {}
+    for a in db.scalars(select(AliquotaUf)):
+        por_uf.setdefault(a.uf, []).append(a)
+    return por_uf
+
+
+def _difal(destinos: dict[str, list[AliquotaUf]], uf_empresa: str | None, uf: str | None, competencia: str,
+           consumidor_final: bool | None, contribuinte: bool | None) -> DestinoDifal | None:
+    """Venda a consumidor final não contribuinte de outro estado. Sem o indIEDest na nota, consumidor final conta como
+    não contribuinte (a venda a pessoa física é o caso comum)."""
+    if not uf or not uf_empresa or uf == uf_empresa or not consumidor_final or contribuinte:
+        return None
+    dia = date.fromisoformat(competencia + "-01")
+    a = next((x for x in destinos.get(uf, []) if x.vigencia_inicio <= dia and (x.vigencia_fim is None or dia <= x.vigencia_fim)), None)
+    return DestinoDifal(uf, a.aliquota, a.fcp, a.base_dupla) if a else None
 
 
 def _credito_estoque_st(db: Session, p: Planejamento) -> CreditoEstoqueSt | None:

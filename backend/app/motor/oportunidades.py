@@ -149,6 +149,12 @@ def avaliar_oportunidades(
 def pontos_criticos(entrada: EntradaSimulacao, simples: ResultadoRegime) -> list[PontoCritico]:
     pr = entrada.premissas
     pts: list[PontoCritico] = []
+    difal = [i for i in entrada.itens if i.difal is not None and i.gera_receita]
+    if difal:
+        ufs = sorted({i.difal.uf for i in difal})
+        pts.append(PontoCritico("DIFAL", f"{_brl(sum((i.valor for i in difal), ZERO))} em vendas a consumidor final não contribuinte de "
+                                         f"{len(ufs)} estado(s) ({', '.join(ufs)}). No Lucro Presumido e no Lucro Real o DIFAL dessas vendas, "
+                                         "com o FCP, é pago ao estado de destino e já está no ICMS; no Simples não é devido (STF, ADI 5464)."))
     if not entrada.folha_informada:
         pts.append(PontoCritico("FOLHA", "Folha e pró-labore não informados: LP e LR calculados sem INSS sobre folha; "
                                          "cada R$ 1.000/mês de pró-labore acrescenta R$ 600 de INSS por trimestre."))

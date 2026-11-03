@@ -42,6 +42,7 @@ class NotaFiscal(Base):
     uf_destinatario: Mapped[str | None] = mapped_column(String(2))
     crt_emitente: Mapped[str | None] = mapped_column(String(1))
     consumidor_final: Mapped[bool | None]
+    dest_contribuinte: Mapped[bool | None]  # indIEDest 1 = contribuinte; 2 e 9 (ou CPF) = não contribuinte
 
 
 class NotaItem(Base):

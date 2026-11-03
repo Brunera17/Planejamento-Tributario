@@ -73,11 +73,11 @@ def gerar(sim: Simulacao, p: Planejamento) -> bytes:
                ("receita_interestadual", "Vendas interestaduais"), ("remessas_sem_receita", "Remessas sem receita"),
                ("compras", "Compras de mercadorias"), ("despesas", "Despesas operacionais"),
                ("icms_debito", "ICMS débito (regime normal)"), ("icms_credito", "ICMS crédito"),
-               ("icms_a_recolher", "ICMS a recolher"), ("pis_cofins_lr_debito", "PIS/COFINS LR – débitos"),
+               ("icms_difal", "DIFAL e FCP (estados de destino)"), ("icms_a_recolher", "ICMS a recolher"), ("pis_cofins_lr_debito", "PIS/COFINS LR – débitos"),
                ("pis_cofins_lr_credito", "PIS/COFINS LR – créditos"),
                ("pis_cofins_lr_a_recolher", "PIS/COFINS LR – a recolher")]
     for chave, rot in rotulos:
-        valores = [r["base"][c][chave] for c in comps]
+        valores = [r["base"][c].get(chave, 0) for c in comps]  # simulações antigas não têm o DIFAL
         wb_base.append([rot, *valores])
         col_total = get_column_letter(len(comps) + 2)
         wb_base[f"{col_total}{lin}"] = f"=SUM(B{lin}:{get_column_letter(len(comps) + 1)}{lin})"

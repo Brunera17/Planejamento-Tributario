@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.seguranca import gerar_hash
 from app.db.session import SessionLocal
 from app.models import (
+    AliquotaUf,
     CfopRegra,
     CompraMensal,
     DevolucaoMensal,
@@ -107,6 +108,14 @@ def carregar_tabelas(db: Session) -> None:
             "monofasico", "confianca", "sujeito_st", "indicio_ncm_incorreto", "fundamento", "produto_exemplo",
             "observacao", "requer_revisao", "acao_recomendada", "cst_ibs_cbs", "cclass_trib", "beneficio_reforma")})
     carregar_normas(db)
+    carregar_aliquotas_uf(db)
+
+
+def carregar_aliquotas_uf(db: Session) -> None:
+    for a in ler("aliquotas_uf.json")["aliquotas"]:
+        _incluir_se_falta(db, AliquotaUf, {"uf": a["uf"], "vigencia_inicio": date.fromisoformat(a["vigencia_inicio"] or "2000-01-01")}, {
+            "aliquota": Decimal(a["aliquota"]), "fcp": Decimal(a["fcp"]), "base_dupla": True, "fonte": a["fonte"][:300],
+            "vigencia_fim": date.fromisoformat(a["vigencia_fim"]) if a["vigencia_fim"] else None})
 
 
 def carregar_normas(db: Session) -> None:

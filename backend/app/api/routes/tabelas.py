@@ -1,5 +1,5 @@
 """Tabelas legais: leitura para todos; escrita só para o contador."""
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 from decimal import Decimal
 
@@ -9,8 +9,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual
-from app.core.erros import NaoEncontrado
+from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import (
+    AliquotaUf,
     CfopRegra,
     GrupoDespesa,
     ItemDespesa,
@@ -101,6 +102,14 @@ class RegraStEntrada(Esquema):
         if self.vigencia_fim and self.vigencia_fim < self.vigencia_inicio:
             raise ValueError("O fim da vigência não pode ser antes do início")
         return self
+
+
+class AliquotaUfEntrada(Esquema):
+    aliquota: Decimal = Field(ge=Decimal("0.07"), le=Decimal("0.35"), description="Alíquota interna geral (0,205 = 20,5%)")
+    fcp: Decimal = Field(default=Decimal("0"), ge=0, le=Decimal("0.04"))
+    base_dupla: bool = True
+    vigencia_inicio: date
+    fonte: str = Field(min_length=5, max_length=300)
 
 
 def _reavaliar_planejamentos(db: Session, coluna, valor) -> None:
@@ -318,3 +327,31 @@ def alterar_st(regra_id: int, dados: RegraStEntrada, db: DB, u: Contador):
     db.execute(update(Simulacao).values(desatualizada=True))
     db.commit()
     return _linhas([r])[0]
+
+
+@router.get("/aliquotas-uf")
+def aliquotas_uf(db: DB, _: UsuarioAtual):
+    nomes = {u.id: u.nome for u in db.scalars(select(Usuario))}
+    hoje = date.today()
+    return [{**l, "alterado_por_nome": nomes.get(l["alterado_por"]),
+             "vigente_hoje": l["vigencia_inicio"] <= hoje and (l["vigencia_fim"] is None or hoje <= l["vigencia_fim"])}
+            for l in _linhas(db.scalars(select(AliquotaUf).order_by(AliquotaUf.uf, AliquotaUf.vigencia_inicio)))]
+
+
+@router.post("/aliquotas-uf/{uf}", status_code=201)
+def nova_aliquota_uf(uf: str, dados: AliquotaUfEntrada, db: DB, u: Contador):
+    """A lei do estado mudou: a alíquota nova começa na data informada e a anterior termina na véspera."""
+    uf = uf.upper()
+    atuais = db.scalars(select(AliquotaUf).where(AliquotaUf.uf == uf).order_by(AliquotaUf.vigencia_inicio)).all()
+    if not atuais:
+        raise NaoEncontrado("Estado")
+    anterior = next((a for a in reversed(atuais) if a.vigencia_inicio < dados.vigencia_inicio), None)
+    if anterior is None or any(a.vigencia_inicio >= dados.vigencia_inicio for a in atuais):
+        raise ErroNegocio("Informe uma data posterior ao início da alíquota em vigor", campos={"vigencia_inicio": "anterior à vigente"})
+    anterior.vigencia_fim = dados.vigencia_inicio - timedelta(days=1)
+    nova = AliquotaUf(uf=uf, aliquota=dados.aliquota, fcp=dados.fcp, base_dupla=dados.base_dupla, vigencia_inicio=dados.vigencia_inicio,
+                      fonte=dados.fonte.strip(), alterado_por=u.id, alterado_em=datetime.now(UTC))
+    db.add(nova)
+    db.execute(update(Simulacao).values(desatualizada=True))
+    db.commit()
+    return _linhas([nova])[0]

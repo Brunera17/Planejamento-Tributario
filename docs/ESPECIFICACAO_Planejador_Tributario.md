@@ -202,7 +202,7 @@ Valores padrão vêm das tabelas legais; o contador pode sobrescrever por planej
 | RBT12 informado (PGDAS-D) | vazio → estimado | `Premissas!B15` |
 | Aplicar ICMS-ST nas vendas internas | Não | `Premissas!B69` |
 | Alíquota interna de ICMS | pela UF/NCM | `Premissas!B70` (18%) |
-| Alíquota interestadual média | 12% | `Premissas!B71` |
+| Alíquota interestadual (só quando a nota não traz a UF de destino) | 12% | `Premissas!B71` |
 | Excluir ICMS da base do PIS/COFINS (Tema 69) | Não | `Premissas!B85` |
 | Crédito de PIS/COFINS sobre fretes/armazenagem | Proporcional | `Premissas!B80` |
 | % das compras com crédito de IBS/CBS | 100% | `Premissas!B63` |
@@ -222,6 +222,7 @@ grava a versão usada, para que um relatório antigo continue reproduzível.
 | `reforma_cronograma` | por ano de 2027 a 2033: CBS, IBS, fator de ICMS mantido, fonte e autor da última alteração. Mantida pelo contador na tela Base legal › Reforma Tributária; cada alteração exige a fonte, guarda o valor anterior em `reforma_historico` e desatualiza as simulações. Carga inicial: CBS de referência de 11,3% (TCU, Acórdão 2933/2026-Plenário), 11,2% em 2027 e 2028 (LC 214/2025, art. 347), e IBS projetado de 17,7% (a planilha original usava CBS de 8,8%) |
 | `norma` | biblioteca de normas de ICMS, PIS/COFINS e CBS/IBS: título, esfera, tributos, resumo, uso no cálculo, link do texto oficial e situação. Mantida pelo contador em Base legal › Normas; a carga inicial traz as leis federais, o RICMS/SP e as portarias de ST |
 | `regra_st` | mercadorias na substituição tributária do ICMS por UF e NCM (posição, subposição ou código, com exceções), CEST, segmento, vigência e as normas que listam e que revogam. Carga inicial: todos os anexos da Portaria CAT 68/2019 (SP), com as revogações até a Portaria SRE 34/2026 (fim da ST de autopeças, pneus e outros em 30/09/2026). A ST de cada item de venda é decidida pela vigência na competência; o CST da nota continua decidindo a premissa e gera aviso quando destaca ST depois do fim |
+| `aliquota_uf` | alíquota interna geral de cada estado, FCP da regra geral, base dupla ou única e vigência (alíquotas modais de 2026 na carga; o contador inclui a nova alíquota com a data de início em Base legal › ICMS por estado). Usada no DIFAL: nas vendas a consumidor final não contribuinte de outro estado (`nota_fiscal.dest_contribuinte`, do indIEDest; sem o campo, consumidor final conta como não contribuinte), LP e LR recolhem ao destino base dupla × (alíquota + FCP) − ICMS interestadual (EC 87/2015; LC 190/2022). O DIFAL soma ao ICMS a recolher sem ser abatido pelo saldo credor; o Simples não recolhe (ADI 5464), nem acima do sublimite |
 | `nota_item.bc_st`, `nota_item.vl_icms_st` | base e valor do ICMS-ST do item (vBCST/vICMSST ou vBCSTRet/vICMSSTRet). Reimportar o mesmo XML completa a base nos itens antigos. Usados no crédito do estoque que sai da ST: Portaria CAT 28/2020, Anexo IV (LP/LR: BC ST × alíquota interna; fornecedor do Simples: com dedução do valor da mercadoria) e Anexo V (Simples: (BC ST − valor da mercadoria) × alíquota interna). O planejamento estima o crédito por real de custo pelas entradas com ST até a véspera da exclusão e aplica ao estoque informado (premissa `estoque_st_valor`); LP/LR usam em 12 parcelas desde o mês da exclusão e o Simples abate no DAS a partir do mês seguinte. Aparece como a oportunidade `CREDITO_ESTOQUE_ST` |
 | `icms_aliquota` | por UF de origem × destino e, opcionalmente, por NCM |
 | `cfop_regra` | CFOP, natureza, gera receita?, CSOSN/CST por regime, CST IBS/CBS e cClassTrib — `Premissas` seção 7 |
@@ -460,7 +461,9 @@ Melhorias obrigatórias em relação à planilha:
 
 ```
 Base_ICMS_item = RL_item  se CST ICMS = "00",  senão 0
-Aliq_item      = aliquota interna se Interna, senão aliquota interestadual (tabela icms_aliquota)
+Aliq_item      = aliquota interna se Interna; se Interestadual, por item: 4% se orig ∈ {1,2,3,8} (Res. Senado 13/2012),
+                 7% de S/SE (sem ES) para N/NE/CO/ES, 12% nos demais (Res. Senado 22/1989); sem UF de destino, o parâmetro
+DIFAL_item     = se consumidor final não contribuinte de outra UF: (V − V × Aliq_item) ÷ (1 − aliq_dest − fcp) × (aliq_dest + fcp) − V × Aliq_item
 DEB_ICMS_m     = Σ Base_ICMS_item × Aliq_item
 
 com XML de entrada:  CRED_ICMS_m = Σ ICMS destacado nas entradas

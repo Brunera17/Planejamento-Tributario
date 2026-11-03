@@ -140,3 +140,19 @@ class RegraSt(Base, Vigencia):
     revogada_por_id: Mapped[int | None] = mapped_column(ForeignKey("norma.id"))
     alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     alterado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AliquotaUf(Base, Vigencia):
+    """Alíquota interna geral (modal) do ICMS de cada estado, para o DIFAL das vendas a não contribuinte de outro estado."""
+
+    __tablename__ = "aliquota_uf"
+    __table_args__ = (UniqueConstraint("uf", "vigencia_inicio", name="uq_aliquota_uf"),)
+
+    id: Mapped[PK]
+    uf: Mapped[str] = mapped_column(String(2))
+    aliquota: Mapped[Decimal] = mapped_column(Aliquota)  # sem o fundo de combate à pobreza
+    fcp: Mapped[Decimal] = mapped_column(Aliquota, default=Decimal("0"))  # fundo de combate à pobreza na regra geral
+    base_dupla: Mapped[bool] = mapped_column(default=True)  # base "por dentro" com a alíquota do destino (LC 190/2022)
+    fonte: Mapped[str | None] = mapped_column(String(300))
+    alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    alterado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

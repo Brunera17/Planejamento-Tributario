@@ -514,7 +514,7 @@ def montar(d: DadosRelatorio) -> bytes:
         ("PIS e COFINS", [("Monofásicos", mono), ("Tributação normal", receita - mono)], (MARCA, GRADE),
          "A parte monofásica não paga PIS e COFINS de novo na revenda."),
         ("ICMS", [("Para outros estados", interest), ("Dentro do estado", receita - interest)], (RGBColor(0x4F, 0x8F, 0xA4), GRADE),
-         "Vendas para outros estados usam a alíquota interestadual (7% ou 12%)."),
+         "Vendas para outros estados usam a alíquota interestadual: 4% para importados, 7% ou 12% conforme o destino."),
     )):
         x = MARGEM + i * Inches(6.2)
         dados = CategoryChartData()
