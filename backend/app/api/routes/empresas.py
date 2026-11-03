@@ -77,19 +77,25 @@ def excluir(empresa_id: int, db: DB, _: Contador):
 @router.post("/importacao/previa")
 async def previa(arquivo: UploadFile, db: DB, _: Contador):
     conteudo = await _ler(arquivo)
-    return [dataclasses.asdict(l) for l in importacao_empresas.previa(db, arquivo.filename, conteudo)]
+    try:
+        return [dataclasses.asdict(l) for l in importacao_empresas.previa(db, arquivo.filename, conteudo)]
+    except importacao_empresas.PlanilhaInvalida as e:
+        raise ErroNegocio(str(e), 422) from e
 
 
 @router.post("/importacao/confirmar")
 async def confirmar(arquivo: UploadFile, db: DB, u: Contador):
     conteudo = await _ler(arquivo)
-    imp = importacao_empresas.confirmar(db, arquivo.filename, conteudo, u.id)
+    try:
+        imp = importacao_empresas.confirmar(db, arquivo.filename, conteudo, u.id)
+    except importacao_empresas.PlanilhaInvalida as e:
+        raise ErroNegocio(str(e), 422) from e
     return {"incluidas": imp.incluidas, "atualizadas": imp.atualizadas, "rejeitadas": imp.rejeitadas}
 
 
 async def _ler(arquivo: UploadFile) -> bytes:
-    if not (arquivo.filename or "").lower().endswith((".xlsx", ".csv")):
-        raise ErroNegocio("Envie um arquivo .xlsx ou .csv", 415)
+    if not (arquivo.filename or "").lower().endswith((".xlsx", ".xls", ".csv")):
+        raise ErroNegocio("Envie um arquivo .xlsx, .xls ou .csv", 415)
     conteudo = await arquivo.read()
     if len(conteudo) > 10 * 1024 * 1024:
         raise ErroNegocio("Arquivo acima de 10 MB", 413)

@@ -14,7 +14,11 @@ ASSINATURAS: dict[str, bytes | None] = {
     ".jpg": b"\xff\xd8\xff",
     ".jpeg": b"\xff\xd8\xff",
     ".xlsx": b"PK\x03\x04",
+    ".xls": b"\xd0\xcf\x11\xe0",
+    ".zip": b"PK\x03\x04",
     ".csv": None,
+    ".txt": None,  # SPED e arquivos de texto do sistema contábil
+    ".xml": None,
 }
 
 
@@ -28,7 +32,7 @@ def validar(nome: str, conteudo: bytes) -> str:
     """Devolve a extensão; confere formato, tamanho e se o conteúdo corresponde à extensão."""
     ext = Path(nome).suffix.lower()
     if ext not in ASSINATURAS:
-        raise ErroNegocio("Envie o arquivo em PDF, XLSX, CSV, JPG ou PNG", 415, {"arquivo": "formato não aceito"})
+        raise ErroNegocio("Envie o arquivo em PDF, XML, TXT, XLSX, XLS, CSV, ZIP, JPG ou PNG", 415, {"arquivo": "formato não aceito"})
     limite = get_settings().upload_max_mb
     if len(conteudo) > limite * 1024 * 1024:
         raise ErroNegocio(f"O arquivo tem mais de {limite} MB", 413, {"arquivo": "muito grande"})

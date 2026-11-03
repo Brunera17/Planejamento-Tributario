@@ -4,7 +4,7 @@ import { type FormEvent, useState } from "react";
 import { api, mensagemErro } from "../api/cliente";
 import type { Empresa } from "../api/tipos";
 import { REGIMES } from "../lib/formato";
-import { Botao, Card, Erro } from "./ui";
+import { Botao, Erro, LegendaObrigatorio, Modal, Obrigatorio } from "./ui";
 
 const UFS = "AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".split(" ");
 const ATIVIDADES = { COMERCIO: "Comércio", INDUSTRIA: "Indústria", SERVICO: "Serviço" };
@@ -47,18 +47,18 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
   const muda = empresa && (empresa.regime_tributario !== f.regime_tributario || empresa.uf !== f.uf);
 
   return (
-    <Card titulo={empresa ? `Editar ${empresa.razao_social}` : "Nova empresa"}>
+    <Modal aberto titulo={empresa ? "Editar empresa" : "Nova empresa"} descricao={empresa?.razao_social} fechar={fechar} largura="max-w-3xl">
       <form onSubmit={enviar} className="grid gap-3 text-sm md:grid-cols-6">
         <label className="md:col-span-4">
-          Razão social
+          Razão social<Obrigatorio />
           <input autoFocus className={campo} maxLength={200} value={f.razao_social} onChange={(e) => setF({ ...f, razao_social: e.target.value })} />
         </label>
         <label className="md:col-span-2">
-          CNPJ
+          CNPJ<Obrigatorio />
           <input className={campo} maxLength={18} placeholder="00.000.000/0000-00" value={f.cnpj} onChange={(e) => setF({ ...f, cnpj: e.target.value })} />
         </label>
         <label className="md:col-span-2">
-          Regime atual
+          Regime atual<Obrigatorio />
           <select className={campo} value={f.regime_tributario} onChange={(e) => setF({ ...f, regime_tributario: e.target.value })}>
             {Object.entries(REGIMES).map(([k, v]) => (
               <option key={k} value={k}>
@@ -68,7 +68,7 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
           </select>
         </label>
         <label>
-          UF
+          UF<Obrigatorio />
           <select className={campo} value={f.uf} onChange={(e) => setF({ ...f, uf: e.target.value })}>
             {UFS.map((u) => (
               <option key={u}>{u}</option>
@@ -76,7 +76,7 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
           </select>
         </label>
         <label>
-          Atividade
+          Atividade<Obrigatorio />
           <select className={campo} value={f.atividade} onChange={(e) => setF({ ...f, atividade: e.target.value })}>
             {Object.entries(ATIVIDADES).map(([k, v]) => (
               <option key={k} value={k}>
@@ -101,16 +101,19 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
           {f.atividade !== "COMERCIO" && <p className="text-warning-ink">O cálculo está validado só para comércio (Anexo I do Simples e presunção de 8% e 12%).</p>}
           {muda && <p className="text-warning-ink">Mudar o regime ou a UF deixa as simulações desta empresa desatualizadas.</p>}
           <Erro mensagem={erro} />
-          <div className="flex gap-2">
-            <Botao type="submit" disabled={salvar.isPending}>
-              {empresa ? "Salvar alterações" : "Cadastrar empresa"}
-            </Botao>
-            <Botao type="button" variante="secundario" onClick={fechar}>
-              Cancelar
-            </Botao>
+          <div className="flex items-center justify-between gap-2 border-t border-surface pt-3">
+            <LegendaObrigatorio />
+            <div className="flex gap-2">
+              <Botao variante="secundario" onClick={fechar}>
+                Cancelar
+              </Botao>
+              <Botao type="submit" disabled={salvar.isPending}>
+                {empresa ? "Salvar alterações" : "Cadastrar empresa"}
+              </Botao>
+            </div>
           </div>
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, baixarArquivo, mensagemErro } from "../api/cliente";
-import { Botao, Card, Erro } from "../components/ui";
+import { Botao, Card, EnvioArquivo, Erro, Modal, Obrigatorio } from "../components/ui";
 import { competenciaExtenso } from "../lib/formato";
 
 type Documento = {
@@ -18,89 +18,28 @@ type Dados = {
   tipos: { id: number; nome: string }[];
   documentos: Documento[];
 };
-type Celula = { competencia: string; tipo: number; nome: string };
+type Celula = { competencia: string; tipo: number; nome: string; editavel: boolean; doc?: Documento };
 
-const FORMATOS = ".pdf,.xlsx,.csv,.jpg,.jpeg,.png";
+const FORMATOS = [".pdf", ".xml", ".txt", ".xlsx", ".xls", ".csv", ".zip", ".jpg", ".jpeg", ".png"];
 
-/** Conferência de documentos: uma linha por documento, uma coluna por mês, com a ação na própria célula. */
+/** Conferência de documentos: uma linha por documento, uma coluna por mês; cada célula abre o envio daquele documento. */
 export function Documentos({ pid }: { pid: number }) {
-  const qc = useQueryClient();
   const [erro, setErro] = useState<string | null>(null);
-  const [justificando, setJustificando] = useState<Celula | null>(null);
-  const [justificativa, setJustificativa] = useState("");
+  const [aberta, setAberta] = useState<Celula | null>(null);
   const { data } = useQuery({
     queryKey: ["documentos", pid],
     queryFn: async () => (await api.get<Dados>(`/planejamentos/${pid}/documentos`)).data,
-  });
-
-  function concluido() {
-    setErro(null);
-    qc.invalidateQueries({ queryKey: ["documentos", pid] });
-    qc.invalidateQueries({ queryKey: ["planejamento", String(pid)] });
-    qc.invalidateQueries({ queryKey: ["progresso", pid] });
-  }
-  const falhou = (e: unknown) => setErro(mensagemErro(e));
-
-  const enviar = useMutation({
-    mutationFn: ({ competencia, tipo, arquivo }: { competencia: string; tipo: number; arquivo: File }) => {
-      const fd = new FormData();
-      fd.append("arquivo", arquivo);
-      return api.post(`/planejamentos/${pid}/documentos/${competencia}/${tipo}`, fd);
-    },
-    onSuccess: concluido,
-    onError: falhou,
-  });
-  const naoSeAplica = useMutation({
-    mutationFn: (c: Celula) => api.put(`/planejamentos/${pid}/documentos/${c.competencia}/${c.tipo}/nao-se-aplica`, { justificativa: justificativa.trim() }),
-    onSuccess: () => {
-      setJustificando(null);
-      setJustificativa("");
-      concluido();
-    },
-    onError: falhou,
-  });
-  const excluir = useMutation({
-    mutationFn: (id: number) => api.delete(`/planejamentos/${pid}/documentos/${id}`),
-    onSuccess: concluido,
-    onError: falhou,
   });
 
   if (!data) return <p>Carregando…</p>;
   const esperados = data.tipos.length * data.competencias.length;
   const faltam = esperados - data.documentos.length;
   const achar = (c: string, t: number) => data.documentos.find((d) => d.competencia === c && d.tipo_documento_id === t);
-  const baixar = (d: Documento) => baixarArquivo(`/planejamentos/${pid}/documentos/${d.id}/download`, d.arquivo ?? "documento").catch(falhou);
-  const acao = "text-left text-brand underline underline-offset-2";
 
   return (
     <div className="space-y-4">
       <Erro mensagem={erro} />
-      {justificando && (
-        <Card titulo="Marcar como não se aplica">
-          <p className="mb-2 text-sm text-text-muted">
-            {justificando.nome}, {competenciaExtenso(justificando.competencia)}
-          </p>
-          <label className="block text-sm">
-            Por que este documento não se aplica?
-            <textarea
-              autoFocus
-              rows={2}
-              maxLength={500}
-              className="mt-1 w-full rounded border border-border bg-white px-2 py-1.5"
-              value={justificativa}
-              onChange={(e) => setJustificativa(e.target.value)}
-            />
-          </label>
-          <div className="mt-2 flex gap-2">
-            <Botao disabled={justificativa.trim().length < 5 || naoSeAplica.isPending} onClick={() => naoSeAplica.mutate(justificando)}>
-              Marcar como não se aplica
-            </Botao>
-            <Botao variante="secundario" onClick={() => setJustificando(null)}>
-              Cancelar
-            </Botao>
-          </div>
-        </Card>
-      )}
+      {aberta && <EnvioDocumento pid={pid} celula={aberta} fechar={() => setAberta(null)} falhou={(e) => setErro(mensagemErro(e))} />}
       <Card titulo={faltam === 0 ? `Todos os ${esperados} documentos resolvidos` : `Faltam ${faltam} de ${esperados} documentos`} semPadding>
         <div className="overflow-x-auto">
           <table className="condensado w-full border-collapse text-sm">
@@ -108,7 +47,7 @@ export function Documentos({ pid }: { pid: number }) {
               <tr className="border-b border-border">
                 <th className="px-4 py-2 text-left font-medium text-text-muted">Documento</th>
                 {data.competencias.map((c) => (
-                  <th key={c.competencia} className="min-w-44 border-l border-surface px-3 py-2 text-left font-medium text-text-muted">
+                  <th key={c.competencia} className="min-w-40 border-l border-surface px-3 py-2 text-left font-medium text-text-muted">
                     {competenciaExtenso(c.competencia)}
                     {!c.editavel && <span className="block text-xs font-normal">enviado para conferência</span>}
                   </th>
@@ -118,59 +57,38 @@ export function Documentos({ pid }: { pid: number }) {
             <tbody>
               {data.tipos.map((t) => (
                 <tr key={t.id} className="border-b border-surface last:border-0">
-                  <th scope="row" className="max-w-64 px-4 py-2 text-left align-top font-medium">
+                  <th scope="row" className="max-w-64 px-4 py-2 text-left align-middle font-medium">
                     {t.nome}
                   </th>
                   {data.competencias.map(({ competencia, editavel }) => {
                     const d = achar(competencia, t.id);
+                    const celula = { competencia, tipo: t.id, nome: t.nome, editavel, doc: d };
                     return (
-                      <td key={competencia} className={`border-l border-surface px-3 py-2 align-top ${d ? "" : "bg-alert-soft"}`}>
-                        {d?.arquivo && (
-                          <button className={`${acao} block max-w-44 truncate`} title={d.arquivo} onClick={() => baixar(d)}>
-                            ✔ {d.arquivo}
-                          </button>
-                        )}
-                        {d?.nao_se_aplica && (
-                          <span className="block" title={d.justificativa ?? ""}>
-                            – Não se aplica
-                            <span className="block text-xs text-text-muted">{d.justificativa}</span>
-                          </span>
-                        )}
-                        {!d && <span className="block text-alert-ink">! Pendente</span>}
-                        {editavel && (
-                          <span className="mt-1 flex flex-wrap gap-x-3 text-xs">
-                            <label className="cursor-pointer text-brand underline underline-offset-2 focus-within:outline-2">
-                              {d?.arquivo ? "Substituir" : "Enviar arquivo"}
-                              <input
-                                type="file"
-                                accept={FORMATOS}
-                                className="sr-only"
-                                aria-label={`Enviar ${t.nome} de ${competenciaExtenso(competencia)}`}
-                                onChange={(e) => {
-                                  const arquivo = e.target.files?.[0];
-                                  e.target.value = "";
-                                  if (arquivo) enviar.mutate({ competencia, tipo: t.id, arquivo });
-                                }}
-                              />
-                            </label>
-                            {!d?.nao_se_aplica && (
-                              <button
-                                className={acao}
-                                onClick={() => {
-                                  setJustificativa("");
-                                  setJustificando({ competencia, tipo: t.id, nome: t.nome });
-                                }}
-                              >
+                      <td key={competencia} className={`border-l border-surface px-3 py-2 align-middle ${d ? "" : "bg-alert-soft"}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0">
+                            {d?.arquivo && (
+                              <span className="block truncate text-success-ink" title={d.arquivo}>
+                                Enviado
+                                <span className="block truncate text-xs text-text-muted">{d.arquivo}</span>
+                              </span>
+                            )}
+                            {d?.nao_se_aplica && (
+                              <span className="block" title={d.justificativa ?? ""}>
                                 Não se aplica
-                              </button>
+                                <span className="block truncate text-xs text-text-muted">{d.justificativa}</span>
+                              </span>
                             )}
-                            {d && (
-                              <button className="text-alert underline underline-offset-2" onClick={() => window.confirm("Remover este documento?") && excluir.mutate(d.id)}>
-                                Remover
-                              </button>
-                            )}
+                            {!d && <span className="text-alert-ink">Pendente</span>}
                           </span>
-                        )}
+                          <Botao
+                            variante={!d && editavel ? "linha-destaque" : "linha"}
+                            aria-label={`${d ? "Abrir" : "Enviar"} ${t.nome} de ${competenciaExtenso(competencia)}`}
+                            onClick={() => setAberta(celula)}
+                          >
+                            {d ? "Abrir" : editavel ? "Enviar" : "Ver"}
+                          </Botao>
+                        </div>
                       </td>
                     );
                   })}
@@ -180,7 +98,123 @@ export function Documentos({ pid }: { pid: number }) {
           </table>
         </div>
       </Card>
-      <p className="text-sm text-text-muted">Aceita PDF, XLSX, CSV, JPG e PNG de até 10 MB.</p>
     </div>
+  );
+}
+
+function EnvioDocumento({ pid, celula, fechar, falhou }: { pid: number; celula: Celula; fechar: () => void; falhou: (e: unknown) => void }) {
+  const qc = useQueryClient();
+  const d = celula.doc;
+  const [modo, setModo] = useState<"arquivo" | "nao-se-aplica">(d?.nao_se_aplica ? "nao-se-aplica" : "arquivo");
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const [justificativa, setJustificativa] = useState(d?.justificativa ?? "");
+  const [removendo, setRemovendo] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  function concluido() {
+    qc.invalidateQueries({ queryKey: ["documentos", pid] });
+    qc.invalidateQueries({ queryKey: ["planejamento", String(pid)] });
+    qc.invalidateQueries({ queryKey: ["progresso", pid] });
+    fechar();
+  }
+  const opcoes = { onSuccess: concluido, onError: (e: unknown) => setErro(mensagemErro(e)) };
+  const enviar = useMutation({
+    mutationFn: () => {
+      const fd = new FormData();
+      fd.append("arquivo", arquivos[0]);
+      return api.post(`/planejamentos/${pid}/documentos/${celula.competencia}/${celula.tipo}`, fd);
+    },
+    ...opcoes,
+  });
+  const naoSeAplica = useMutation({
+    mutationFn: () => api.put(`/planejamentos/${pid}/documentos/${celula.competencia}/${celula.tipo}/nao-se-aplica`, { justificativa: justificativa.trim() }),
+    ...opcoes,
+  });
+  const excluir = useMutation({ mutationFn: () => api.delete(`/planejamentos/${pid}/documentos/${d!.id}`), ...opcoes });
+
+  const pronto = modo === "arquivo" ? arquivos.length === 1 : justificativa.trim().length >= 5;
+  const titulo = `${celula.nome}`;
+
+  return (
+    <Modal aberto fechar={fechar} titulo={titulo} descricao={competenciaExtenso(celula.competencia)}>
+      <div className="space-y-4 text-sm">
+        {d && (
+          <div className="flex items-center justify-between gap-3 rounded border border-surface bg-bg px-3 py-2">
+            <span className="min-w-0">
+              <span className="block font-medium">{d.arquivo ? "Arquivo enviado" : "Marcado como não se aplica"}</span>
+              <span className="block truncate text-text-muted">{d.arquivo ?? d.justificativa}</span>
+            </span>
+            <span className="flex shrink-0 gap-1.5">
+              {d.arquivo && (
+                <Botao variante="linha" onClick={() => baixarArquivo(`/planejamentos/${pid}/documentos/${d.id}/download`, d.arquivo ?? "documento").catch(falhou)}>
+                  Baixar
+                </Botao>
+              )}
+              {celula.editavel && (
+                <Botao variante="linha-perigo" onClick={() => setRemovendo(true)}>
+                  Remover
+                </Botao>
+              )}
+            </span>
+          </div>
+        )}
+        {removendo && (
+          <div className="flex items-center justify-between gap-3 rounded border border-alert/40 bg-alert-soft px-3 py-2 text-alert-ink">
+            <span>O documento volta a ficar pendente. Remover?</span>
+            <span className="flex gap-1.5">
+              <Botao variante="linha" onClick={() => setRemovendo(false)}>
+                Voltar
+              </Botao>
+              <Botao variante="linha-perigo" disabled={excluir.isPending} onClick={() => excluir.mutate()}>
+                Remover documento
+              </Botao>
+            </span>
+          </div>
+        )}
+        {celula.editavel ? (
+          <>
+            <fieldset className="flex flex-wrap gap-4">
+              <legend className="sr-only">O que fazer</legend>
+              <label className="flex items-center gap-1.5">
+                <input type="radio" name="modo-documento" checked={modo === "arquivo"} onChange={() => setModo("arquivo")} />
+                {d?.arquivo ? "Substituir o arquivo" : "Enviar arquivo"}
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="radio" name="modo-documento" checked={modo === "nao-se-aplica"} onChange={() => setModo("nao-se-aplica")} />
+                Não se aplica a este mês
+              </label>
+            </fieldset>
+            {modo === "arquivo" ? (
+              <EnvioArquivo formatos={FORMATOS} arquivos={arquivos} aoEscolher={(fs) => setArquivos(fs.slice(0, 1))} />
+            ) : (
+              <label className="block">
+                Por que este documento não se aplica?<Obrigatorio />
+                <textarea
+                  autoFocus
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Ex.: a empresa não teve funcionários neste mês"
+                  className="mt-1 w-full rounded border border-border bg-white px-2 py-1.5"
+                  value={justificativa}
+                  onChange={(e) => setJustificativa(e.target.value)}
+                />
+              </label>
+            )}
+            <p className="text-xs text-text-muted">Até 10 MB por arquivo.</p>
+            <Erro mensagem={erro} />
+            <div className="flex justify-end gap-2 border-t border-surface pt-3">
+              <Botao variante="secundario" onClick={fechar}>
+                Cancelar
+              </Botao>
+              <Botao disabled={!pronto || enviar.isPending || naoSeAplica.isPending} onClick={() => (modo === "arquivo" ? enviar.mutate() : naoSeAplica.mutate())}>
+                {modo === "arquivo" ? "Enviar documento" : "Marcar como não se aplica"}
+              </Botao>
+            </div>
+          </>
+        ) : (
+          <p className="text-text-muted">Este mês foi enviado para conferência e está só para consulta.</p>
+        )}
+      </div>
+    </Modal>
   );
 }

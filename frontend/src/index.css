@@ -86,6 +86,10 @@ select:focus {
   background: var(--color-highlight);
 }
 
+.modal::backdrop {
+  background: rgb(31 41 51 / 0.45);
+}
+
 /* O único movimento automático do sistema: a composição da carga cresce ao abrir o resultado. */
 @keyframes crescer {
   from {

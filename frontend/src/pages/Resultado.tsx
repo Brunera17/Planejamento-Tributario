@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { api, baixarArquivo, lerSessao, mensagemErro } from "../api/cliente";
 import type { LinhaNcm, PassoMemoria, Planejamento, Resultado as TResultado, ResultadoRegime, SimulacaoResumo } from "../api/tipos";
-import { Badge, Botao, Card, Erro, Tabela } from "../components/ui";
+import { Badge, Botao, BotaoLink, Card, Erro, Tabela } from "../components/ui";
 import { brl, competenciaExtenso, dataHora, percentual, REGIMES } from "../lib/formato";
 
 const CORES: Record<string, string> = {
@@ -58,9 +58,9 @@ export function Resultado() {
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <Link to={`/planejamentos/${s.planejamento_id}?aba=simulacoes`} className="text-brand underline underline-offset-2">
+        <BotaoLink to={`/planejamentos/${s.planejamento_id}?aba=simulacoes`} variante="linha">
           Voltar ao planejamento
-        </Link>
+        </BotaoLink>
         <span className="text-text-muted">
           {planejamento?.razao_social}, simulação {s.versao}
         </span>
@@ -418,12 +418,17 @@ function PainelRelatorio({ sid, pid, preliminar }: { sid: number; pid: number; p
             <ul className="divide-y divide-surface text-sm">
               {emitidos.map((r) => (
                 <li key={r.id} className="py-2">
-                  <button className="text-left text-brand underline underline-offset-2" onClick={() => baixarArquivo(`/relatorios/${r.id}/download`, r.arquivo).catch((e) => setErro(mensagemErro(e)))}>
-                    {dataHora(r.gerado_em)}
-                  </button>
-                  <div className="text-text-muted">
-                    {r.gerado_por_nome}, simulação {r.simulacao_id}
-                    {r.preliminar ? ", preliminar" : ""}
+                  <div className="flex items-center justify-between gap-3">
+                    <span>
+                      {dataHora(r.gerado_em)}
+                      <span className="block text-text-muted">
+                        {r.gerado_por_nome}, simulação {r.simulacao_id}
+                        {r.preliminar ? ", preliminar" : ""}
+                      </span>
+                    </span>
+                    <Botao variante="linha" onClick={() => baixarArquivo(`/relatorios/${r.id}/download`, r.arquivo).catch((e) => setErro(mensagemErro(e)))}>
+                      Baixar PDF
+                    </Botao>
                   </div>
                 </li>
               ))}

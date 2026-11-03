@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, baixarArquivo, lerSessao, mensagemErro } from "../api/cliente";
-import { Botao, Card, Erro, Ficha, Tabela } from "../components/ui";
+import { Botao, Card, Erro, Ficha, Modal, Obrigatorio, Tabela, useConfirmacao } from "../components/ui";
 import { brl } from "../lib/formato";
 
 type Alerta = { tipo: string; rotulo: string; trava: boolean };
@@ -44,6 +44,7 @@ const FILTROS = [
 export function Revisao({ pid }: { pid: number }) {
   const contador = lerSessao()?.usuario.perfil === "CONTADOR";
   const qc = useQueryClient();
+  const [confirmar, janelaConfirmacao] = useConfirmacao();
   const [filtro, setFiltro] = useState("pendentes");
   const [tipo, setTipo] = useState<string | null>(null);
   const [aberto, setAberto] = useState<Produto | null>(null);
@@ -94,6 +95,7 @@ export function Revisao({ pid }: { pid: number }) {
       ) : (
         <p className="text-sm text-success-ink">✔ Nenhum produto trava a simulação final.</p>
       )}
+      {janelaConfirmacao}
       {aberto && <FormRevisao key={`${aberto.cod_produto}-${aberto.ncm_nota}`} pid={pid} produto={aberto} fechar={() => setAberto(null)} concluido={atualizar} />}
       <Card
         titulo={`${visiveis.length} ${visiveis.length === 1 ? "produto" : "produtos"}`}
@@ -167,23 +169,29 @@ export function Revisao({ pid }: { pid: number }) {
                     </span>
                   )}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2 text-right">
-                  {contador && (
-                    <button
-                      className="text-brand underline underline-offset-2"
-                      onClick={() => {
-                        setAberto(p);
-                        window.scrollTo({ top: 0 });
-                      }}
-                    >
-                      {p.revisado ? "Alterar" : "Revisar"}
-                    </button>
-                  )}
-                  {contador && p.id_revisao && (
-                    <button className="ml-3 text-alert underline underline-offset-2" onClick={() => window.confirm("Desfazer esta revisão?") && desfazer.mutate(p.id_revisao!)}>
-                      Desfazer
-                    </button>
-                  )}
+                <td className="px-4 py-2">
+                  <div className="flex justify-end gap-1.5">
+                    {contador && (
+                      <Botao variante="linha" onClick={() => setAberto(p)}>
+                        {p.revisado ? "Alterar" : "Revisar"}
+                      </Botao>
+                    )}
+                    {contador && p.id_revisao && (
+                      <Botao
+                        variante="linha-perigo"
+                        onClick={async () =>
+                          (await confirmar({
+                            titulo: "Desfazer revisão",
+                            mensagem: "O produto volta a seguir só a lei e, se a lei pedir confirmação, volta a travar a simulação final.",
+                            confirmar: "Desfazer revisão",
+                            perigo: true,
+                          })) && desfazer.mutate(p.id_revisao!)
+                        }
+                      >
+                        Desfazer
+                      </Botao>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -221,10 +229,10 @@ function FormRevisao({ pid, produto, fechar, concluido }: { pid: number; produto
   const pronto = valido && consulta && motivo.trim().length >= 5 && (!condicional || decisao);
 
   return (
-    <Card titulo={`Revisar ${produto.descricao || `NCM ${ncmFmt(produto.ncm_nota)}`}`}>
+    <Modal aberto fechar={fechar} titulo="Revisar produto" descricao={produto.descricao || `Itens agregados no NCM ${ncmFmt(produto.ncm_nota)}`}>
       <div className="grid gap-4 text-sm md:grid-cols-[14rem_1fr]">
         <label>
-          NCM a usar no cálculo
+          NCM a usar no cálculo<Obrigatorio />
           <input
             inputMode="numeric"
             maxLength={8}
@@ -250,7 +258,9 @@ function FormRevisao({ pid, produto, fechar, concluido }: { pid: number; produto
         </div>
         {condicional && (
           <fieldset className="md:col-span-2">
-            <legend className="mb-1 font-medium">Depois de conferir, este produto é monofásico?</legend>
+            <legend className="mb-1 font-medium">
+              Depois de conferir, este produto é monofásico?<Obrigatorio />
+            </legend>
             <div className="flex gap-4">
               {(["SIM", "NAO"] as const).map((v) => (
                 <label key={v} className="flex items-center gap-1.5">
@@ -262,7 +272,7 @@ function FormRevisao({ pid, produto, fechar, concluido }: { pid: number; produto
           </fieldset>
         )}
         <label className="md:col-span-2">
-          Motivo da decisão
+          Motivo da decisão<Obrigatorio />
           <textarea
             rows={2}
             maxLength={500}
@@ -274,16 +284,16 @@ function FormRevisao({ pid, produto, fechar, concluido }: { pid: number; produto
         </label>
         <div className="space-y-2 md:col-span-2">
           <Erro mensagem={erro} />
-          <div className="flex gap-2">
-            <Botao disabled={!pronto || salvar.isPending} onClick={() => salvar.mutate()}>
-              Salvar revisão
-            </Botao>
+          <div className="flex justify-end gap-2 border-t border-surface pt-3">
             <Botao variante="secundario" onClick={fechar}>
               Cancelar
+            </Botao>
+            <Botao disabled={!pronto || salvar.isPending} onClick={() => salvar.mutate()}>
+              Salvar revisão
             </Botao>
           </div>
         </div>
       </div>
-    </Card>
+    </Modal>
   );
 }

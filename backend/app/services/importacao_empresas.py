@@ -36,18 +36,55 @@ class LinhaPrevia:
     avisos: list[str] = field(default_factory=list)
 
 
+class PlanilhaInvalida(ValueError):
+    pass
+
+
+def _celula(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))  # CNPJ e telefone numéricos chegam como 3.4567890000130E13
+    return str(v)
+
+
+def _decodificar(conteudo: bytes) -> str:
+    # o Excel no Windows grava CSV em cp1252; só UTF-8 válido é lido como UTF-8
+    try:
+        return conteudo.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return conteudo.decode("cp1252", errors="replace")
+
+
 def _ler_linhas(nome: str, conteudo: bytes) -> list[dict]:
-    if nome.lower().endswith(".csv"):
-        texto = conteudo.decode("utf-8-sig", errors="replace")
-        dialeto = csv.Sniffer().sniff(texto.splitlines()[0], delimiters=";,")
-        linhas = list(csv.reader(io.StringIO(texto), dialeto))
+    n = nome.lower()
+    try:
+        if n.endswith(".csv"):
+            texto = _decodificar(conteudo)
+            primeira = next((l for l in texto.splitlines() if l.strip()), "")
+            delim = ";" if primeira.count(";") >= primeira.count(",") else ","
+            linhas = list(csv.reader(io.StringIO(texto), delimiter=delim))
+        elif n.endswith(".xls"):
+            import xlrd
+
+            ws = xlrd.open_workbook(file_contents=conteudo).sheet_by_index(0)
+            linhas = [[_celula(v) for v in ws.row_values(i)] for i in range(ws.nrows)]
+        else:
+            ws = load_workbook(io.BytesIO(conteudo), read_only=True, data_only=True).active
+            linhas = [[_celula(v) for v in r] for r in ws.iter_rows(values_only=True)]
+    except PlanilhaInvalida:
+        raise
+    except Exception as e:  # noqa: BLE001 – arquivo corrompido ou de outro formato
+        raise PlanilhaInvalida(f"Não foi possível ler o arquivo: {e}") from e
+
+    # o cabeçalho pode vir depois de um título; vale a primeira linha com Empresa e CNPJ
+    for i, r in enumerate(linhas[:20]):
+        cab = [COLUNAS.get(sem_acentos(c).upper().strip()) for c in r]
+        if {"razao_social", "cnpj"} <= set(cab):
+            break
     else:
-        ws = load_workbook(io.BytesIO(conteudo), read_only=True, data_only=True).active
-        linhas = [["" if v is None else str(v) for v in r] for r in ws.iter_rows(values_only=True)]
-    if not linhas:
-        return []
-    cab = [COLUNAS.get(sem_acentos(c).upper().strip()) for c in linhas[0]]
-    return [{k: v.strip() for k, v in zip(cab, r) if k} for r in linhas[1:] if any(str(x).strip() for x in r)]
+        raise PlanilhaInvalida("Cabeçalho não encontrado: a planilha precisa das colunas Empresa e CNPJ")
+    return [{k: v.strip() for k, v in zip(cab, r) if k} for r in linhas[i + 1:] if any(str(x).strip() for x in r)]
 
 
 def previa(db: Session, nome: str, conteudo: bytes) -> list[LinhaPrevia]:
@@ -55,6 +92,8 @@ def previa(db: Session, nome: str, conteudo: bytes) -> list[LinhaPrevia]:
     for i, d in enumerate(_ler_linhas(nome, conteudo), start=2):
         lp = LinhaPrevia(i, d, "VALIDA")
         cnpj = normalizar_cnpj(d.get("cnpj"))
+        if cnpj.isdigit() and 11 < len(cnpj) < 14:
+            cnpj = cnpj.zfill(14)  # célula numérica perde os zeros à esquerda
         d["cnpj"] = cnpj
         if not d.get("razao_social"):
             lp.erros.append("Empresa (razão social) é obrigatória")

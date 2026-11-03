@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import type { Empresa, Planejamento } from "../api/tipos";
-import { Badge, BarraProgresso, Botao, Cabecalho, Card, Erro, Tabela } from "../components/ui";
+import { Badge, BarraProgresso, Botao, Cabecalho, Card, Erro, LegendaObrigatorio, Modal, Obrigatorio, Tabela } from "../components/ui";
 import { competenciaExtenso, formatarCnpj, REGIMES, STATUS } from "../lib/formato";
 
 export function Planejamentos() {
   const contador = lerSessao()?.usuario.perfil === "CONTADOR";
+  const navegar = useNavigate();
   const [novo, setNovo] = useState(false);
   const [status, setStatus] = useState("");
   const [busca, setBusca] = useState("");
@@ -22,7 +23,7 @@ export function Planejamentos() {
       <Cabecalho
         titulo="Planejamentos"
         descricao="Cada planejamento reúne os dados de uma empresa num período e compara os três regimes."
-        acoes={contador && !novo && <Botao onClick={() => setNovo(true)}>Novo planejamento</Botao>}
+        acoes={contador && <Botao onClick={() => setNovo(true)}>Novo planejamento</Botao>}
       />
       {novo && <NovoPlanejamento fechar={() => setNovo(false)} />}
       <Card
@@ -50,9 +51,9 @@ export function Planejamentos() {
       >
         <Tabela cabecalho={["Empresa", "CNPJ", "Regime atual", "Período", "Progresso", "Status"]}>
           {data.map((p) => (
-            <tr key={p.id}>
+            <tr key={p.id} className="cursor-pointer" onClick={() => navegar(`/planejamentos/${p.id}`)}>
               <td className="px-4 py-2">
-                <Link className="font-medium text-brand underline-offset-2 hover:underline" to={`/planejamentos/${p.id}`}>
+                <Link className="font-medium text-brand underline-offset-2 hover:underline" to={`/planejamentos/${p.id}`} onClick={(e) => e.stopPropagation()}>
                   {p.razao_social}
                 </Link>
               </td>
@@ -62,7 +63,7 @@ export function Planejamentos() {
                 {competenciaExtenso(p.competencia_inicial)} a {competenciaExtenso(p.competencia_final)}
               </td>
               <td className="px-2 py-2">
-                <Link to={`/planejamentos/${p.id}?aba=pendencias`} title="Ver o que falta">
+                <Link to={`/planejamentos/${p.id}?aba=pendencias`} title="Ver o que falta" onClick={(e) => e.stopPropagation()}>
                   <BarraProgresso valor={p.progresso} />
                 </Link>
               </td>
@@ -90,13 +91,20 @@ function NovoPlanejamento({ fechar }: { fechar: () => void }) {
     },
     onError: (e) => setErro(mensagemErro(e)),
   });
-  const campo = "mt-1 block rounded border border-border bg-white px-2 py-1.5";
+  const campo = "mt-1 block w-full rounded border border-border bg-white px-2 py-1.5";
+  const completo = form.empresa_id && form.competencia_inicial && form.competencia_final;
   return (
-    <Card titulo="Novo planejamento">
-      <div className="flex flex-wrap items-end gap-4 text-sm">
-        <label>
-          Empresa
-          <select className={`${campo} min-w-64`} value={form.empresa_id} onChange={(e) => setForm({ ...form, empresa_id: e.target.value })}>
+    <Modal aberto fechar={fechar} titulo="Novo planejamento" descricao="Escolha a empresa e os meses que entram na comparação." largura="max-w-xl">
+      <form
+        className="grid gap-3 text-sm sm:grid-cols-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (completo) criar.mutate();
+        }}
+      >
+        <label className="sm:col-span-2">
+          Empresa<Obrigatorio />
+          <select autoFocus className={campo} value={form.empresa_id} onChange={(e) => setForm({ ...form, empresa_id: e.target.value })}>
             <option value="">Selecione</option>
             {empresas.map((e) => (
               <option key={e.id} value={e.id}>
@@ -106,27 +114,28 @@ function NovoPlanejamento({ fechar }: { fechar: () => void }) {
           </select>
         </label>
         <label>
-          Primeiro mês
+          Primeiro mês<Obrigatorio />
           <input type="month" className={campo} value={form.competencia_inicial} onChange={(e) => setForm({ ...form, competencia_inicial: e.target.value })} />
         </label>
         <label>
-          Último mês
+          Último mês<Obrigatorio />
           <input type="month" className={campo} value={form.competencia_final} onChange={(e) => setForm({ ...form, competencia_final: e.target.value })} />
         </label>
-        <div className="flex gap-2">
-          <Botao onClick={() => criar.mutate()} disabled={!form.empresa_id || !form.competencia_inicial || !form.competencia_final}>
-            Criar planejamento
-          </Botao>
-          <Botao variante="secundario" onClick={fechar}>
-            Cancelar
-          </Botao>
-        </div>
-      </div>
-      {erro && (
-        <div className="mt-3">
+        <div className="space-y-2 sm:col-span-2">
           <Erro mensagem={erro} />
+          <div className="flex items-center justify-between gap-2 border-t border-surface pt-3">
+            <LegendaObrigatorio />
+            <div className="flex gap-2">
+              <Botao variante="secundario" onClick={fechar}>
+                Cancelar
+              </Botao>
+              <Botao type="submit" disabled={!completo || criar.isPending}>
+                Criar planejamento
+              </Botao>
+            </div>
+          </div>
         </div>
-      )}
-    </Card>
+      </form>
+    </Modal>
   );
 }

@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import type { Bloco, Catalogo, Planejamento as TPlanejamento, SimulacaoResumo } from "../api/tipos";
-import { Badge, BarraProgresso, Botao, Cabecalho, CampoMoeda, Card, Erro, Ficha, Tabela } from "../components/ui";
+import { Badge, BarraProgresso, Botao, BotaoLink, Cabecalho, CampoMoeda, Card, EnvioArquivo, Erro, Ficha, Modal, Obrigatorio, Tabela, useConfirmacao } from "../components/ui";
 import { brl, competenciaExtenso, dataHora, editarMoeda, formatarCnpj, lerMoeda, REGIMES } from "../lib/formato";
 import { Bens } from "./Bens";
 import { Documentos } from "./Documentos";
@@ -93,6 +93,7 @@ function Coleta({ pid }: { pid: number }) {
   const [erro, setErro] = useState<string | null>(null);
   const [log, setLog] = useState<string | null>(null);
   const [relatorios, setRelatorios] = useState<ResumoRelatorio[] | null>(null);
+  const [importando, setImportando] = useState(false);
   const { data } = useQuery({
     queryKey: ["coleta", pid],
     queryFn: async () => (await api.get<ColetaDados>(`/planejamentos/${pid}/coleta`)).data,
@@ -114,6 +115,7 @@ function Coleta({ pid }: { pid: number }) {
       return api.post(`/planejamentos/${pid}/nfe`, fd);
     },
     onSuccess: (r) => {
+      setRelatorios(null);
       setLog(`${r.data.lidos} notas lidas: ${r.data.importados} importadas e ${r.data.ignorados} ignoradas.`);
       atualizar();
     },
@@ -148,79 +150,137 @@ function Coleta({ pid }: { pid: number }) {
   return (
     <div className="space-y-4">
       <Erro mensagem={erro} />
+      {log && <p className="text-sm">{log}</p>}
+      {relatorios && <ResumoImportacao resumos={relatorios} fechar={() => setRelatorios(null)} />}
       <Card
-        titulo="Notas fiscais de saída"
+        titulo="Movimento mensal"
         acoes={
-          <div className="flex flex-wrap gap-2">
-            <label className="cursor-pointer rounded border border-border bg-white px-3 py-1.5 text-sm font-medium text-brand hover:border-brand hover:bg-highlight">
-              {importarRelatorio.isPending ? "Importando relatório…" : "Importar relatório do Domínio"}
-              <input
-                type="file"
-                multiple
-                accept=".xls,.xlsx"
-                className="hidden"
-                disabled={importarRelatorio.isPending}
-                onChange={(e) => {
-                  const arquivos = Array.from(e.target.files ?? []);
-                  e.target.value = "";
-                  if (arquivos.length) importarRelatorio.mutate(arquivos);
-                }}
-              />
-            </label>
-            <label className="cursor-pointer rounded border border-border bg-white px-3 py-1.5 text-sm font-medium text-brand hover:border-brand hover:bg-highlight">
-              Importar XML ou .zip
-              <input type="file" accept=".xml,.zip" className="hidden" onChange={(e) => e.target.files?.[0] && importar.mutate(e.target.files[0])} />
-            </label>
-          </div>
+          <Botao variante="secundario" onClick={() => setImportando(true)}>
+            Importar documentos
+          </Botao>
         }
+        semPadding
       >
-        <p className="mb-3 max-w-[80ch] text-sm text-text-muted">
-          O relatório é o "Movimentação de Produtos – ICMS – PIS – COFINS" do Domínio, em .xls. Pode enviar os de saídas e de entradas
-          de vários meses de uma vez; o de entradas preenche as devoluções de venda.
-        </p>
-        {log && <p className="mb-2 text-sm">{log}</p>}
-        {relatorios && <ResumoImportacao resumos={relatorios} fechar={() => setRelatorios(null)} />}
-        <Tabela cabecalho={["Competência", "Notas", "Itens", "Valor total"]} numericas={[1, 2, 3]}>
+        <Tabela cabecalho={["Competência", "Faturamento (notas de saída)", "Compras", "Devoluções", "Folha", "Pró-labore"]} numericas={[1, 2, 3, 4, 5]}>
           {data.competencias.map((c) => {
             const s = data.saidas.find((x) => x.competencia === c);
             return (
               <tr key={c}>
-                <td className="px-2 py-1.5">{competenciaExtenso(c)}</td>
-                <td className="num px-2 py-1.5">{s?.notas ?? <span className="text-alert">pendente</span>}</td>
-                <td className="num px-2 py-1.5">{s?.itens ?? "—"}</td>
-                <td className="num px-2 py-1.5">{brl(s?.valor)}</td>
+                <td className="px-4 py-1.5">{competenciaExtenso(c)}</td>
+                <td className="num px-2 py-1.5">
+                  {s ? (
+                    <>
+                      {brl(s.valor)}
+                      <span className="block text-xs text-text-muted">
+                        {s.notas} {s.notas === 1 ? "nota" : "notas"}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-alert">pendente</span>
+                  )}
+                </td>
+                <td className="px-2 py-1 text-right">
+                  <CampoMoeda rotulo={`Compras ${c}`} valor={data.compras[c]} onChange={(v) => mensal("compras", c, v)} />
+                </td>
+                <td className="px-2 py-1 text-right">
+                  <CampoMoeda rotulo={`Devoluções ${c}`} valor={data.devolucoes[c]} onChange={(v) => mensal("devolucoes", c, v)} />
+                </td>
+                {(["folha", "pro_labore"] as const).map((campo) => (
+                  <td key={campo} className="px-2 py-1 text-right">
+                    <CampoMoeda
+                      rotulo={`${campo} ${c}`}
+                      valor={data.folha[c]?.[campo]}
+                      onChange={(v) => gravar.mutate({ rota: "folha", corpo: [{ competencia: c, ...data.folha[c], [campo]: v }] })}
+                    />
+                  </td>
+                ))}
               </tr>
             );
           })}
         </Tabela>
       </Card>
-      <Card titulo="Compras, devoluções, folha e pró-labore">
-        <Tabela cabecalho={["Competência", "Compras", "Devoluções", "Folha", "Pró-labore"]} numericas={[1, 2, 3, 4]}>
-          {data.competencias.map((c) => (
-            <tr key={c}>
-              <td className="px-2 py-1.5">{competenciaExtenso(c)}</td>
-              <td className="px-2 py-1 text-right">
-                <CampoMoeda rotulo={`Compras ${c}`} valor={data.compras[c]} onChange={(v) => mensal("compras", c, v)} />
-              </td>
-              <td className="px-2 py-1 text-right">
-                <CampoMoeda rotulo={`Devoluções ${c}`} valor={data.devolucoes[c]} onChange={(v) => mensal("devolucoes", c, v)} />
-              </td>
-              {(["folha", "pro_labore"] as const).map((campo) => (
-                <td key={campo} className="px-2 py-1 text-right">
-                  <CampoMoeda
-                    rotulo={`${campo} ${c}`}
-                    valor={data.folha[c]?.[campo]}
-                    onChange={(v) =>
-                      gravar.mutate({ rota: "folha", corpo: [{ competencia: c, ...data.folha[c], [campo]: v }] })
-                    }
-                  />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </Tabela>
-      </Card>
+      <ImportarDocumentos
+        aberto={importando}
+        fechar={() => setImportando(false)}
+        enviando={importar.isPending || importarRelatorio.isPending}
+        enviar={(tipo, arquivos) => {
+          setImportando(false);
+          if (tipo === "relatorio") importarRelatorio.mutate(arquivos);
+          else arquivos.forEach((f) => importar.mutate(f));
+        }}
+      />
     </div>
+  );
+}
+
+const TIPOS_IMPORTACAO = {
+  relatorio: {
+    nome: "Relatório do Domínio",
+    detalhe: "Movimentação de Produtos – ICMS – PIS – COFINS. O de saídas preenche o faturamento; o de entradas, as devoluções. Pode enviar vários meses de uma vez.",
+    formatos: [".xls", ".xlsx"],
+  },
+  xml: {
+    nome: "XML de NF-e",
+    detalhe: "Notas de saída avulsas ou num arquivo .zip. Preenchem o faturamento e a lista de produtos para revisão.",
+    formatos: [".xml", ".zip"],
+  },
+};
+
+function ImportarDocumentos({
+  aberto,
+  fechar,
+  enviar,
+  enviando,
+}: {
+  aberto: boolean;
+  fechar: () => void;
+  enviar: (tipo: keyof typeof TIPOS_IMPORTACAO, arquivos: File[]) => void;
+  enviando: boolean;
+}) {
+  const [tipo, setTipo] = useState<keyof typeof TIPOS_IMPORTACAO>("relatorio");
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const t = TIPOS_IMPORTACAO[tipo];
+  return (
+    <Modal aberto={aberto} fechar={fechar} titulo="Importar documentos" descricao="Os valores lidos entram no movimento mensal; notas já importadas não são duplicadas.">
+      <div className="space-y-4 text-sm">
+        <fieldset className="grid gap-2 sm:grid-cols-2">
+          <legend className="mb-1 font-medium">Tipo de documento</legend>
+          {(Object.keys(TIPOS_IMPORTACAO) as (keyof typeof TIPOS_IMPORTACAO)[]).map((k) => (
+            <label key={k} className={`flex cursor-pointer gap-2 rounded border px-3 py-2 ${tipo === k ? "border-brand bg-highlight" : "border-border"}`}>
+              <input
+                type="radio"
+                name="tipo-documento"
+                checked={tipo === k}
+                onChange={() => {
+                  setTipo(k);
+                  setArquivos([]);
+                }}
+              />
+              <span>
+                <span className="block font-medium">{TIPOS_IMPORTACAO[k].nome}</span>
+                <span className="text-xs text-text-muted">{TIPOS_IMPORTACAO[k].formatos.join(", ")}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <p className="text-text-muted">{t.detalhe}</p>
+        <EnvioArquivo formatos={t.formatos} multiplo arquivos={arquivos} aoEscolher={setArquivos} />
+        <div className="flex justify-end gap-2 border-t border-surface pt-3">
+          <Botao variante="secundario" onClick={fechar}>
+            Cancelar
+          </Botao>
+          <Botao
+            disabled={!arquivos.length || enviando}
+            onClick={() => {
+              enviar(tipo, arquivos);
+              setArquivos([]);
+            }}
+          >
+            Importar {arquivos.length > 1 ? `${arquivos.length} arquivos` : "arquivo"}
+          </Botao>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -317,7 +377,22 @@ function Pendencias({ pid }: { pid: number }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
       {data.blocos.map((b) => (
-        <Card key={b.codigo} titulo={`${b.nome} (peso ${b.peso}%)`} acoes={<span className="num text-sm">{b.preenchidos}/{b.esperados}</span>}>
+        <Card
+          key={b.codigo}
+          titulo={`${b.nome} (peso ${b.peso}%)`}
+          acoes={
+            <span className="flex items-center gap-3">
+              {b.codigo === "NCM" && b.pendencias.length > 0 && (
+                <BotaoLink variante="linha" to={`/planejamentos/${pid}?aba=revisao`}>
+                  Revisar produtos
+                </BotaoLink>
+              )}
+              <span className="num text-sm">
+                {b.preenchidos}/{b.esperados}
+              </span>
+            </span>
+          }
+        >
           {b.pendencias.length === 0 ? (
             <p className="text-sm">✔ Completo</p>
           ) : (
@@ -325,13 +400,7 @@ function Pendencias({ pid }: { pid: number }) {
               {b.pendencias.map((x, i) => (
                 <li key={i}>
                   <span className="text-alert">●</span> {x.competencia ? `${competenciaExtenso(x.competencia)}: ` : ""}
-                  {b.codigo === "NCM" ? (
-                    <Link className="text-brand underline underline-offset-2" to={`/planejamentos/${pid}?aba=revisao`}>
-                      {x.descricao}
-                    </Link>
-                  ) : (
-                    x.descricao
-                  )}
+                  {x.descricao}
                 </li>
               ))}
             </ul>
@@ -373,10 +442,10 @@ function Simulacoes({ pid }: { pid: number }) {
             <td className="px-2 py-1.5 font-medium">{REGIMES[s.regime_recomendado]}</td>
             <td className="px-2 py-1.5">{dataHora(s.executada_em)}</td>
             <td className="px-2 py-1.5">{s.desatualizada ? <span className="text-alert">⚠ desatualizada</span> : s.aprovada_em ? "✔ aprovada" : "atual"}</td>
-            <td className="px-2 py-1.5">
-              <Link className="text-brand underline underline-offset-2" to={`/simulacoes/${s.id}`}>
+            <td className="px-2 py-1.5 text-right">
+              <BotaoLink variante="linha" to={`/simulacoes/${s.id}`}>
                 Ver resultado
-              </Link>
+              </BotaoLink>
             </td>
           </tr>
         ))}
@@ -402,9 +471,9 @@ function ResumoImportacao({ resumos, fechar }: { resumos: ResumoRelatorio[]; fec
     <div className="mb-4 rounded border border-border bg-bg p-3 text-sm" role="status">
       <div className="mb-2 flex items-center justify-between">
         <strong className="font-semibold">Importação concluída</strong>
-        <button className="text-brand underline underline-offset-2" onClick={fechar}>
+        <Botao variante="linha" onClick={fechar}>
           Fechar
-        </button>
+        </Botao>
       </div>
       <ul className="space-y-2">
         {resumos.map((r, i) => (
@@ -550,19 +619,19 @@ function OutrasDespesas({
                 onChange={(e) => setLinhas(linhas.map((x, j) => (j === i ? { ...x, valor: e.target.value.replace(/[^\d.,]/g, "") } : x)))}
               />
               {editavel && linhas.length > 1 && (
-                <button type="button" className="text-alert underline underline-offset-2" onClick={() => setLinhas(linhas.filter((_, j) => j !== i))}>
+                <Botao variante="linha-perigo" onClick={() => setLinhas(linhas.filter((_, j) => j !== i))}>
                   Remover
-                </button>
+                </Botao>
               )}
             </div>
           ))}
           <Erro mensagem={erro} />
           {editavel && (
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" className="text-brand underline underline-offset-2" onClick={() => setLinhas([...linhas, { descricao: "", valor: "" }])}>
+              <Botao variante="secundario" onClick={() => setLinhas([...linhas, { descricao: "", valor: "" }])}>
                 Adicionar linha
-              </button>
-              <Botao type="button" variante="secundario" onClick={salvarLinhas}>
+              </Botao>
+              <Botao onClick={salvarLinhas}>
                 Salvar outras despesas
               </Botao>
               {alterada && <span className="text-warning-ink">Alterações ainda não salvas</span>}
@@ -586,6 +655,7 @@ const ESTADOS: Record<string, string> = {
 function AcoesStatus({ p }: { p: TPlanejamento }) {
   const qc = useQueryClient();
   const contador = lerSessao()?.usuario.perfil === "CONTADOR";
+  const [confirmar, janelaConfirmacao] = useConfirmacao();
   const [devolvendo, setDevolvendo] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -604,9 +674,15 @@ function AcoesStatus({ p }: { p: TPlanejamento }) {
     onError: (e) => setErro(mensagemErro(e)),
   });
 
-  function enviar() {
-    if (p.progresso < 100 && !window.confirm(`Os dados estão em ${p.progresso}%. Enviar para conferência mesmo assim?`)) return;
-    mudar.mutate({ status: "EM_CONFERENCIA" });
+  async function enviar() {
+    const ok =
+      p.progresso >= 100 ||
+      (await confirmar({
+        titulo: "Enviar para conferência",
+        mensagem: `Os dados estão em ${p.progresso}%. O contador vai receber o planejamento com pendências (veja a aba Pendências). Enviar mesmo assim?`,
+        confirmar: "Enviar com pendências",
+      }));
+    if (ok) mudar.mutate({ status: "EM_CONFERENCIA" });
   }
 
   const ultimo = historico[historico.length - 1];
@@ -623,7 +699,7 @@ function AcoesStatus({ p }: { p: TPlanejamento }) {
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="text-text-muted">{ESTADOS[p.status]}</span>
         <div className="ml-auto flex flex-wrap gap-2">
-          {podeDevolver && !devolvendo && (
+          {podeDevolver && (
             <Botao variante="secundario" onClick={() => setDevolvendo(true)}>
               {p.status === "EM_CONFERENCIA" ? "Devolver para a coleta" : "Reabrir a coleta"}
             </Botao>
@@ -641,28 +717,29 @@ function AcoesStatus({ p }: { p: TPlanejamento }) {
         </div>
       </div>
       <Erro mensagem={erro} />
-      {devolvendo && (
-        <Card titulo="Por que está voltando para a coleta?">
+      {janelaConfirmacao}
+      <Modal aberto={devolvendo} fechar={() => setDevolvendo(false)} titulo="Devolver para a coleta" descricao="O motivo aparece para quem está coletando os dados." largura="max-w-lg">
+        <label className="block text-sm">
+          Motivo<Obrigatorio />
           <textarea
             autoFocus
-            rows={2}
+            rows={3}
             maxLength={500}
-            aria-label="Motivo"
             placeholder="Diga o que precisa ser ajustado"
-            className="w-full rounded border border-border bg-white px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded border border-border bg-white px-2 py-1.5"
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
           />
-          <div className="mt-2 flex gap-2">
-            <Botao disabled={motivo.trim().length < 3 || mudar.isPending} onClick={() => mudar.mutate({ status: "EM_COLETA", motivo: motivo.trim() })}>
-              Devolver para a coleta
-            </Botao>
-            <Botao variante="secundario" onClick={() => setDevolvendo(false)}>
-              Cancelar
-            </Botao>
-          </div>
-        </Card>
-      )}
+        </label>
+        <div className="mt-3 flex justify-end gap-2 border-t border-surface pt-3">
+          <Botao variante="secundario" onClick={() => setDevolvendo(false)}>
+            Cancelar
+          </Botao>
+          <Botao disabled={motivo.trim().length < 3 || mudar.isPending} onClick={() => mudar.mutate({ status: "EM_COLETA", motivo: motivo.trim() })}>
+            Devolver para a coleta
+          </Botao>
+        </div>
+      </Modal>
     </div>
   );
 }
