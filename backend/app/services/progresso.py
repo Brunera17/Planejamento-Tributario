@@ -26,16 +26,16 @@ from app.models import (
     Planejamento,
     TipoDocumento,
 )
-from app.services import revisao_produtos
+from app.services import premissas_auto, revisao_produtos
 
 PESOS_PADRAO = {
-    "SAIDAS": 20, "DESPESAS": 20, "COMPRAS": 15, "NCM": 10, "FOLHA": 10,
-    "DOCUMENTOS": 10, "OUTRAS_DESPESAS": 5, "BENS": 5, "OBSERVACOES": 5,
+    "SAIDAS": 20, "DESPESAS": 20, "COMPRAS": 10, "NCM": 10, "FOLHA": 10,
+    "DOCUMENTOS": 10, "OUTRAS_DESPESAS": 5, "BENS": 5, "OBSERVACOES": 5, "PREMISSAS": 5,
 }
 NOMES = {
     "SAIDAS": "Saídas (faturamento)", "DESPESAS": "Despesas", "COMPRAS": "Compras", "NCM": "Revisão de produtos",
     "FOLHA": "Folha e pró-labore", "DOCUMENTOS": "Documentos", "OUTRAS_DESPESAS": "Outras despesas",
-    "BENS": "Bens próprios", "OBSERVACOES": "Observações",
+    "BENS": "Bens próprios", "OBSERVACOES": "Observações", "PREMISSAS": "Premissas",
 }
 
 
@@ -117,6 +117,10 @@ def calcular(db: Session, p: Planejamento) -> tuple[int, list[Bloco]]:
     tem_bem = db.scalar(select(Bem.id).where(Bem.empresa_id == p.empresa_id).limit(1)) is not None
     b["BENS"].ok() if tem_bem or p.sem_bens else b["BENS"].falta(None, "Cadastrar bens ou declarar que não possui")
     b["OBSERVACOES"].ok() if p.observacoes_aceitas_em else b["OBSERVACOES"].falta(None, "Aceite das observações")
+
+    faltam = premissas_auto.faltantes(db, p)
+    for chave, rotulo in premissas_auto.ROTULOS.items():
+        b["PREMISSAS"].falta(None, rotulo) if chave in faltam else b["PREMISSAS"].ok()
 
     valor = sum(x.peso * x.fracao for x in b.values())
     tudo_ok = all(x.preenchidos == x.esperados for x in b.values())

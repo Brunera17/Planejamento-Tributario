@@ -236,7 +236,8 @@ def importar(db: Session, p: Planejamento, nome: str, conteudo: bytes, usuario_i
         db.flush()
         db.add_all(NotaItem(nota_fiscal_id=nf.id, n_item=n, cod_produto=i.cod_produto, descricao=i.descricao, ncm=i.ncm,
                             cfop=i.cfop, quantidade=i.quantidade, vl_unitario=i.unitario, vl_produtos=i.valor,
-                            vl_total=i.valor, vl_icms=i.icms, cst_pis=i.cst_pis) for n, i in enumerate(itens, start=1))
+                            vl_total=i.valor, vl_icms=i.icms, cst_pis=i.cst_pis,
+                            cst_icms=i.cst_icms or None) for n, i in enumerate(itens, start=1))
         resumo.notas_importadas += 1
         acc = por_comp[nf.competencia]
         acc["notas"] += 1

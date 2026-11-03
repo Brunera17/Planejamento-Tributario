@@ -387,6 +387,11 @@ function Pendencias({ pid }: { pid: number }) {
                   Revisar produtos
                 </BotaoLink>
               )}
+              {b.codigo === "PREMISSAS" && b.pendencias.length > 0 && (
+                <BotaoLink variante="linha" to={`/planejamentos/${pid}?aba=premissas`}>
+                  Preencher premissas
+                </BotaoLink>
+              )}
               <span className="num text-sm">
                 {b.preenchidos}/{b.esperados}
               </span>

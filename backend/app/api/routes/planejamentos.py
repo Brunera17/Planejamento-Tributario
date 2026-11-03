@@ -40,7 +40,7 @@ from app.schemas.planejamento import (
     StatusEntrada,
     ValorCompetencia,
 )
-from app.services import progresso, relatorio_contabil, revisao_produtos
+from app.services import premissas_auto, progresso, relatorio_contabil, revisao_produtos
 from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
@@ -177,6 +177,7 @@ def ver_coleta(pid: int, db: DB, _: UsuarioAtual):
     def mensal(modelo):
         return {m.competencia: m.valor for m in db.scalars(select(modelo).where(modelo.planejamento_id == pid))}
 
+    auto = premissas_auto.derivar(db, p)
     return {
         "competencias": p.competencias(),
         "compras": mensal(CompraMensal),
@@ -187,6 +188,13 @@ def ver_coleta(pid: int, db: DB, _: UsuarioAtual):
                                for o in db.scalars(select(CompraOrigem).where(CompraOrigem.planejamento_id == pid))],
         "premissas": {pr.chave: json.loads(pr.valor) for pr in
                       db.scalars(select(PremissaPlanejamento).where(PremissaPlanejamento.planejamento_id == pid))},
+        # valores tirados das notas: valem enquanto o contador não informar outro
+        "premissas_auto": {k: {"valor": d.valor, "fonte": d.fonte} for k, d in auto.premissas.items()},
+        "composicao_auto": auto.composicao and {
+            "linhas": [{"aliquota": a, "percentual": v} for a, v in sorted(auto.composicao.items(), reverse=True)],
+            "fonte": auto.fonte_composicao,
+        },
+        "indicio_st": auto.indicio_st,
         "saidas": [{"competencia": c, "notas": n, "itens": i, "valor": v} for c, n, i, v in db.execute(
             select(NotaFiscal.competencia, func.count(func.distinct(NotaFiscal.id)), func.count(NotaItem.id),
                    func.sum(NotaItem.vl_total))
@@ -231,6 +239,14 @@ def gravar_folha(pid: int, valores: list[FolhaCompetencia], db: DB, _: UsuarioAt
             f = FolhaMensal(planejamento_id=pid, competencia=v.competencia)
             db.add(f)
         f.folha, f.pro_labore = v.folha, v.pro_labore
+    _alterou(db, p)
+
+
+@router.delete("/{pid}/composicao-compras", status_code=204)
+def apagar_composicao(pid: int, db: DB, _: UsuarioAtual):
+    """Volta a origem das compras para o valor das notas (ou para pendente, sem notas de compra)."""
+    p = obter_planejamento(db, pid)
+    db.execute(delete(CompraOrigem).where(CompraOrigem.planejamento_id == pid))
     _alterou(db, p)
 
 
@@ -401,7 +417,8 @@ async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
             continue
         nf = NotaFiscal(planejamento_id=pid, importacao_id=imp.id, chave_acesso=n.chave_acesso, numero=n.numero,
                         data_emissao=n.data_emissao, competencia=n.competencia, tipo=tipo,
-                        uf_emitente=n.uf_emitente, uf_destinatario=n.uf_destinatario)
+                        uf_emitente=n.uf_emitente, uf_destinatario=n.uf_destinatario,
+                        crt_emitente=n.crt_emitente, consumidor_final=n.consumidor_final)
         db.add(nf)
         db.flush()
         db.add_all(NotaItem(nota_fiscal_id=nf.id, **vars(i)) for i in n.itens)

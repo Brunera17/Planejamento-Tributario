@@ -2,11 +2,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
-import { Botao, Card, Erro } from "../components/ui";
+import { Botao, Card, Erro, Obrigatorio } from "../components/ui";
 import { brl, editarMoeda, lerMoeda, percentual } from "../lib/formato";
 
 type Origem = { origem: string; aliquota: number; percentual: number };
-type Coleta = { composicao_compras: Origem[]; premissas: Record<string, string | boolean>; compras: Record<string, number> };
+type Automatica = { valor: string | number | boolean; fonte: string };
+type Coleta = {
+  composicao_compras: Origem[];
+  premissas: Record<string, string | boolean>;
+  premissas_auto: Record<string, Automatica>;
+  composicao_auto: { linhas: { aliquota: number; percentual: number }[]; fonte: string } | null;
+  indicio_st: string | null;
+  compras: Record<string, number>;
+};
 type Parametro = { chave: string; valor: number };
 
 const MOEDAS = {
@@ -26,6 +34,21 @@ const OPCOES = [
 ] as const;
 
 const campo = "mt-1 block w-full rounded border border-border bg-white px-2 py-1.5 disabled:bg-bg";
+
+/** De onde vem o valor: informado pelo contador (sem marca), das notas (com a explicação) ou pendente. */
+function Procedencia({ auto, informado, vazio }: { auto?: Automatica; informado: boolean; vazio?: boolean }) {
+  if (informado && !vazio) return null;
+  if (auto && !informado)
+    return (
+      <span className="mt-1 block text-xs text-brand">
+        <span className="mr-1 rounded bg-highlight px-1.5 py-0.5 font-medium">Das notas</span>
+        {auto.fonte}
+      </span>
+    );
+  return <span className="mt-1 block text-xs font-medium text-alert-ink">Pendente: informe para concluir as premissas</span>;
+}
+
+const mesmo = (a: unknown, b: unknown) => (typeof a === "boolean" || typeof b === "boolean" ? a === b : Number(a) === Number(b));
 
 export function Premissas({ pid }: { pid: number }) {
   const { data } = useQuery({
@@ -60,17 +83,20 @@ const AVISO_SIMULACAO = "Salvo. As simulações deste planejamento ficam desatua
 function OrigemCompras({ pid, coleta, interna }: { pid: number; coleta: Coleta; interna: number }) {
   const linhas = [
     { origem: "Compras internas (fornecedor da mesma UF)", aliquota: interna },
-    { origem: "Interestaduais de Sul e Sudeste (exceto ES)", aliquota: 0.12 },
-    { origem: "Interestaduais de Norte, Nordeste, Centro-Oeste e ES", aliquota: 0.07 },
-    { origem: "Importados", aliquota: 0.04 },
+    { origem: "Interestaduais a 12% (regra geral)", aliquota: 0.12 },
+    { origem: "Interestaduais a 7% (de Sul e Sudeste para Norte, Nordeste, Centro-Oeste e ES)", aliquota: 0.07 },
+    { origem: "Importados (4%, Resolução do Senado 13/2012)", aliquota: 0.04 },
   ];
   const informada = coleta.composicao_compras.length > 0;
+  const auto = coleta.composicao_auto;
+  const base: { aliquota: number; percentual: number }[] = informada ? coleta.composicao_compras : (auto?.linhas ?? []);
   const inicial = () =>
     Object.fromEntries(linhas.map((l) => {
-      const o = coleta.composicao_compras.find((x) => Math.abs(Number(x.aliquota) - l.aliquota) < 0.0001);
+      const o = base.find((x) => Math.abs(Number(x.aliquota) - l.aliquota) < 0.0001);
       return [l.aliquota, o ? editarMoeda(Number(o.percentual) * 100) : ""];
     }));
   const [valores, setValores] = useState<Record<string, string>>(inicial);
+  useEffect(() => setValores(inicial()), [coleta]); // eslint-disable-line react-hooks/exhaustive-deps
   const [erro, setErro] = useState<string | null>(null);
   const [salvo, setSalvo] = useState(false);
   const concluir = useConcluir(pid);
@@ -96,13 +122,41 @@ function OrigemCompras({ pid, coleta, interna }: { pid: number; coleta: Coleta; 
       setErro(mensagemErro(e));
     },
   });
+  const usarNotas = useMutation({
+    mutationFn: () => api.delete(`/planejamentos/${pid}/composicao-compras`),
+    onSuccess: () => {
+      setErro(null);
+      setSalvo(false);
+      concluir();
+    },
+    onError: (e) => setErro(mensagemErro(e)),
+  });
 
   return (
     <Card titulo="Origem das compras">
       <p className="mb-3 max-w-[75ch] text-sm text-text-muted">
         Define o crédito de ICMS no Lucro Presumido e no Lucro Real. O crédito é o imposto destacado na nota de compra, que muda conforme a origem do fornecedor.
       </p>
-      {!informada && <p className="mb-3 rounded border border-warning bg-warning-soft px-3 py-2 text-sm text-warning-ink">Ainda não informada. Enquanto isso, a simulação assume 100% de compras internas, o que pode superestimar o crédito.</p>}
+      {!informada && auto && (
+        <p className="mb-3 rounded border border-brand/30 bg-highlight px-3 py-2 text-sm">
+          <span className="mr-1 rounded bg-white px-1.5 py-0.5 text-xs font-medium text-brand">Das notas</span>
+          Calculada pelas notas de compra importadas: {auto.fonte}. Ao alterar e salvar, vale o que você informar.
+        </p>
+      )}
+      {informada && auto && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-text-muted">
+          Informada pelo contador. As notas de compra indicam outra composição.
+          <Botao variante="linha" disabled={usarNotas.isPending} onClick={() => usarNotas.mutate()}>
+            Usar a das notas
+          </Botao>
+        </p>
+      )}
+      {!informada && !auto && (
+        <p className="mb-3 rounded border border-warning bg-warning-soft px-3 py-2 text-sm text-warning-ink">
+          Pendente. Importe o XML das notas de compra para o sistema calcular, ou informe abaixo. Enquanto isso, a simulação assume 100% de compras
+          internas, o que pode superestimar o crédito.
+        </p>
+      )}
       <table className="condensado w-full max-w-2xl text-sm">
         <thead>
           <tr className="border-b border-border text-text-muted">
@@ -155,10 +209,14 @@ function OrigemCompras({ pid, coleta, interna }: { pid: number; coleta: Coleta; 
 
 function FormPremissas({ pid, coleta }: { pid: number; coleta: Coleta }) {
   const contador = lerSessao()?.usuario.perfil === "CONTADOR";
+  const informado = (k: string) => coleta.premissas[k] != null;
+  const auto = coleta.premissas_auto;
+  // informado pelo contador > tirado das notas > padrão
+  const valor = (k: string) => (informado(k) ? coleta.premissas[k] : auto[k]?.valor);
   const inicial = () => ({
-    moedas: Object.fromEntries((Object.keys(MOEDAS) as ChaveMoeda[]).map((k) => [k, coleta.premissas[k] != null ? editarMoeda(Number(coleta.premissas[k])) : ""])) as Record<ChaveMoeda, string>,
-    opcoes: Object.fromEntries(OPCOES.map((o) => [o.chave, (coleta.premissas[o.chave] as boolean | undefined) ?? o.padrao])) as Record<string, boolean>,
-    pct: coleta.premissas.pct_compras_credito_ibs_cbs != null ? editarMoeda(Number(coleta.premissas.pct_compras_credito_ibs_cbs) * 100) : "100,00",
+    moedas: Object.fromEntries((Object.keys(MOEDAS) as ChaveMoeda[]).map((k) => [k, valor(k) != null ? editarMoeda(Number(valor(k))) : ""])) as Record<ChaveMoeda, string>,
+    opcoes: Object.fromEntries(OPCOES.map((o) => [o.chave, (valor(o.chave) as boolean | undefined) ?? o.padrao])) as Record<string, boolean>,
+    pct: valor("pct_compras_credito_ibs_cbs") != null ? editarMoeda(Number(valor("pct_compras_credito_ibs_cbs")) * 100) : "",
   });
   const [f, setF] = useState(inicial);
   const [erro, setErro] = useState<string | null>(null);
@@ -172,6 +230,8 @@ function FormPremissas({ pid, coleta }: { pid: number; coleta: Coleta }) {
       (Object.keys(MOEDAS) as ChaveMoeda[]).forEach((k) => (corpo[k] = lerMoeda(f.moedas[k])));
       const pct = lerMoeda(f.pct);
       corpo.pct_compras_credito_ibs_cbs = pct == null ? null : pct / 100;
+      // valor igual ao das notas, sem nada informado antes: continua seguindo as notas
+      for (const k of Object.keys(corpo)) if (!informado(k) && auto[k] && mesmo(corpo[k], auto[k].valor)) corpo[k] = null;
       return api.put(`/planejamentos/${pid}/premissas`, corpo);
     },
     onSuccess: () => {
@@ -188,6 +248,7 @@ function FormPremissas({ pid, coleta }: { pid: number; coleta: Coleta }) {
   const moeda = (k: ChaveMoeda) => (
     <label key={k}>
       {MOEDAS[k]}
+      <Obrigatorio />
       <input
         inputMode="decimal"
         disabled={!contador}
@@ -199,6 +260,7 @@ function FormPremissas({ pid, coleta }: { pid: number; coleta: Coleta }) {
           setF({ ...f, moedas: { ...f.moedas, [k]: e.target.value.replace(/[^\d.,]/g, "") } });
         }}
       />
+      <Procedencia auto={auto[k]} informado={informado(k)} vazio={!f.moedas[k]} />
     </label>
   );
   const semRbt12 = !lerMoeda(f.moedas.rbt12_informado);
@@ -207,18 +269,22 @@ function FormPremissas({ pid, coleta }: { pid: number; coleta: Coleta }) {
   return (
     <Card titulo="Premissas do cálculo">
       {!contador && <p className="mb-3 text-sm text-text-muted">Só o contador altera estas premissas.</p>}
+      <p className="mb-4 max-w-[80ch] text-sm text-text-muted">
+        O que dá para tirar das notas importadas já vem preenchido. O que ficar pendente aparece na aba Pendências até ser informado; salvar
+        confirma as opções marcadas.
+      </p>
       <div className="grid gap-6 text-sm lg:grid-cols-2">
         <section className="space-y-3">
           <h3 className="font-semibold">Simples Nacional</h3>
           {moeda("rbt12_informado")}
-          {semRbt12 && <p className="text-text-muted">Vazio, o sistema estima pela média do período × 12.</p>}
+          {semRbt12 && <p className="text-text-muted">Enquanto estiver vazio, o sistema estima pela média do período × 12.</p>}
           <h3 className="pt-2 font-semibold">Estoque</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             {moeda("estoque_inicial")}
             {moeda("estoque_final")}
           </div>
           <p className={umEstoque ? "text-alert-ink" : "text-text-muted"}>
-            {umEstoque ? "Informe os dois valores, ou deixe os dois vazios." : "Vazios, o custo das mercadorias no Lucro Real é igual às compras do período."}
+            {umEstoque ? "Informe os dois valores, ou deixe os dois vazios." : "Sem estoque, informe 0,00 nos dois: o custo das mercadorias no Lucro Real fica igual às compras do período."}
           </p>
           <h3 className="pt-2 font-semibold">Lucro Real</h3>
           {moeda("adicoes_lr")}
@@ -241,13 +307,19 @@ function FormPremissas({ pid, coleta }: { pid: number; coleta: Coleta }) {
               />
               <span>
                 {o.rotulo}
+                <Obrigatorio />
                 <span className="block text-text-muted">{o.ajuda}</span>
+                <Procedencia auto={auto[o.chave]} informado={informado(o.chave)} />
+                {o.chave === "aplicar_st_vendas_internas" && !informado(o.chave) && !auto[o.chave] && coleta.indicio_st && (
+                  <span className="mt-1 block text-xs text-warning-ink">{coleta.indicio_st}</span>
+                )}
               </span>
             </label>
           ))}
           <h3 className="pt-2 font-semibold">Reforma Tributária</h3>
           <label>
             Compras com crédito de IBS/CBS (%)
+            <Obrigatorio />
             <input
               inputMode="decimal"
               disabled={!contador}
@@ -258,6 +330,7 @@ function FormPremissas({ pid, coleta }: { pid: number; coleta: Coleta }) {
                 setF({ ...f, pct: e.target.value.replace(/[^\d.,]/g, "") });
               }}
             />
+            <Procedencia auto={auto.pct_compras_credito_ibs_cbs} informado={informado("pct_compras_credito_ibs_cbs")} vazio={!f.pct} />
           </label>
           <p className="text-text-muted">Compras de optantes do Simples geram crédito limitado ao valor pago no DAS.</p>
         </section>

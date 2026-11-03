@@ -65,7 +65,10 @@ DE_PARA = {
     "Tarifas Mercado Livre – campanhas de publicidade": "Campanhas de Publicidade (marketplace)",
 }
 FOLHA = {"2026-06": ("18400.00", "6000.00"), "2026-07": ("18400.00", "6000.00"), "2026-08": ("19150.00", "6000.00")}
-PREMISSAS = {"rbt12_informado": "2240000.00", "estoque_inicial": "182000.00", "estoque_final": "191500.00"}
+PREMISSAS = {"rbt12_informado": "2240000.00", "estoque_inicial": "182000.00", "estoque_final": "191500.00",
+             "adicoes_lr": "0.00", "exclusoes_lr": "0.00", "prejuizo_fiscal_compensar": "0.00",
+             "aplicar_st_vendas_internas": False, "excluir_icms_base_pis_cofins": False, "credito_frete_integral": False,
+             "pct_compras_credito_ibs_cbs": "1.00"}
 
 
 def _centavos(v: Decimal) -> Decimal:
@@ -93,7 +96,7 @@ def carregar_exemplo(db: Session) -> Planejamento:
         for ambito, uf, sufixo in (("Interna", "SP", "INT"), ("Interestadual", "MG", "EST")):
             nota = NotaFiscal(planejamento_id=p.id, chave_acesso=f"EXEMPLO{c.replace('-', '')}{sufixo}", numero=f"{c}-{sufixo}",
                               data_emissao=date.fromisoformat(c + "-15"), competencia=c, tipo="SAIDA", uf_emitente="SP",
-                              uf_destinatario=uf)
+                              uf_destinatario=uf, consumidor_final=False)  # distribuidora: vende para oficinas e lojas
             db.add(nota)
             db.flush()
             itens = [i for i in fx["itens"] if i["competencia"] == c and i["ambito"] == ambito]

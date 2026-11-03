@@ -40,7 +40,7 @@ from app.motor.tipos import (
     Regime,
 )
 from app.seeds import tabelas
-from app.services import revisao_produtos
+from app.services import premissas_auto, revisao_produtos
 from app.services.relatorio_contabil import CFOP_COMPRA_REVENDA
 
 ZERO = Decimal("0")
@@ -76,8 +76,12 @@ def _vigentes(db: Session, modelo, referencia: date):
     )).all()
 
 
-def premissas_do_planejamento(db: Session, p: Planejamento) -> Premissas:
-    valores = {}
+def premissas_do_planejamento(db: Session, p: Planejamento, auto: premissas_auto.Automaticas | None = None) -> Premissas:
+    """Informado pelo contador > tirado das notas > padrão do motor."""
+    auto = auto or premissas_auto.derivar(db, p)
+    valores: dict = {k: d.valor for k, d in auto.premissas.items()}
+    if auto.composicao:
+        valores["composicao_compras"] = auto.composicao
     for pr in db.scalars(select(PremissaPlanejamento).where(PremissaPlanejamento.planejamento_id == p.id)):
         tipo = PREMISSAS.get(pr.chave)
         if tipo is None:
@@ -207,6 +211,7 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     parametros = tabelas.parametros({x.chave: x.valor for x in _vigentes(db, ParametroTributario, referencia)})
     reforma = [AnoReforma(r.ano, r.cbs, r.ibs, r.fator_icms) for r in db.scalars(select(ReformaCronograma))]
 
+    auto = premissas_auto.derivar(db, p)
     entrada = EntradaSimulacao(
         competencias=comps,
         itens=cls.itens,
@@ -218,12 +223,13 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         faixas_simples=faixas,
         reforma=reforma,
         parametros=parametros,
-        premissas=premissas_do_planejamento(db, p),
+        premissas=premissas_do_planejamento(db, p, auto),
         folha_informada=folha_informada,
         despesas_nao_informadas=nao_informadas,
         ncms_confianca_media={x.ncm for x in produtos if x.avaliacao.enquadramento == Enquadramento.CONDICIONAL and not x.revisado},
         icms_entradas_real=icms_entradas,
-        composicao_informada=db.scalar(select(CompraOrigem.id).where(CompraOrigem.planejamento_id == p.id).limit(1)) is not None,
+        composicao_informada=db.scalar(select(CompraOrigem.id).where(CompraOrigem.planejamento_id == p.id).limit(1)) is not None
+        or auto.composicao is not None,
         ncm_info=_info_ncm(produtos),
     )
     return EntradaMontada(entrada, pendencias)

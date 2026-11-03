@@ -26,6 +26,9 @@ class ItemLido:
     vl_total: Decimal
     vl_icms: Decimal
     cst_pis: str | None = None
+    orig_icms: str | None = None  # 0 nacional; 1, 2, 3 e 8 importados ou com conteúdo importado acima de 40%
+    cst_icms: str | None = None  # CST (regime normal) ou CSOSN (Simples) do ICMS
+    aliq_icms: Decimal | None = None  # pICMS destacado
 
 
 @dataclass
@@ -38,6 +41,8 @@ class NotaLida:
     cnpj_destinatario: str | None
     uf_emitente: str | None
     uf_destinatario: str | None
+    crt_emitente: str | None = None  # 1 e 4 = Simples Nacional; 2 e 3 = regime normal
+    consumidor_final: bool | None = None  # indFinal
     itens: list[ItemLido] = field(default_factory=list)
 
     @property
@@ -71,15 +76,21 @@ def ler_xml(conteudo: bytes) -> NotaLida:
         cnpj_destinatario=_txt(inf, "n:dest/n:CNPJ") or None,
         uf_emitente=_txt(inf, "n:emit/n:enderEmit/n:UF") or None,
         uf_destinatario=_txt(inf, "n:dest/n:enderDest/n:UF") or None,
+        crt_emitente=_txt(inf, "n:emit/n:CRT") or None,
+        consumidor_final=(_txt(ide, "n:indFinal") == "1") if _txt(ide, "n:indFinal") else None,
     )
     for det in inf.findall("n:det", NS):
         prod = det.find("n:prod", NS)
         vprod = _dec(prod, "n:vProd")
         total = vprod - _dec(prod, "n:vDesc") + _dec(prod, "n:vFrete") + _dec(prod, "n:vSeg") + _dec(prod, "n:vOutro")
         icms = det.find("n:imposto/n:ICMS", NS)
-        vicms = ZERO
+        vicms, orig, cst_icms, aliq = ZERO, None, None, None
         if icms is not None and len(icms):
-            vicms = _dec(icms[0], "n:vICMS")
+            g = icms[0]
+            vicms = _dec(g, "n:vICMS")
+            orig = _txt(g, "n:orig") or None
+            cst_icms = _txt(g, "n:CST") or _txt(g, "n:CSOSN") or None
+            aliq = _dec(g, "n:pICMS") / 100 if _txt(g, "n:pICMS") else None
         pis = det.find("n:imposto/n:PIS", NS)
         cst_pis = _txt(pis[0], "n:CST") if pis is not None and len(pis) else ""
         nota.itens.append(ItemLido(
@@ -94,6 +105,9 @@ def ler_xml(conteudo: bytes) -> NotaLida:
             vl_total=total,
             vl_icms=vicms,
             cst_pis=cst_pis or None,
+            orig_icms=orig,
+            cst_icms=cst_icms,
+            aliq_icms=aliq,
         ))
     return nota
 

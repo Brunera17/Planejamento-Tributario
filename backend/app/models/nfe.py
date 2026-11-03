@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
 
-from .comum import PK, Competencia, Dinheiro, Momento, Valor
+from .comum import PK, Aliquota, Competencia, Dinheiro, Momento, Valor
 
 
 class ImportacaoNfe(Base):
@@ -40,6 +40,8 @@ class NotaFiscal(Base):
     tipo: Mapped[str] = mapped_column(String(7))  # SAIDA, ENTRADA
     uf_emitente: Mapped[str | None] = mapped_column(String(2))
     uf_destinatario: Mapped[str | None] = mapped_column(String(2))
+    crt_emitente: Mapped[str | None] = mapped_column(String(1))
+    consumidor_final: Mapped[bool | None]
 
 
 class NotaItem(Base):
@@ -62,3 +64,6 @@ class NotaItem(Base):
     vl_total: Mapped[Valor]
     vl_icms: Mapped[Decimal] = mapped_column(Dinheiro, default=0)
     cst_pis: Mapped[str | None] = mapped_column(String(2))
+    orig_icms: Mapped[str | None] = mapped_column(String(1))
+    cst_icms: Mapped[str | None] = mapped_column(String(3))
+    aliq_icms: Mapped[Decimal | None] = mapped_column(Aliquota)
