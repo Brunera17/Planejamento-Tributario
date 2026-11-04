@@ -6,10 +6,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 class ErroNegocio(Exception):
-    def __init__(self, mensagem: str, status: int = 422, campos: dict[str, str] | None = None):
+    def __init__(self, mensagem: str, status: int = 422, campos: dict[str, str] | None = None,
+                 cabecalhos: dict[str, str] | None = None):
         self.mensagem = mensagem
         self.status = status
         self.campos = campos or {}
+        self.cabecalhos = cabecalhos or {}  # ex.: Retry-After no 429
 
 
 class NaoEncontrado(ErroNegocio):
@@ -20,7 +22,7 @@ class NaoEncontrado(ErroNegocio):
 def registrar_handlers(app: FastAPI) -> None:
     @app.exception_handler(ErroNegocio)
     async def _negocio(_: Request, e: ErroNegocio):
-        return JSONResponse({"erro": e.mensagem, "campos": e.campos}, status_code=e.status)
+        return JSONResponse({"erro": e.mensagem, "campos": e.campos}, status_code=e.status, headers=e.cabecalhos or None)
 
     @app.exception_handler(RequestValidationError)
     async def _validacao(_: Request, e: RequestValidationError):

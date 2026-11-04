@@ -16,6 +16,7 @@ from app.motor import engine
 from app.schemas.comum import Esquema
 from app.services import apresentacao_pptx, exportacao_excel, relatorio_pdf
 from app.services import simulacao as servico
+from app.services.auditoria import auditar
 from app.services.entrada import montar_entrada
 from app.services.serializacao import para_json
 
@@ -101,11 +102,14 @@ def atualizar_oportunidade(oid: int, dados: OportunidadeAtualizacao, db: DB, _: 
 
 
 @router.get("/simulacoes/{sid}/excel")
-def excel(sid: int, db: DB, _: Contador):
+def excel(sid: int, db: DB, u: Contador):
     s = _simulacao(db, sid)
     p = db.get(Planejamento, s.planejamento_id)
     nome = f"PLANEJAMENTO_{p.empresa.cnpj}_{p.competencia_inicial}_{p.competencia_final}_v{s.versao}.xlsx"
-    return Response(exportacao_excel.gerar(s, p),
+    conteudo = exportacao_excel.gerar(s, p)
+    auditar("EXCEL_EXPORTADO", usuario=u, planejamento=p, recurso_tipo="simulacao", recurso_id=sid,
+            detalhes={"arquivo": nome, "versao": s.versao})
+    return Response(conteudo,
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="{nome}"'})
 
@@ -116,7 +120,10 @@ def apresentacao(sid: int, db: DB, u: Contador):
     s = _simulacao(db, sid)
     p = db.get(Planejamento, s.planejamento_id)
     nome = f"APRESENTACAO_{p.empresa.cnpj}_{p.competencia_inicial}_{p.competencia_final}_v{s.versao}.pptx"
-    return Response(apresentacao_pptx.gerar(db, s, u),
+    conteudo = apresentacao_pptx.gerar(db, s, u)
+    auditar("APRESENTACAO_EXPORTADA", usuario=u, planejamento=p, recurso_tipo="simulacao", recurso_id=sid,
+            detalhes={"arquivo": nome, "versao": s.versao})
+    return Response(conteudo,
                     media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     headers={"Content-Disposition": f'attachment; filename="{nome}"'})
 
@@ -147,7 +154,11 @@ def recomendacao(sid: int, db: DB, _: Contador):
 @router.post("/simulacoes/{sid}/relatorio-pdf", response_model=RelatorioSaida, status_code=201)
 def gerar_relatorio(sid: int, dados: RelatorioEntrada, db: DB, u: Contador):
     itens = [x.strip() for x in (dados.recomendacao or []) if x.strip()]
-    return relatorio_pdf.gerar(db, _simulacao(db, sid), u, itens or None)
+    rel = relatorio_pdf.gerar(db, _simulacao(db, sid), u, itens or None)
+    auditar("RELATORIO_GERADO", usuario=u, planejamento=db.get(Planejamento, rel.planejamento_id),
+            recurso_tipo="relatorio_pdf", recurso_id=rel.id,
+            detalhes={"arquivo": rel.arquivo, "sha256": rel.hash_sha256, "preliminar": rel.preliminar})
+    return rel
 
 
 @router.get("/planejamentos/{pid}/relatorios")
@@ -158,7 +169,7 @@ def listar_relatorios(pid: int, db: DB, _: Contador):
 
 
 @router.get("/relatorios/{rid}/download")
-def baixar_relatorio(rid: int, db: DB, _: Contador):
+def baixar_relatorio(rid: int, db: DB, u: Contador):
     """Os PDFs são somente leitura: o arquivo precisa conferir com o hash gravado na emissão."""
     rel = db.get(RelatorioPdf, rid)
     if rel is None:
@@ -168,4 +179,6 @@ def baixar_relatorio(rid: int, db: DB, _: Contador):
         raise ErroNegocio("Arquivo do relatório não encontrado no armazenamento", 410)
     if hashlib.sha256(arq.read_bytes()).hexdigest() != rel.hash_sha256:
         raise ErroNegocio("O arquivo arquivado não confere com o hash registrado na emissão", 409)
+    auditar("RELATORIO_BAIXADO", usuario=u, planejamento=db.get(Planejamento, rel.planejamento_id),
+            recurso_tipo="relatorio_pdf", recurso_id=rel.id, detalhes={"arquivo": rel.arquivo})
     return FileResponse(arq, media_type="application/pdf", filename=rel.arquivo)

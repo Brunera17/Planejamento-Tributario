@@ -28,7 +28,10 @@ class ImportacaoNfe(Base):
 
 class NotaFiscal(Base):
     __tablename__ = "nota_fiscal"
-    __table_args__ = (UniqueConstraint("planejamento_id", "chave_acesso", name="uq_nota_chave"),)
+    __table_args__ = (
+        UniqueConstraint("planejamento_id", "chave_acesso", name="uq_nota_chave"),
+        Index("ix_nota_fiscal_planejamento_tipo_competencia", "planejamento_id", "tipo", "competencia"),
+    )
 
     id: Mapped[PK]
     planejamento_id: Mapped[int] = mapped_column(ForeignKey("planejamento.id", ondelete="CASCADE"))

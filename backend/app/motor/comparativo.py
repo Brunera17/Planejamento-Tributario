@@ -118,7 +118,7 @@ def simular_crescimento(
         if rbt12 > p.teto_simples:
             aliq_sn, obs = None, "Acima do teto: Simples inelegível"
         else:
-            parcela = f.p_irpj + f.p_csll + f.p_cpp + f.p_icms * (1 - st) + (f.p_pis + f.p_cofins) * (1 - mono)
+            parcela = f.p_irpj + f.p_csll + f.p_cpp + f.p_ipi + f.p_icms * (1 - st) + (f.p_pis + f.p_cofins) * (1 - mono)
             aliq_sn = a.efetiva * parcela
             obs = f"Faixa {f.faixa}"
             if rbt12 > p.sublimite_simples:

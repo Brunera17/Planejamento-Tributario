@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from .base import BaseCompetencia, ItemCalculado
 from .icms import ResultadoIcms
-from .presumido import base_pis_cofins, inss_patronal, irpj_devido
+from .presumido import base_pis_cofins, encargos_folha, inss_patronal, irpj_devido
 from .tipos import ZERO, EntradaSimulacao, Memoria, Parametros, Regime, ResultadoRegime, TributoValor
 
 
@@ -91,8 +91,9 @@ def calcular_real(
         cmv = compras
         formula_cmv = "compras do período (estoque inicial = final)"
     despesas = sum((d.valor for d in entrada.despesas if d.dedutivel), ZERO)
+    encargos = encargos_folha(entrada)
     pessoal = sum(
-        (entrada.folha.get(c, ZERO) * (1 + p.encargos_folha) + entrada.pro_labore.get(c, ZERO) * (1 + p.inss_pro_labore)
+        (entrada.folha.get(c, ZERO) * (1 + encargos) + entrada.pro_labore.get(c, ZERO) * (1 + p.inss_pro_labore)
          for c in entrada.competencias),
         ZERO,
     )

@@ -15,7 +15,7 @@
  {"chave": "sublimite_simples", "valor": "3600000", "descricao": "Sublimite do Simples (ICMS/ISS)", "fundamento": "LC 123/2006, art. 13-A"},
  {"chave": "teto_simples", "valor": "4800000", "descricao": "Teto do Simples Nacional", "fundamento": "LC 123/2006, art. 3º"},
  {"chave": "alerta_sublimite", "valor": "0.70", "descricao": "Percentual do sublimite que dispara o alerta", "fundamento": "regra interna"},
- {"chave": "encargos_folha", "valor": "0.278", "descricao": "Encargos patronais sobre a folha (CPP 20% + RAT + Terceiros)", "fundamento": "Lei 8.212/1991"},
+ {"chave": "encargos_folha", "valor": "0.278", "descricao": "Encargos patronais de referência sobre a folha (CPP 20% + RAT 2% + terceiros 5,8%), quando o planejamento não informa RAT, FAP e terceiros", "fundamento": "Lei 8.212/1991, art. 22; Lei 10.666/2003, art. 10"},
  {"chave": "inss_pro_labore", "valor": "0.20", "descricao": "INSS patronal sobre o pró-labore", "fundamento": "Lei 8.212/1991, art. 22, III"},
  {"chave": "aliq_icms_interna", "valor": "0.18", "descricao": "Alíquota interna de ICMS (SP – autopeças)", "fundamento": "RICMS/SP"},
  {"chave": "aliq_icms_interestadual", "valor": "0.12", "descricao": "Alíquota interestadual quando a nota não traz a UF de destino", "fundamento": "Res. Senado 22/1989; por item: 4% importados (Res. 13/2012), 7% ou 12% pelo destino"}

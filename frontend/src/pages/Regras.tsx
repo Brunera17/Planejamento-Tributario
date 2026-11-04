@@ -8,6 +8,7 @@ import { brl } from "../lib/formato";
 import { AliquotasUf } from "./AliquotasUf";
 import { Normas } from "./Normas";
 import { Reforma } from "./Reforma";
+import { ReducoesReforma } from "./ReducoesReforma";
 import { SubstituicaoTributaria } from "./SubstituicaoTributaria";
 
 type RegraCfop = { cfop: number; natureza: string; gera_receita: boolean };
@@ -47,7 +48,7 @@ export function Regras() {
   const [cfop, setCfop] = useState<RegraCfop | null>(null);
   const [busca, setBusca] = useState("");
   const [params, setParams] = useSearchParams();
-  const aba = (["normas", "st", "uf", "cfop", "reforma"] as const).find((a) => a === params.get("aba")) ?? "ncm";
+  const aba = (["normas", "st", "uf", "cfop", "reforma", "reducoes"] as const).find((a) => a === params.get("aba")) ?? "ncm";
 
   const { data: base } = useQuery({
     queryKey: ["base-legal"],
@@ -101,6 +102,7 @@ export function Regras() {
             rotulo: cfopPendentes.length ? `CFOP (${cfopPendentes.length} sem regra)` : "CFOP",
           },
           { id: "reforma", rotulo: "Reforma Tributária" },
+          { id: "reducoes", rotulo: "Reduções de CBS e IBS" },
           { id: "normas", rotulo: "Normas" },
         ].map((a) => (
           <button
@@ -120,6 +122,7 @@ export function Regras() {
       {aba === "st" && <SubstituicaoTributaria />}
       {aba === "uf" && <AliquotasUf />}
       {aba === "reforma" && <Reforma />}
+      {aba === "reducoes" && <ReducoesReforma />}
 
       {aba === "cfop" && cfopPendentes.length > 0 && (
         <Card titulo="CFOP sem regra" semPadding>

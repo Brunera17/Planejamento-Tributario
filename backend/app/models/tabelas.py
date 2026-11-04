@@ -32,6 +32,7 @@ class SimplesFaixa(Base, Vigencia):
     p_pis: Mapped[Decimal] = mapped_column(Aliquota)
     p_cpp: Mapped[Decimal] = mapped_column(Aliquota)
     p_icms: Mapped[Decimal] = mapped_column(Aliquota)
+    p_ipi: Mapped[Decimal] = mapped_column(Aliquota, default=Decimal("0"))  # só no Anexo II (indústria)
 
 
 class ParametroTributario(Base, Vigencia):
@@ -154,5 +155,26 @@ class AliquotaUf(Base, Vigencia):
     fcp: Mapped[Decimal] = mapped_column(Aliquota, default=Decimal("0"))  # fundo de combate à pobreza na regra geral
     base_dupla: Mapped[bool] = mapped_column(default=True)  # base "por dentro" com a alíquota do destino (LC 190/2022)
     fonte: Mapped[str | None] = mapped_column(String(300))
+    alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    alterado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RegraReforma(Base, Vigencia):
+    """Redução de CBS e IBS por NCM nos anexos da LC 214/2025 (60% ou 100%, que é a alíquota zero)."""
+
+    __tablename__ = "regra_reforma"
+    __table_args__ = (Index("ix_regra_reforma_ncm", "ncm"),)
+
+    id: Mapped[PK]
+    ncm: Mapped[str] = mapped_column(String(8))  # capítulo, posição, subposição ou código: vale para todo NCM que começa assim
+    excecoes: Mapped[str | None] = mapped_column(String(300))
+    anexo: Mapped[str] = mapped_column(String(20))
+    item: Mapped[str | None] = mapped_column(String(10))
+    descricao: Mapped[str] = mapped_column(String(200))
+    reducao: Mapped[Decimal] = mapped_column(Aliquota)  # 0,6 = 60%; 1 = alíquota zero
+    condicao: Mapped[str | None] = mapped_column(Text)  # requisito que o NCM sozinho não mostra
+    cst: Mapped[str] = mapped_column(String(3), default="200")
+    cclass_trib: Mapped[str | None] = mapped_column(String(6))
+    norma_id: Mapped[int | None] = mapped_column(ForeignKey("norma.id"))
     alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     alterado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

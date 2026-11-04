@@ -33,6 +33,7 @@ class ItemBruto:
     sujeito_st: bool | None = None  # pela tabela de ST com vigência; vazio segue a regra do NCM
     origem: str | None = None  # origem da mercadoria (orig do ICMS): 1, 2, 3 e 8 vão a 4% para outro estado
     difal: DestinoDifal | None = None  # venda a não contribuinte de outro estado, com a alíquota do destino
+    reducao_ibs_cbs: Decimal = Decimal("0")  # redução dos anexos da LC 214/2025
 
 
 @dataclass
@@ -85,6 +86,7 @@ def classificar(
             ref=b.ref,
             aliq_interestadual=aliquota_interestadual(uf_empresa, b.uf_destino, b.origem) if ambito == Ambito.INTERESTADUAL else None,
             difal=b.difal if ambito == Ambito.INTERESTADUAL else None,
+            reducao_ibs_cbs=b.reducao_ibs_cbs,
         ))
     return out
 

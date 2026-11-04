@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual, obter_planejamento
+from app.core.config import get_settings
 from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import (
     CompraMensal,
@@ -45,8 +46,10 @@ from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
 from app.services.entrada import PREMISSAS
+from app.services.auditoria import auditar, auditar_uma_vez
 from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
+from app.utils.upload import ler_limitado
 
 router = APIRouter(prefix="/planejamentos", tags=["Planejamentos e coleta"])
 
@@ -122,8 +125,12 @@ def criar(dados: PlanejamentoEntrada, db: DB, u: Contador):
 
 
 @router.get("/{pid}", response_model=PlanejamentoSaida)
-def detalhar(pid: int, db: DB, _: UsuarioAtual):
-    return _saida(obter_planejamento(db, pid))
+def detalhar(pid: int, db: DB, u: UsuarioAtual):
+    p = obter_planejamento(db, pid)
+    # a tela dispara vários GETs do mesmo planejamento; registra a abertura uma vez por sessão
+    auditar_uma_vez(f"planejamento:{pid}", "PLANEJAMENTO_ABERTO", usuario=u, planejamento=p,
+                    recurso_tipo="planejamento", recurso_id=pid)
+    return _saida(p)
 
 
 @router.post("/{pid}/status", response_model=PlanejamentoSaida)
@@ -275,6 +282,12 @@ def _validar_premissa(chave: str, valor) -> str:
         raise ErroNegocio("Valor inválido", campos={chave: "não pode ser negativo"})
     if chave == "pct_compras_credito_ibs_cbs" and numero > 1:
         raise ErroNegocio("Valor inválido", campos={chave: "precisa ficar entre 0% e 100%"})
+    if chave == "rat" and numero not in (Decimal("0.01"), Decimal("0.02"), Decimal("0.03")):
+        raise ErroNegocio("Valor inválido", campos={chave: "o RAT é 1%, 2% ou 3%"})
+    if chave == "fap" and not Decimal("0.5") <= numero <= Decimal("2"):
+        raise ErroNegocio("Valor inválido", campos={chave: "o FAP vai de 0,5000 a 2,0000"})
+    if chave == "terceiros" and numero > Decimal("0.1"):
+        raise ErroNegocio("Valor inválido", campos={chave: "terceiros acima de 10%: confira o FPAS"})
     return json.dumps(str(numero))
 
 
@@ -385,13 +398,15 @@ def gravar_levantamento(pid: int, competencia: str, dados: LevantamentoEntrada, 
 
 
 @router.post("/{pid}/nfe")
-async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
+def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     """XML de NF-e avulso ou .zip com vários XML. Notas já importadas (mesma chave) são ignoradas."""
     p = obter_planejamento(db, pid)
     nome = arquivo.filename or "arquivo"
     if not nome.lower().endswith((".xml", ".zip")):
         raise ErroNegocio("Envie um XML de NF-e ou um .zip com XMLs", 415)
-    notas, erros = ler_arquivos(nome, await arquivo.read())
+    s = get_settings()
+    limite = s.nfe_zip_max_mb if nome.lower().endswith(".zip") else s.nfe_xml_max_mb
+    notas, erros = ler_arquivos(nome, ler_limitado(arquivo, limite))
     imp = ImportacaoNfe(planejamento_id=pid, origem="XML", arquivo=nome, importado_por=u.id, lidos=len(notas),
                         importados=0, ignorados=0)
     db.add(imp)
@@ -438,25 +453,29 @@ async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     imp.status = "CONCLUIDA"
     imp.log = "\n".join(log) or None
     _alterou(db, p)
+    auditar("NFE_IMPORTADA", usuario=u, planejamento=p, recurso_tipo="importacao_nfe", recurso_id=imp.id,
+            detalhes={"arquivo": nome, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados,
+                      "erros": len(erros)})
     return {"id": imp.id, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados, "log": log}
 
 
 @router.post("/{pid}/relatorio-contabil")
-async def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
+def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     """Relatório "Movimentação de Produtos – ICMS – PIS – COFINS" do Domínio (.xls ou .xlsx), de saídas ou de entradas."""
     p = obter_planejamento(db, pid)
     nome = arquivo.filename or "relatorio.xls"
     if not nome.lower().endswith((".xls", ".xlsx")):
         raise ErroNegocio("Envie o relatório em .xls ou .xlsx", 415)
-    conteudo = await arquivo.read()
-    if len(conteudo) > 20 * 1024 * 1024:
-        raise ErroNegocio("Arquivo acima de 20 MB", 413)
+    conteudo = ler_limitado(arquivo, get_settings().relatorio_contabil_max_mb)
     try:
         resumo = relatorio_contabil.importar(db, p, nome, conteudo, u.id)
     except relatorio_contabil.RelatorioInvalido as e:
         db.rollback()
         raise ErroNegocio(str(e), 422, {"arquivo": str(e)}) from e
     _alterou(db, p)
+    auditar("RELATORIO_CONTABIL_IMPORTADO", usuario=u, planejamento=p, recurso_tipo="relatorio_contabil",
+            detalhes={"arquivo": nome, "tipo": resumo.tipo, "linhas": resumo.linhas,
+                      "notas_importadas": resumo.notas_importadas, "notas_ignoradas": resumo.notas_ignoradas})
     return {
         "tipo": resumo.tipo, "empresa_relatorio": resumo.empresa_relatorio, "linhas": resumo.linhas,
         "notas_importadas": resumo.notas_importadas, "notas_ignoradas": resumo.notas_ignoradas,
@@ -482,9 +501,10 @@ def ver_revisao(pid: int, db: DB, _: UsuarioAtual):
 
 
 @router.get("/{pid}/revisao/exportar")
-def exportar_revisao(pid: int, db: DB, _: UsuarioAtual):
+def exportar_revisao(pid: int, db: DB, u: UsuarioAtual):
     p = obter_planejamento(db, pid)
     texto = revisao_produtos.exportar_csv(revisao_produtos.analisar(db, p))
+    auditar("REVISAO_EXPORTADA", usuario=u, planejamento=p, recurso_tipo="planejamento", recurso_id=pid)
     return Response("\ufeff" + texto, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="REVISAO_{p.empresa.cnpj}.csv"'})
 

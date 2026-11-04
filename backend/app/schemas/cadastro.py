@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from app.utils.simples import ROMANOS, anexo_da_empresa
 from app.utils.validacao import UFS, cnpj_valido, normalizar_cnpj, somente_digitos
 
 from .comum import Esquema
@@ -25,7 +26,9 @@ class UsuarioSaida(Esquema):
 
 
 class LoginSaida(Esquema):
-    token: str
+    access: str  # JWT de 15 min; o front guarda só em memória
+    expira_em: datetime
+    sessao_expira_em: int  # epoch do fim absoluto da sessão (12 h após o login)
     usuario: UsuarioSaida
 
 
@@ -78,10 +81,18 @@ class EmpresaEntrada(Esquema):
             raise ValueError("CNAE deve ter 7 dígitos")
         return d
 
+    @field_validator("anexo_simples")
+    @classmethod
+    def _anexo_valido(cls, v: str | None) -> str | None:
+        if v and v not in ROMANOS:
+            raise ValueError("O anexo do Simples vai de I a V")
+        return v or None
+
     @model_validator(mode="after")
     def _anexo(self):
+        # optante sem anexo informado: fica o sugerido pelo CNAE ou pela atividade
         if self.regime_tributario == "SIMPLES_NACIONAL" and not self.anexo_simples:
-            self.anexo_simples = "I"
+            self.anexo_simples = anexo_da_empresa(None, self.cnae, self.atividade)[0]
         return self
 
     @field_validator("telefone")

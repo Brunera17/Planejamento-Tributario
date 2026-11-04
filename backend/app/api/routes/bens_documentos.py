@@ -2,6 +2,7 @@
 
 Nenhum dos dois entra no cálculo: alterar atualiza o progresso, mas não desatualiza as simulações.
 """
+import hashlib
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Literal
@@ -13,10 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, UsuarioAtual, obter_planejamento
+from app.core.config import get_settings
 from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import Bem, Documento, Levantamento, Planejamento, TipoDocumento
 from app.schemas.comum import Esquema
 from app.services import documentos, progresso
+from app.services.auditoria import auditar
+from app.utils.upload import ler_limitado
 
 router = APIRouter(prefix="/planejamentos", tags=["Bens e documentos"])
 
@@ -155,10 +159,10 @@ def listar_documentos(pid: int, db: DB, _: UsuarioAtual):
 
 
 @router.post("/{pid}/documentos/{competencia}/{tipo_id}", status_code=201)
-async def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
+def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     p = obter_planejamento(db, pid)
     nome = (arquivo.filename or "documento").replace("\\", "/").rsplit("/", 1)[-1][:200]
-    conteudo = await arquivo.read()
+    conteudo = ler_limitado(arquivo, get_settings().upload_max_mb)
     ext = documentos.validar(nome, conteudo)
     doc = _documento(db, _levantamento(db, p, competencia, u.id), tipo_id)
     anterior = doc.arquivo
@@ -166,6 +170,9 @@ async def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: Up
     doc.nao_se_aplica, doc.justificativa, doc.enviado_em = False, None, datetime.now(UTC)
     _progresso(db, p)
     documentos.apagar(anterior)
+    auditar("DOCUMENTO_ENVIADO", usuario=u, planejamento=p, recurso_tipo="documento", recurso_id=doc.id,
+            detalhes={"arquivo": nome, "bytes": len(conteudo), "sha256": hashlib.sha256(conteudo).hexdigest(),
+                      "competencia": competencia, "tipo_documento_id": tipo_id, "substituiu": bool(anterior)})
     return {"id": doc.id, "arquivo": nome}
 
 
@@ -181,21 +188,25 @@ def marcar_nao_se_aplica(pid: int, competencia: str, tipo_id: int, dados: NaoSeA
 
 
 @router.delete("/{pid}/documentos/{doc_id}", status_code=204)
-def excluir_documento(pid: int, doc_id: int, db: DB, _: UsuarioAtual):
+def excluir_documento(pid: int, doc_id: int, db: DB, u: UsuarioAtual):
     p = obter_planejamento(db, pid)
     doc, lv = _doc_do_planejamento(db, pid, doc_id)
     if lv.status != "EM_PREENCHIMENTO":
         raise ErroNegocio(MES_FECHADO, 409)
-    arquivo = doc.arquivo
+    arquivo, nome = doc.arquivo, doc.arquivo_nome
     db.delete(doc)
     _progresso(db, p)
     documentos.apagar(arquivo)
+    auditar("DOCUMENTO_EXCLUIDO", usuario=u, planejamento=p, recurso_tipo="documento", recurso_id=doc_id,
+            detalhes={"arquivo": nome, "competencia": lv.competencia})
 
 
 @router.get("/{pid}/documentos/{doc_id}/download")
-def baixar_documento(pid: int, doc_id: int, db: DB, _: UsuarioAtual):
-    doc, _lv = _doc_do_planejamento(db, pid, doc_id)
+def baixar_documento(pid: int, doc_id: int, db: DB, u: UsuarioAtual):
+    doc, lv = _doc_do_planejamento(db, pid, doc_id)
     if not doc.arquivo or not documentos.caminho(doc.arquivo).exists():
         raise ErroNegocio("O arquivo deste documento não está no armazenamento; envie-o novamente", 410)
+    auditar("DOCUMENTO_BAIXADO", usuario=u, planejamento=obter_planejamento(db, pid), recurso_tipo="documento",
+            recurso_id=doc.id, detalhes={"arquivo": doc.arquivo_nome or doc.arquivo, "competencia": lv.competencia})
     return FileResponse(documentos.caminho(doc.arquivo), filename=doc.arquivo_nome or doc.arquivo,
                         media_type="application/octet-stream")

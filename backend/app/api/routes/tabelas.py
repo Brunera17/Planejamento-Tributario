@@ -22,6 +22,7 @@ from app.models import (
     Planejamento,
     ReformaCronograma,
     ReformaHistorico,
+    RegraReforma,
     RegraSt,
     Simulacao,
     SimplesFaixa,
@@ -31,7 +32,7 @@ from app.motor.lei_monofasico import avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
 from app.seeds.tabelas import ler
-from app.services import progresso, substituicao
+from app.services import progresso, reducoes_reforma, substituicao
 from app.services.simulacao import marcar_desatualizada
 
 router = APIRouter(prefix="/tabelas", tags=["Tabelas legais"])
@@ -110,6 +111,31 @@ class AliquotaUfEntrada(Esquema):
     base_dupla: bool = True
     vigencia_inicio: date
     fonte: str = Field(min_length=5, max_length=300)
+
+
+class RegraReformaEntrada(Esquema):
+    ncm: str
+    excecoes: list[str] = []
+    anexo: str = Field(min_length=3, max_length=20)
+    item: str | None = Field(default=None, max_length=10)
+    descricao: str = Field(min_length=3, max_length=200)
+    reducao: Decimal = Field(gt=0, le=1, description="0,6 = redução de 60%; 1 = alíquota zero")
+    condicao: str | None = None
+    cclass_trib: str | None = Field(default=None, pattern=r"^\d{6}$")
+    vigencia_fim: date | None = None
+
+    @field_validator("ncm")
+    @classmethod
+    def _ncm(cls, v: str) -> str:
+        d = "".join(c for c in v if c.isdigit())
+        if not 2 <= len(d) <= 8:
+            raise ValueError("Informe o capítulo (2 dígitos), a posição, a subposição ou o NCM completo")
+        return d
+
+    @field_validator("excecoes")
+    @classmethod
+    def _excecoes(cls, v: list[str]) -> list[str]:
+        return [d for d in ("".join(c for c in x if c.isdigit()) for x in v) if d]
 
 
 def _reavaliar_planejamentos(db: Session, coluna, valor) -> None:
@@ -355,3 +381,45 @@ def nova_aliquota_uf(uf: str, dados: AliquotaUfEntrada, db: DB, u: Contador):
     db.execute(update(Simulacao).values(desatualizada=True))
     db.commit()
     return _linhas([nova])[0]
+
+
+@router.get("/reforma-reducoes")
+def reducoes_reforma_lista(db: DB, _: UsuarioAtual):
+    nomes = {u.id: u.nome for u in db.scalars(select(Usuario))}
+    return [{**l, "excecoes": [e for e in (l["excecoes"] or "").split(",") if e], "alterado_por_nome": nomes.get(l["alterado_por"])}
+            for l in _linhas(db.scalars(select(RegraReforma).order_by(RegraReforma.anexo, RegraReforma.ncm)))]
+
+
+@router.get("/reforma-reducoes/consulta")
+def consultar_reducao(ncm: str, db: DB, _: UsuarioAtual):
+    ncm = "".join(c for c in ncm if c.isdigit())
+    r = reducoes_reforma.carregar(db).buscar(ncm)
+    return {"ncm": ncm, "reducao": None if r is None else {**vars(r), "rotulo": r.rotulo}}
+
+
+def _gravar_reducao(r: RegraReforma, dados: RegraReformaEntrada, u) -> None:
+    for k, v in dados.model_dump().items():
+        setattr(r, k, (",".join(v) or None) if k == "excecoes" else v)
+    r.alterado_por, r.alterado_em = u.id, datetime.now(UTC)
+
+
+@router.post("/reforma-reducoes", status_code=201)
+def incluir_reducao(dados: RegraReformaEntrada, db: DB, u: Contador):
+    r = RegraReforma(cst="200", vigencia_inicio=date(2000, 1, 1),
+                     norma_id=db.scalar(select(Norma.id).where(Norma.codigo == "lc214-2025")))
+    _gravar_reducao(r, dados, u)
+    db.add(r)
+    db.execute(update(Simulacao).values(desatualizada=True))
+    db.commit()
+    return _linhas([r])[0]
+
+
+@router.put("/reforma-reducoes/{regra_id}")
+def alterar_reducao(regra_id: int, dados: RegraReformaEntrada, db: DB, u: Contador):
+    r = db.get(RegraReforma, regra_id)
+    if r is None:
+        raise NaoEncontrado("Redução da Reforma")
+    _gravar_reducao(r, dados, u)
+    db.execute(update(Simulacao).values(desatualizada=True))
+    db.commit()
+    return _linhas([r])[0]

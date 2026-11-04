@@ -185,7 +185,7 @@ interestadual S/SE 12%, interestadual N/NE/CO/ES 7%, importados 4%. **A soma dev
 #### e) Folha e pró-labore
 
 Por competência: folha de salários e pró-labore. Campo vazio = "não informado" (pendência), igual às despesas.
-Encargos padrão: 27,8% sobre a folha (CPP 20% + RAT + Terceiros) e 20% sobre o pró-labore (parametrizáveis).
+Encargos sobre a folha: CPP 20% + RAT × FAP + terceiros, com RAT (1%, 2% ou 3%), FAP (0,5 a 2,0) e terceiros (pelo FPAS) informados nas premissas do planejamento (Lei 8.212/1991, art. 22; Lei 10.666/2003, art. 10). Sem esses dados vale a referência de 27,8% (CPP 20% + RAT 2% + terceiros 5,8%); com algum informado, os que faltam seguem a referência. Pró-labore: 20%. No Simples do comércio (Anexo I) a CPP está no DAS; no Anexo IV ela seria recolhida à parte (não se aplica ao comércio).
 
 #### f) Bens próprios e documentos
 
@@ -223,6 +223,9 @@ grava a versão usada, para que um relatório antigo continue reproduzível.
 | `norma` | biblioteca de normas de ICMS, PIS/COFINS e CBS/IBS: título, esfera, tributos, resumo, uso no cálculo, link do texto oficial e situação. Mantida pelo contador em Base legal › Normas; a carga inicial traz as leis federais, o RICMS/SP e as portarias de ST |
 | `regra_st` | mercadorias na substituição tributária do ICMS por UF e NCM (posição, subposição ou código, com exceções), CEST, segmento, vigência e as normas que listam e que revogam. Carga inicial: todos os anexos da Portaria CAT 68/2019 (SP), com as revogações até a Portaria SRE 34/2026 (fim da ST de autopeças, pneus e outros em 30/09/2026). A ST de cada item de venda é decidida pela vigência na competência; o CST da nota continua decidindo a premissa e gera aviso quando destaca ST depois do fim |
 | `aliquota_uf` | alíquota interna geral de cada estado, FCP da regra geral, base dupla ou única e vigência (alíquotas modais de 2026 na carga; o contador inclui a nova alíquota com a data de início em Base legal › ICMS por estado). Usada no DIFAL: nas vendas a consumidor final não contribuinte de outro estado (`nota_fiscal.dest_contribuinte`, do indIEDest; sem o campo, consumidor final conta como não contribuinte), LP e LR recolhem ao destino base dupla × (alíquota + FCP) − ICMS interestadual (EC 87/2015; LC 190/2022). O DIFAL soma ao ICMS a recolher sem ser abatido pelo saldo credor; o Simples não recolhe (ADI 5464), nem acima do sublimite |
+| `regra_reforma` | reduções de CBS e IBS por NCM (capítulo, posição ou código, com exceções) dos anexos da LC 214/2025: I (cesta básica) e XV (hortícolas, frutas e ovos), alíquota zero; VII (alimentos) e VIII (higiene e limpeza), 60%. Com requisito quando o NCM sozinho não basta, CST 200 e cClassTrib. Mantida em Base legal › Reduções de CBS e IBS; no conflito entre anexos vale o maior benefício. Na projeção: receita tributada = Σ receita do item × (1 − redução); crédito das compras × (1 − redução média das vendas); despesas creditam pela alíquota cheia |
+| `simples_faixa` | faixas dos Anexos I (comércio) e II (indústria, com a parcela do IPI) da LC 123/2006. O anexo do cálculo é o do cadastro da empresa; vazio, o sugerido pelo CNAE (divisões 45 a 47 → I; 10 a 33 → II) ou pela atividade. Serviços (III a V) ainda não são calculados: a simulação sai pelo Anexo I com pendência. Na indústria, o IPI está no DAS mas não no LP/LR (ponto de atenção) |
+| extrato do PGDAS-D | o PDF enviado em Documentos é lido (período de apuração, RBT12 e atividades declaradas): o RBT12 vira premissa automática e, se o anexo declarado diverge do cadastro, a simulação fica com pendência |
 | `nota_item.bc_st`, `nota_item.vl_icms_st` | base e valor do ICMS-ST do item (vBCST/vICMSST ou vBCSTRet/vICMSSTRet). Reimportar o mesmo XML completa a base nos itens antigos. Usados no crédito do estoque que sai da ST: Portaria CAT 28/2020, Anexo IV (LP/LR: BC ST × alíquota interna; fornecedor do Simples: com dedução do valor da mercadoria) e Anexo V (Simples: (BC ST − valor da mercadoria) × alíquota interna). O planejamento estima o crédito por real de custo pelas entradas com ST até a véspera da exclusão e aplica ao estoque informado (premissa `estoque_st_valor`); LP/LR usam em 12 parcelas desde o mês da exclusão e o Simples abate no DAS a partir do mês seguinte. Aparece como a oportunidade `CREDITO_ESTOQUE_ST` |
 | `icms_aliquota` | por UF de origem × destino e, opcionalmente, por NCM |
 | `cfop_regra` | CFOP, natureza, gera receita?, CSOSN/CST por regime, CST IBS/CBS e cClassTrib — `Premissas` seção 7 |
@@ -292,7 +295,7 @@ todas a cada simulação; o contador pode marcar como *descartada* (com motivo) 
 
 | # | Oportunidade | Condição | Impacto estimado (trimestre) | Prioridade |
 |---|---|---|---|---|
-| 1 | CPP embutida no DAS | Regime atual = Simples | `CPP_SN − 3 × (folha × 27,8% + pró-labore × 20%)` | Alta |
+| 1 | CPP embutida no DAS | Regime atual = Simples | `CPP_SN − 3 × (folha × encargos da empresa + pró-labore × 20%)` | Alta |
 | 2 | Segregação dos monofásicos no PGDAS-D (recuperação 5 anos) | Simples e NF-e com CST 99 em itens monofásicos | `RL_mono × Aef × (%PIS + %COFINS)` | Alta |
 | 3 | ICMS-ST nas vendas internas (recuperação) | Simples, itens sujeitos à ST com CSOSN 102 | `RL_interna × Aef × %ICMS` | Alta |
 | 4 | Revisão de NCM (possível monofásico) | NCMs marcados "indício de NCM incorreto" | Receita desses NCMs × `Aef × (%PIS + %COFINS)` | Média |
@@ -510,7 +513,7 @@ RL
 (−) Σ PISCOF_rec
 (−) CMV  = Estoque_inicial + Compras − Estoque_final   (sem estoque: CMV = Compras, com aviso)
 (−) Despesas dedutíveis (catálogo com dedutivel_irpj_csll = Sim)
-(−) Pessoal = Σ [folha × (1 + 27,8%) + pró-labore × (1 + 20%)]
+(−) Pessoal = Σ [folha × (1 + encargos da empresa) + pró-labore × (1 + 20%)]
 (=) LAIR
 (+) Adições  (−) Exclusões
 (−) Compensação de prejuízo fiscal (limitada a 30% do lucro ajustado)

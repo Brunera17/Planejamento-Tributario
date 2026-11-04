@@ -113,6 +113,7 @@ export function Resultado() {
             <>Mudar de regime não reduziria a carga neste período. Base: {brl(receita)} de receita líquida em {meses} meses.</>
           )}
         </p>
+        <p className="mt-2 max-w-[64ch] text-sm text-text-muted">{enquadramentoSimples(r.simples, receita)}</p>
         <Composicao r={r} receita={receita} atual={atual} />
       </section>
 
@@ -217,10 +218,50 @@ export function Resultado() {
   );
 }
 
+const ANEXOS: Record<number, string> = { 1: "Anexo I (comércio)", 2: "Anexo II (indústria)" };
+const anexoSimples = (s: ResultadoRegime) => ANEXOS[s.detalhes.anexo ?? 1] ?? `Anexo ${s.detalhes.anexo}`;
+
+/** Onde a empresa se encaixa no Simples: anexo, faixa do RBT12 e alíquota efetiva do DAS. */
+function enquadramentoSimples(s: ResultadoRegime, receita: number) {
+  const d = s.detalhes;
+  const faixa = `${d.faixa}ª faixa`;
+  const rbt12 = `RBT12 de ${brl(d.rbt12)}${d.rbt12_estimado ? ", estimado pela média do período" : ""}`;
+  if (!s.elegivel) return `No Simples: acima do teto de R$ 4,8 milhões (${rbt12}), a empresa não pode optar.`;
+  const sublimite = d.acima_sublimite ? "; acima do sublimite, o ICMS é pago fora do DAS" : "";
+  // o monofásico e a ST saem do DAS: a carga sobre a receita fica abaixo da alíquota da tabela
+  const segregacao = !d.acima_sublimite && s.total < receita * d.aliquota_efetiva_das - 0.01 ? "; a carga fica menor porque o monofásico e a ST saem do DAS" : "";
+  return `No Simples: ${anexoSimples(s)}, ${faixa} (${rbt12}), alíquota efetiva de ${percentual(d.aliquota_efetiva_das)} no DAS${sublimite}${segregacao}.`;
+}
+
 function DetalheRegime({ reg, receita }: { reg: ResultadoRegime; receita: number }) {
   const linhas = reg.tributos.filter((t) => t.competencia == null && t.valor !== 0);
+  const d = reg.detalhes;
   return (
     <Card titulo={REGIMES[reg.regime]}>
+      {reg.regime === "SIMPLES_NACIONAL" && (
+        <div className="mb-3">
+          <dl className="grid grid-cols-2 overflow-hidden rounded-md border-t border-l border-border text-sm">
+            {[
+              ["Anexo", anexoSimples(reg)],
+              ["Faixa", `${d.faixa}ª`],
+              [d.rbt12_estimado ? "RBT12 (estimado)" : "RBT12", brl(d.rbt12)],
+              ["Alíquota nominal", percentual(d.aliquota_nominal)],
+              ["Parcela a deduzir", brl(d.parcela_deduzir)],
+              ["Alíquota efetiva", percentual(d.aliquota_efetiva_das)],
+            ].map(([rotulo, valor]) => (
+              <div key={rotulo} className="border-r border-b border-border px-2.5 py-1">
+                <dt className="text-xs text-text-muted">{rotulo}</dt>
+                <dd className="num font-medium">{valor}</dd>
+              </div>
+            ))}
+          </dl>
+          {(!reg.elegivel || d.acima_sublimite > 0) && (
+            <p className="mt-1.5 text-xs text-warning-ink">
+              {!reg.elegivel ? "RBT12 acima do teto de R$ 4,8 milhões: a empresa não pode optar pelo Simples." : "RBT12 acima do sublimite de R$ 3,6 milhões: o ICMS é pago fora do DAS."}
+            </p>
+          )}
+        </div>
+      )}
       <Tabela cabecalho={["Tributo", "Valor", "% da receita"]} numericas={[1, 2]}>
         {linhas.map((t) => (
           <tr key={t.tributo}>
@@ -300,7 +341,7 @@ function MemoriaCalculo({ sid }: { sid: number }) {
 }
 
 const GRUPOS = [
-  { nome: "ICMS", tributos: ["ICMS"], cor: "bg-t-icms" },
+  { nome: "ICMS", tributos: ["ICMS", "IPI"], cor: "bg-t-icms" },  // IPI só no DAS da indústria (Anexo II)
   { nome: "PIS e COFINS", tributos: ["PIS", "COFINS", "PIS/COFINS"], cor: "bg-t-piscofins" },
   { nome: "IRPJ e CSLL", tributos: ["IRPJ", "CSLL"], cor: "bg-t-irpjcsll" },
   { nome: "CPP e INSS", tributos: ["CPP", "INSS patronal"], cor: "bg-t-cpp" },
@@ -361,7 +402,7 @@ function Composicao({ r, receita, atual }: { r: TResultado; receita: number; atu
         {GRUPOS.map((g) => (
           <li key={g.nome} className="flex items-center gap-1.5">
             <span aria-hidden className={`inline-block h-2.5 w-2.5 rounded-sm ${g.cor}`} />
-            {g.nome}
+            {g.nome === "ICMS" && r.simples.tributos.some((t) => t.tributo === "IPI") ? "ICMS e IPI" : g.nome}
           </li>
         ))}
         <li>Percentuais sobre a receita líquida de {brl(receita)}</li>

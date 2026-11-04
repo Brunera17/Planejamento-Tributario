@@ -60,6 +60,7 @@ class ItemSaida:
     ref: str | None = None  # id do nota_item, para rastreabilidade
     aliq_interestadual: Decimal | None = None  # 4%, 7% ou 12% pela origem e pelo destino; None usa o parâmetro
     difal: DestinoDifal | None = None
+    reducao_ibs_cbs: Decimal = Decimal("0")  # anexos da LC 214/2025: 0,6 = redução de 60%; 1 = alíquota zero
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,7 @@ class FaixaSimples:
     p_pis: Decimal
     p_cpp: Decimal
     p_icms: Decimal
+    p_ipi: Decimal = Decimal("0")  # só no Anexo II (indústria)
 
 
 @dataclass(frozen=True)
@@ -115,7 +117,8 @@ class Parametros:
     sublimite_simples: Decimal = Decimal("3600000")
     teto_simples: Decimal = Decimal("4800000")
     alerta_sublimite: Decimal = Decimal("0.70")
-    encargos_folha: Decimal = Decimal("0.278")
+    encargos_folha: Decimal = Decimal("0.278")  # referência: CPP 20% + RAT 2% + terceiros 5,8%
+    cpp_patronal: Decimal = Decimal("0.20")  # Lei 8.212/1991, art. 22, I
     inss_pro_labore: Decimal = Decimal("0.20")
     aliq_icms_interna: Decimal = Decimal("0.18")
     aliq_icms_interestadual: Decimal = Decimal("0.12")
@@ -141,6 +144,10 @@ class Premissas:
     prejuizo_fiscal_compensar: Decimal = ZERO
     regime_atual: Regime = Regime.SIMPLES_NACIONAL
     vendas_b2c: bool = True
+    # encargos sobre a folha da empresa; vazios usam a referência de 27,8% dos parâmetros
+    rat: Decimal | None = None  # 1%, 2% ou 3% pelo risco da atividade preponderante
+    fap: Decimal | None = None  # Fator Acidentário de Prevenção: 0,5 a 2,0
+    terceiros: Decimal | None = None  # outras entidades pelo FPAS (5,8% no comércio em geral)
 
 
 @dataclass(frozen=True)
@@ -190,6 +197,7 @@ class EntradaSimulacao:
     ncm_info: dict[str, InfoNcm] = field(default_factory=dict)
     composicao_informada: bool = False  # False = origem das compras assumida (100% internas)
     estoque_st: CreditoEstoqueSt | None = None
+    anexo_simples: str = "I"  # anexo das faixas_simples (LC 123/2006)
 
 
 # ------------------------------------------------------------------ saídas

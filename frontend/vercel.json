@@ -1,0 +1,8 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/:caminho*", "destination": "https://planejador-api.onrender.com/api/:caminho*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

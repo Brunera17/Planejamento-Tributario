@@ -1,11 +1,23 @@
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000/api" });
+/**
+ * Sessão: o access (JWT de 15 min) fica só em memória — nenhum script lê de localStorage.
+ * O refresh mora num cookie HttpOnly que só vai para /api/auth; ao recarregar a página, /auth/refresh
+ * recupera a sessão sem pedir a senha. No localStorage fica só o usuário (nome e perfil, para a tela).
+ */
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL ?? "/api", // relativo: proxy do Vite no dev, rewrite da Vercel em produção
+  withCredentials: true, // o cookie de refresh (só é enviado às rotas /auth)
+  headers: { "X-Requested-With": "planejador" }, // proteção contra CSRF exigida pela API
+});
 
 const CHAVE = "planejador.sessao";
 
 export type Usuario = { id: number; nome: string; usuario: string; perfil: "CONTADOR" | "ANALISTA" };
-export type Sessao = { token: string; usuario: Usuario };
+export type Sessao = { usuario: Usuario };
+type RespostaSessao = { access: string; expira_em: string; sessao_expira_em: number; usuario: Usuario };
+
+let access: string | null = null;
 
 export function lerSessao(): Sessao | null {
   try {
@@ -16,31 +28,73 @@ export function lerSessao(): Sessao | null {
   }
 }
 
-export function gravarSessao(s: Sessao | null) {
+function gravarUsuario(u: Usuario | null) {
   try {
-    if (s) localStorage.setItem(CHAVE, JSON.stringify(s));
+    if (u) localStorage.setItem(CHAVE, JSON.stringify({ usuario: u }));
     else localStorage.removeItem(CHAVE);
   } catch {
-    /* armazenamento indisponível: a sessão vale só nesta aba */
+    /* armazenamento indisponível: o nome some ao recarregar, a sessão não */
   }
 }
 
+/** Grava a sessão recebida do login ou do refresh; null encerra localmente. */
+export function gravarSessao(s: RespostaSessao | null) {
+  access = s?.access ?? null;
+  gravarUsuario(s?.usuario ?? null);
+}
+
+export function temAccess(): boolean {
+  return access !== null;
+}
+
+// um único refresh em voo: as requisições que tomam 401 juntas esperam a mesma renovação
+let renovando: Promise<boolean> | null = null;
+
+export function renovarSessao(): Promise<boolean> {
+  renovando ??= api
+    .post<RespostaSessao>("/auth/refresh", null, { _semRenovar: true } as unknown as InternalAxiosRequestConfig)
+    .then((r) => {
+      gravarSessao(r.data);
+      return true;
+    })
+    .catch(() => {
+      gravarSessao(null);
+      return false;
+    })
+    .finally(() => {
+      renovando = null;
+    });
+  return renovando;
+}
+
 api.interceptors.request.use((cfg) => {
-  const s = lerSessao();
-  if (s) cfg.headers.Authorization = `Bearer ${s.token}`;
+  if (access) cfg.headers.Authorization = `Bearer ${access}`;
   return cfg;
 });
 
+type ConfigComFlags = InternalAxiosRequestConfig & { _semRenovar?: boolean; _repetida?: boolean };
+
 api.interceptors.response.use(
   (r) => r,
-  (e: AxiosError) => {
-    if (e.response?.status === 401 && !e.config?.url?.includes("/auth/login")) {
-      gravarSessao(null);
+  async (e: AxiosError) => {
+    const cfg = e.config as ConfigComFlags | undefined;
+    const rotaDeLogin = cfg?.url?.includes("/auth/login");
+    if (e.response?.status === 401 && cfg && !rotaDeLogin && !cfg._semRenovar && !cfg._repetida) {
+      if (await renovarSessao()) {
+        cfg._repetida = true;
+        return api(cfg); // repete a original com o access novo
+      }
       window.location.assign("/login");
     }
     return Promise.reject(e);
   },
 );
+
+/** Sai: a API derruba a sessão e apaga o cookie. */
+export async function sair() {
+  await api.post("/auth/logout").catch(() => undefined);
+  gravarSessao(null);
+}
 
 export type ErroApi = { erro: string; campos: Record<string, string> };
 

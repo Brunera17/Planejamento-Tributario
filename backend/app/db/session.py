@@ -11,9 +11,12 @@ class Base(DeclarativeBase):
 
 
 def criar_engine(url: str | None = None):
-    url = url or get_settings().database_url
-    args = {"check_same_thread": False} if url.startswith("sqlite") else {}
-    return create_engine(url, connect_args=args)
+    s = get_settings()
+    url = url or s.database_url
+    if url.startswith("sqlite"):
+        return create_engine(url, connect_args={"check_same_thread": False})
+    # tamanho fixo por processo; pre_ping descarta conexão derrubada pelo Postgres antes de entregá-la
+    return create_engine(url, pool_size=s.db_pool_size, max_overflow=s.db_max_overflow, pool_pre_ping=True)
 
 
 engine = criar_engine()

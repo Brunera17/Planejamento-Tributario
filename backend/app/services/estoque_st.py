@@ -114,10 +114,9 @@ def calcular(db: Session, p: Planejamento, hoje: date | None = None) -> EstoqueS
     tabela = substituicao.carregar(db, uf)
     if tabela.vazia:
         return None
-    linhas = db.execute(
-        select(NotaItem, NotaFiscal).join(NotaFiscal, NotaItem.nota_fiscal_id == NotaFiscal.id)
-        .where(NotaFiscal.planejamento_id == p.id)).all()
-    ncms = {i.ncm for i, _ in linhas}
+    # só os NCMs distintos aqui; os itens de entrada vêm depois, já filtrados pelo corte
+    ncms = set(db.scalars(select(NotaItem.ncm).join(NotaFiscal, NotaItem.nota_fiscal_id == NotaFiscal.id)
+                          .where(NotaFiscal.planejamento_id == p.id).distinct()))
 
     # exclusão relevante: a mais recente que já aconteceu e não é anterior a um ano antes do período
     hoje = hoje or date.today()
@@ -143,9 +142,11 @@ def calcular(db: Session, p: Planejamento, hoje: date | None = None) -> EstoqueS
 
     aliq_interna = _parametro(db, "aliq_icms_interna", "0.18")
     aliq_inter_padrao = _parametro(db, "aliq_icms_interestadual", "0.12")
+    linhas = db.execute(
+        select(NotaItem, NotaFiscal).join(NotaFiscal, NotaItem.nota_fiscal_id == NotaFiscal.id)
+        .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "ENTRADA", NotaItem.ncm.in_(saiu),
+               NotaFiscal.data_emissao <= corte)).all()
     for item, nf in linhas:
-        if nf.tipo != "ENTRADA" or item.ncm not in saiu or nf.data_emissao > corte:
-            continue
         com_st = (item.cst_icms or "") in CST_COM_ST
         if not item.bc_st:
             est.sem_base += com_st

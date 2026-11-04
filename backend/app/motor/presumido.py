@@ -34,10 +34,30 @@ def irpj_devido(base: Decimal, n_meses: int, p: Parametros) -> tuple[Decimal, De
     return normal, adicional
 
 
+RAT_REFERENCIA = Decimal("0.02")
+TERCEIROS_REFERENCIA = Decimal("0.058")
+
+
+def encargos_folha(entrada: EntradaSimulacao) -> Decimal:
+    """CPP 20% + RAT × FAP + terceiros (Lei 8.212/1991, art. 22; Lei 10.666/2003, art. 10).
+
+    Sem RAT, FAP e terceiros informados, vale a referência dos parâmetros (27,8%); com algum informado, os que faltam
+    seguem a referência (RAT 2%, FAP 1, terceiros 5,8%).
+    """
+    pr, p = entrada.premissas, entrada.parametros
+    if pr.rat is None and pr.fap is None and pr.terceiros is None:
+        return p.encargos_folha
+    rat = RAT_REFERENCIA if pr.rat is None else pr.rat
+    fap = Decimal(1) if pr.fap is None else pr.fap
+    terceiros = TERCEIROS_REFERENCIA if pr.terceiros is None else pr.terceiros
+    return p.cpp_patronal + rat * fap + terceiros
+
+
 def inss_patronal(entrada: EntradaSimulacao) -> Decimal:
     p = entrada.parametros
+    encargos = encargos_folha(entrada)
     return sum(
-        (entrada.folha.get(c, ZERO) * p.encargos_folha + entrada.pro_labore.get(c, ZERO) * p.inss_pro_labore
+        (entrada.folha.get(c, ZERO) * encargos + entrada.pro_labore.get(c, ZERO) * p.inss_pro_labore
          for c in entrada.competencias),
         ZERO,
     )
@@ -81,6 +101,11 @@ def calcular_presumido(
     memoria.registrar("Lucro Presumido", "CSLL 9%", "base × 9%", csll)
 
     inss = inss_patronal(entrada)
+    pr = entrada.premissas
+    memoria.registrar("Lucro Presumido", "Encargos patronais sobre a folha",
+                      "CPP 20% + RAT × FAP + terceiros" if (pr.rat, pr.fap, pr.terceiros) != (None, None, None)
+                      else "referência: CPP 20% + RAT 2% + terceiros 5,8%", encargos_folha(entrada),
+                      fundamento="Lei 8.212/1991, art. 22; Lei 10.666/2003, art. 10")
     federal = pis + cofins + irpj + adicional + csll + inss
     tributos = [
         TributoValor("ICMS", icms.total_a_recolher),

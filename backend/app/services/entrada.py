@@ -43,8 +43,9 @@ from app.motor.tipos import (
     Regime,
 )
 from app.seeds import tabelas
-from app.services import estoque_st, premissas_auto, revisao_produtos, substituicao
+from app.services import estoque_st, pgdas, premissas_auto, reducoes_reforma, revisao_produtos, substituicao
 from app.services.relatorio_contabil import CFOP_COMPRA_REVENDA
+from app.utils.simples import ANEXOS_CALCULADOS, ROMANOS, anexo_da_empresa
 
 ZERO = Decimal("0")
 ITEM_FOLHA = "Folha de Pagamento"
@@ -63,6 +64,9 @@ PREMISSAS = {
     "exclusoes_lr": Decimal,
     "prejuizo_fiscal_compensar": Decimal,
     "vendas_b2c": bool,
+    "rat": Decimal,
+    "fap": Decimal,
+    "terceiros": Decimal,
 }
 
 
@@ -99,7 +103,7 @@ def premissas_do_planejamento(db: Session, p: Planejamento, auto: premissas_auto
     return Premissas(regime_atual=Regime(p.empresa.regime_tributario), **valores)
 
 
-def _info_ncm(produtos: list[revisao_produtos.Produto]) -> dict[str, InfoNcm]:
+def _info_ncm(produtos: list[revisao_produtos.Produto], reducoes: reducoes_reforma.TabelaReducoes) -> dict[str, InfoNcm]:
     """Verificação por NCM do planejamento: vem da lei e da revisão, nunca de anotações de outro cliente."""
     grupos: dict[str, list[revisao_produtos.Produto]] = {}
     for x in produtos:
@@ -114,8 +118,10 @@ def _info_ncm(produtos: list[revisao_produtos.Produto]) -> dict[str, InfoNcm]:
             acao = "Revisado pelo contador."
         else:
             acao = "Sem ressalva na lei." if a.enquadramento != Enquadramento.NAO_LISTADO else "Fora dos anexos: tributação normal."
+        red = reducoes.buscar(ncm)
+        reforma = (red.cst, red.cclass_trib, red.rotulo + (f". Requisito: {red.condicao}" if red.condicao else "")) if red             else ("000", "000001", "Não – alíquota padrão")
         info[ncm] = InfoNcm(lista[0].descricao, "MEDIA" if a.enquadramento == Enquadramento.CONDICIONAL else "ALTA", False, bool(pendentes),
-                            acao, "000", "000001", "Não – alíquota padrão")
+                            acao, *reforma)
     return info
 
 
@@ -142,13 +148,15 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     st_vigente = substituicao.carregar(db, p.empresa.uf)
     brutos = []
     destinos = aliquotas_destino(db)
+    reducoes = reducoes_reforma.carregar(db)
     for c, cod, ncm, cfop, uf, origem, final, contribuinte, v in linhas:
         pr = por_produto.get((cod or "", ncm))
         decidido = pr.monofasico if pr and pr.revisao else None
         ncm_final = pr.ncm if pr else ncm
         st = None if st_vigente.vazia else st_vigente.vigente(ncm_final, c) is not None
         brutos.append(ItemBruto(c, ncm_final, cfop, uf, Decimal(str(v)), monofasico=decidido, sujeito_st=st,
-                                origem=origem, difal=_difal(destinos, p.empresa.uf, uf, c, final, contribuinte)))
+                                origem=origem, difal=_difal(destinos, p.empresa.uf, uf, c, final, contribuinte),
+                                reducao_ibs_cbs=_reducao(reducoes, ncm_final)))
 
     regras_cfop = {r.cfop: RegraCfop(r.cfop, r.gera_receita) for r in db.scalars(select(CfopRegra))}
     st = {r.ncm: r.sujeito_st for r in db.scalars(select(NcmRegra))}
@@ -213,9 +221,17 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     nao_informadas = [i.nome for i in db.scalars(select(ItemDespesa).where(ItemDespesa.ativo).order_by(ItemDespesa.ordem))
                       if i.id not in informados]
 
+    anexo, _ = anexo_da_empresa(p.empresa.anexo_simples, p.empresa.cnae, p.empresa.atividade)
+    extrato = pgdas.do_planejamento(db, p)
+    if extrato and extrato.anexos and anexo not in extrato.anexos:
+        declarados = " e ".join(f"Anexo {a}" for a in sorted(extrato.anexos, key=ROMANOS.get))
+        pendencias.append(f"O extrato do PGDAS-D declara {declarados}, mas o cálculo usa o Anexo {anexo}: confira o cadastro da empresa")
+    if anexo not in ANEXOS_CALCULADOS:
+        pendencias.append(f"O sistema ainda não calcula o Anexo {anexo} do Simples (serviços); o Simples saiu pelo Anexo I")
+        anexo = "I"
     faixas = [FaixaSimples(f.faixa, f.rbt12_de, f.rbt12_ate, f.aliq_nominal, f.parcela_deduzir, f.p_irpj, f.p_csll,
-                           f.p_cofins, f.p_pis, f.p_cpp, f.p_icms)
-              for f in _vigentes(db, SimplesFaixa, referencia) if f.anexo == (p.empresa.anexo_simples or "I")]
+                           f.p_cofins, f.p_pis, f.p_cpp, f.p_icms, f.p_ipi)
+              for f in _vigentes(db, SimplesFaixa, referencia) if f.anexo == anexo]
     if not faixas:
         raise ValueError("Tabela do Simples Nacional vigente não cadastrada")
     parametros = tabelas.parametros({x.chave: x.valor for x in _vigentes(db, ParametroTributario, referencia)})
@@ -240,10 +256,16 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         icms_entradas_real=icms_entradas,
         composicao_informada=db.scalar(select(CompraOrigem.id).where(CompraOrigem.planejamento_id == p.id).limit(1)) is not None
         or auto.composicao is not None,
-        ncm_info=_info_ncm(produtos),
+        ncm_info=_info_ncm(produtos, reducoes),
         estoque_st=_credito_estoque_st(db, p),
+        anexo_simples=anexo,
     )
     return EntradaMontada(entrada, pendencias)
+
+
+def _reducao(reducoes: reducoes_reforma.TabelaReducoes, ncm: str) -> Decimal:
+    r = reducoes.buscar(ncm)
+    return r.reducao if r else Decimal("0")
 
 
 def aliquotas_destino(db: Session) -> dict[str, list[AliquotaUf]]:

@@ -1,0 +1,91 @@
+{
+ "anexo": "II",
+ "descricao": "LC 123/2006, Anexo II – Indústria (redação da LC 155/2016)",
+ "vigencia_inicio": "2018-01-01",
+ "faixas": [
+  {
+   "faixa": 1,
+   "rbt12_de": "0",
+   "rbt12_ate": "180000",
+   "aliq_nominal": "0.045",
+   "parcela_deduzir": "0",
+   "p_irpj": "0.055",
+   "p_csll": "0.035",
+   "p_cofins": "0.1151",
+   "p_pis": "0.0249",
+   "p_cpp": "0.375",
+   "p_ipi": "0.075",
+   "p_icms": "0.32"
+  },
+  {
+   "faixa": 2,
+   "rbt12_de": "180000.01",
+   "rbt12_ate": "360000",
+   "aliq_nominal": "0.078",
+   "parcela_deduzir": "5940",
+   "p_irpj": "0.055",
+   "p_csll": "0.035",
+   "p_cofins": "0.1151",
+   "p_pis": "0.0249",
+   "p_cpp": "0.375",
+   "p_ipi": "0.075",
+   "p_icms": "0.32"
+  },
+  {
+   "faixa": 3,
+   "rbt12_de": "360000.01",
+   "rbt12_ate": "720000",
+   "aliq_nominal": "0.10",
+   "parcela_deduzir": "13860",
+   "p_irpj": "0.055",
+   "p_csll": "0.035",
+   "p_cofins": "0.1151",
+   "p_pis": "0.0249",
+   "p_cpp": "0.375",
+   "p_ipi": "0.075",
+   "p_icms": "0.32"
+  },
+  {
+   "faixa": 4,
+   "rbt12_de": "720000.01",
+   "rbt12_ate": "1800000",
+   "aliq_nominal": "0.112",
+   "parcela_deduzir": "22500",
+   "p_irpj": "0.055",
+   "p_csll": "0.035",
+   "p_cofins": "0.1151",
+   "p_pis": "0.0249",
+   "p_cpp": "0.375",
+   "p_ipi": "0.075",
+   "p_icms": "0.32"
+  },
+  {
+   "faixa": 5,
+   "rbt12_de": "1800000.01",
+   "rbt12_ate": "3600000",
+   "aliq_nominal": "0.147",
+   "parcela_deduzir": "85500",
+   "p_irpj": "0.055",
+   "p_csll": "0.035",
+   "p_cofins": "0.1151",
+   "p_pis": "0.0249",
+   "p_cpp": "0.375",
+   "p_ipi": "0.075",
+   "p_icms": "0.32"
+  },
+  {
+   "faixa": 6,
+   "rbt12_de": "3600000.01",
+   "rbt12_ate": "4800000",
+   "aliq_nominal": "0.30",
+   "parcela_deduzir": "720000",
+   "p_irpj": "0.085",
+   "p_csll": "0.075",
+   "p_cofins": "0.2096",
+   "p_pis": "0.0454",
+   "p_cpp": "0.235",
+   "p_ipi": "0.35",
+   "p_icms": "0"
+  }
+ ]
+}
