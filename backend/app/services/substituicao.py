@@ -37,14 +37,18 @@ class TabelaSt:
 
     def __init__(self, regras: list[Regra]):
         self.regras = regras
+        self._vigente: dict[tuple[str, str], Regra | None] = {}  # (ncm, competência): a mesma consulta se repete por item
 
     @property
     def vazia(self) -> bool:
         return not self.regras
 
     def vigente(self, ncm: str, competencia: str) -> Regra | None:
-        dia = _dia(competencia)
-        return next((r for r in self.regras if r.abrange(ncm) and r.vale_em(dia)), None)
+        chave = (ncm, competencia)
+        if chave not in self._vigente:
+            dia = _dia(competencia)
+            self._vigente[chave] = next((r for r in self.regras if r.abrange(ncm) and r.vale_em(dia)), None)
+        return self._vigente[chave]
 
     def encerrada(self, ncm: str, competencia: str) -> Regra | None:
         """A regra que já valeu para o NCM e terminou antes da competência (para avisar notas que ainda destacam ST)."""

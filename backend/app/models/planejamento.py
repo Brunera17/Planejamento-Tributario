@@ -1,7 +1,7 @@
 """Planejamento (cabeçalho do estudo), premissas e histórico de status."""
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -60,6 +60,7 @@ class PremissaPlanejamento(Base):
 
 class HistoricoStatus(Base):
     __tablename__ = "historico_status"
+    __table_args__ = (Index("ix_historico_status_planejamento", "planejamento_id"),)
 
     id: Mapped[PK]
     planejamento_id: Mapped[int | None] = mapped_column(ForeignKey("planejamento.id", ondelete="CASCADE"))

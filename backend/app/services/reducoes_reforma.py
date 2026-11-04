@@ -29,9 +29,15 @@ class Reducao:
 class TabelaReducoes:
     def __init__(self, regras: list[RegraReforma]):
         self.regras = regras
+        self._por_ncm: dict[str, Reducao | None] = {}  # o mesmo NCM aparece em várias linhas das notas
 
     def buscar(self, ncm: str) -> Reducao | None:
         """O maior benefício vale quando o NCM está em mais de um anexo (os anexos de 60% ressalvam os de alíquota zero)."""
+        if ncm not in self._por_ncm:
+            self._por_ncm[ncm] = self._buscar(ncm)
+        return self._por_ncm[ncm]
+
+    def _buscar(self, ncm: str) -> Reducao | None:
         achadas = [r for r in self.regras if ncm.startswith(r.ncm) and not any(ncm.startswith(e) for e in (r.excecoes or "").split(",") if e)]
         if not achadas:
             return None

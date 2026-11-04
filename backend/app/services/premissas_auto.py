@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import CompraMensal, CompraOrigem, NotaFiscal, NotaItem, ParametroTributario, Planejamento, PremissaPlanejamento
@@ -126,27 +126,31 @@ def derivar(db: Session, p: Planejamento) -> Automaticas:
         out.premissas["rbt12_informado"] = Derivada(extrato.rbt12, f"extrato do PGDAS-D de {pa} ({extrato.arquivo}): RBT12 de {_brl(extrato.rbt12)}")
 
     # ---- entradas (XML): origem das compras e regime dos fornecedores
+    # agregado no banco: uma linha por combinação que muda a alíquota do crédito ou o regime do fornecedor
+    filtro_entradas = (NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "ENTRADA", NotaFiscal.competencia.in_(comps),
+                       NotaFiscal.uf_emitente.is_not(None), NotaItem.cfop.in_(CFOP_COMPRA_REVENDA))
     entradas = db.execute(
-        select(NotaFiscal.id, NotaFiscal.uf_emitente, NotaFiscal.crt_emitente, NotaItem.orig_icms, NotaItem.aliq_icms, NotaItem.vl_total)
+        select(NotaFiscal.uf_emitente, NotaFiscal.crt_emitente, NotaItem.orig_icms, NotaItem.aliq_icms, func.sum(NotaItem.vl_total))
         .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
-        .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "ENTRADA", NotaFiscal.competencia.in_(comps),
-               NotaFiscal.uf_emitente.is_not(None), NotaItem.cfop.in_(CFOP_COMPRA_REVENDA))
+        .where(*filtro_entradas)
+        .group_by(NotaFiscal.uf_emitente, NotaFiscal.crt_emitente, NotaItem.orig_icms, NotaItem.aliq_icms)
     ).all()
     if entradas:
         interna = aliquota_interna(db, p)
         partes: dict[Decimal, Decimal] = {}
-        for _, uf_emit, _, orig, aliq, v in entradas:
+        for uf_emit, _, orig, aliq, v in entradas:
             a = aliquota_da_compra(uf, interna, uf_emit, orig, aliq)
             partes[a] = partes.get(a, ZERO) + Decimal(str(v))
         valor = sum(partes.values(), ZERO)
         if valor > 0:
             out.composicao = _fechar_em_cem(partes)
             compras = sum((c.valor for c in db.scalars(select(CompraMensal).where(CompraMensal.planejamento_id == p.id))), ZERO)
-            notas = len({e[0] for e in entradas})
+            notas = db.scalar(select(func.count(func.distinct(NotaFiscal.id)))
+                              .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id).where(*filtro_entradas))
             cobertura = f", {_pct(valor / compras)} das compras informadas" if compras else ""
             out.fonte_composicao = f"{notas} {'nota' if notas == 1 else 'notas'} de compra, {_brl(valor)}{cobertura}"
 
-        com_crt = [(crt, Decimal(str(v))) for _, _, crt, _, _, v in entradas if crt]
+        com_crt = [(crt, Decimal(str(v))) for _, crt, _, _, v in entradas if crt]
         total = sum((v for _, v in com_crt), ZERO)
         if total > 0:
             normal = sum((v for crt, v in com_crt if crt in CRT_NORMAL), ZERO) / total
@@ -155,11 +159,14 @@ def derivar(db: Session, p: Planejamento) -> Automaticas:
                 f"{_pct(normal)} das compras nas notas vêm de fornecedores fora do Simples Nacional")
 
     # ---- saídas: ICMS-ST pelo NCM e pelo CST, e venda a consumidor final
+    # agregado no banco: tudo abaixo soma valores e junta NCMs, então uma linha por combinação basta
     saidas = db.execute(
-        select(NotaItem.ncm, NotaItem.cfop, NotaItem.cst_icms, NotaItem.vl_total, NotaFiscal.uf_destinatario, NotaFiscal.consumidor_final,
-               NotaFiscal.competencia)
+        select(NotaItem.ncm, NotaItem.cfop, NotaItem.cst_icms, func.sum(NotaItem.vl_total).label("vl_total"),
+               NotaFiscal.uf_destinatario, NotaFiscal.consumidor_final, NotaFiscal.competencia)
         .join(NotaFiscal, NotaItem.nota_fiscal_id == NotaFiscal.id)
         .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA", NotaFiscal.competencia.in_(comps))
+        .group_by(NotaItem.ncm, NotaItem.cfop, NotaItem.cst_icms, NotaFiscal.uf_destinatario, NotaFiscal.consumidor_final,
+                  NotaFiscal.competencia)
     ).all()
     internas = [s for s in saidas if (s.uf_destinatario == uf if s.uf_destinatario else str(s.cfop).startswith("5"))]
     if internas:
