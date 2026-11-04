@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.models import CompraMensal, CompraOrigem, NotaFiscal, NotaItem, ParametroTributario, Planejamento, PremissaPlanejamento
 from app.services import pgdas, substituicao
 from app.services.relatorio_contabil import CFOP_COMPRA_REVENDA
+from app.services.memo import por_planejamento
 
 ZERO = Decimal("0")
 UM = Decimal("1")
@@ -112,6 +113,7 @@ def _fechar_em_cem(partes: dict[Decimal, Decimal]) -> dict[Decimal, Decimal]:
     return out
 
 
+@por_planejamento
 def derivar(db: Session, p: Planejamento) -> Automaticas:
     uf = p.empresa.uf
     out = Automaticas()

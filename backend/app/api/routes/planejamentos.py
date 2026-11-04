@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual, obter_planejamento
+from app.core.config import get_settings
 from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import (
     CompraMensal,
@@ -47,6 +48,7 @@ from app.seeds import tabelas
 from app.services.entrada import PREMISSAS
 from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
+from app.utils.upload import ler_limitado
 
 router = APIRouter(prefix="/planejamentos", tags=["Planejamentos e coleta"])
 
@@ -391,13 +393,15 @@ def gravar_levantamento(pid: int, competencia: str, dados: LevantamentoEntrada, 
 
 
 @router.post("/{pid}/nfe")
-async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
+def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     """XML de NF-e avulso ou .zip com vários XML. Notas já importadas (mesma chave) são ignoradas."""
     p = obter_planejamento(db, pid)
     nome = arquivo.filename or "arquivo"
     if not nome.lower().endswith((".xml", ".zip")):
         raise ErroNegocio("Envie um XML de NF-e ou um .zip com XMLs", 415)
-    notas, erros = ler_arquivos(nome, await arquivo.read())
+    s = get_settings()
+    limite = s.nfe_zip_max_mb if nome.lower().endswith(".zip") else s.nfe_xml_max_mb
+    notas, erros = ler_arquivos(nome, ler_limitado(arquivo, limite))
     imp = ImportacaoNfe(planejamento_id=pid, origem="XML", arquivo=nome, importado_por=u.id, lidos=len(notas),
                         importados=0, ignorados=0)
     db.add(imp)
@@ -448,15 +452,13 @@ async def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
 
 
 @router.post("/{pid}/relatorio-contabil")
-async def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
+def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     """Relatório "Movimentação de Produtos – ICMS – PIS – COFINS" do Domínio (.xls ou .xlsx), de saídas ou de entradas."""
     p = obter_planejamento(db, pid)
     nome = arquivo.filename or "relatorio.xls"
     if not nome.lower().endswith((".xls", ".xlsx")):
         raise ErroNegocio("Envie o relatório em .xls ou .xlsx", 415)
-    conteudo = await arquivo.read()
-    if len(conteudo) > 20 * 1024 * 1024:
-        raise ErroNegocio("Arquivo acima de 20 MB", 413)
+    conteudo = ler_limitado(arquivo, get_settings().relatorio_contabil_max_mb)
     try:
         resumo = relatorio_contabil.importar(db, p, nome, conteudo, u.id)
     except relatorio_contabil.RelatorioInvalido as e:

@@ -13,10 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, UsuarioAtual, obter_planejamento
+from app.core.config import get_settings
 from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import Bem, Documento, Levantamento, Planejamento, TipoDocumento
 from app.schemas.comum import Esquema
 from app.services import documentos, progresso
+from app.utils.upload import ler_limitado
 
 router = APIRouter(prefix="/planejamentos", tags=["Bens e documentos"])
 
@@ -155,10 +157,10 @@ def listar_documentos(pid: int, db: DB, _: UsuarioAtual):
 
 
 @router.post("/{pid}/documentos/{competencia}/{tipo_id}", status_code=201)
-async def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
+def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     p = obter_planejamento(db, pid)
     nome = (arquivo.filename or "documento").replace("\\", "/").rsplit("/", 1)[-1][:200]
-    conteudo = await arquivo.read()
+    conteudo = ler_limitado(arquivo, get_settings().upload_max_mb)
     ext = documentos.validar(nome, conteudo)
     doc = _documento(db, _levantamento(db, p, competencia, u.id), tipo_id)
     anterior = doc.arquivo

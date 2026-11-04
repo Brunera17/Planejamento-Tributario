@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.models import CfopRegra, NotaFiscal, NotaItem, Planejamento, RevisaoProduto, Usuario
 from app.motor.lei_monofasico import Avaliacao, Enquadramento, avaliar
 from app.seeds import tabelas
+from app.services.memo import por_planejamento
 from app.utils.validacao import sem_acentos
 
 ZERO = Decimal("0")
@@ -62,6 +63,7 @@ def familia(descricao: str) -> str:
     return " ".join(palavras[:2])
 
 
+@por_planejamento
 def analisar(db: Session, p: Planejamento) -> list[Produto]:
     tabela = tabelas.lei_monofasico()
     revisoes = {(r.cod_produto, r.ncm_nota): r for r in db.scalars(select(RevisaoProduto).where(RevisaoProduto.planejamento_id == p.id))}

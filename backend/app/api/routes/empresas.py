@@ -9,6 +9,7 @@ from app.models import Bem, Empresa, Planejamento
 from app.schemas.cadastro import EmpresaEntrada, EmpresaSaida
 from app.services import importacao_empresas
 from app.services.simulacao import marcar_desatualizada
+from app.utils.upload import ler_limitado
 
 router = APIRouter(prefix="/empresas", tags=["Empresas"])
 
@@ -75,8 +76,8 @@ def excluir(empresa_id: int, db: DB, _: Contador):
 
 
 @router.post("/importacao/previa")
-async def previa(arquivo: UploadFile, db: DB, _: Contador):
-    conteudo = await _ler(arquivo)
+def previa(arquivo: UploadFile, db: DB, _: Contador):
+    conteudo = _ler(arquivo)
     try:
         return [dataclasses.asdict(l) for l in importacao_empresas.previa(db, arquivo.filename, conteudo)]
     except importacao_empresas.PlanilhaInvalida as e:
@@ -84,8 +85,8 @@ async def previa(arquivo: UploadFile, db: DB, _: Contador):
 
 
 @router.post("/importacao/confirmar")
-async def confirmar(arquivo: UploadFile, db: DB, u: Contador):
-    conteudo = await _ler(arquivo)
+def confirmar(arquivo: UploadFile, db: DB, u: Contador):
+    conteudo = _ler(arquivo)
     try:
         imp = importacao_empresas.confirmar(db, arquivo.filename, conteudo, u.id)
     except importacao_empresas.PlanilhaInvalida as e:
@@ -93,10 +94,7 @@ async def confirmar(arquivo: UploadFile, db: DB, u: Contador):
     return {"incluidas": imp.incluidas, "atualizadas": imp.atualizadas, "rejeitadas": imp.rejeitadas}
 
 
-async def _ler(arquivo: UploadFile) -> bytes:
+def _ler(arquivo: UploadFile) -> bytes:
     if not (arquivo.filename or "").lower().endswith((".xlsx", ".xls", ".csv")):
         raise ErroNegocio("Envie um arquivo .xlsx, .xls ou .csv", 415)
-    conteudo = await arquivo.read()
-    if len(conteudo) > 10 * 1024 * 1024:
-        raise ErroNegocio("Arquivo acima de 10 MB", 413)
-    return conteudo
+    return ler_limitado(arquivo, 10)

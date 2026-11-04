@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Documento, Levantamento, Planejamento, TipoDocumento
 from app.services import documentos
+from app.services.memo import por_planejamento
 
 NUMERO = r"\d{1,3}(?:\.\d{3})*,\d{2}"
 PA = re.compile(r"Per[ií]odo\s+de\s+Apura[çc][ãa]o(?:\s*\(PA\))?\s*:?\s*(\d{2})/(\d{4})", re.I)
@@ -67,6 +68,7 @@ def ler(conteudo: bytes, arquivo: str = "") -> ExtratoPgdas:
     return e
 
 
+@por_planejamento
 def do_planejamento(db: Session, p: Planejamento) -> ExtratoPgdas | None:
     """O extrato lido mais recente entre os enviados na aba Documentos (pelo período de apuração)."""
     linhas = db.execute(

@@ -81,17 +81,24 @@ def calcular(db: Session, p: Planejamento) -> tuple[int, list[Bloco]]:
     itens = db.scalars(select(ItemDespesa).where(ItemDespesa.ativo).order_by(ItemDespesa.grupo_id, ItemDespesa.ordem)).all()
     grupos = db.scalars(select(GrupoDespesa).order_by(GrupoDespesa.ordem)).all()
     tipos_doc = db.scalars(select(TipoDocumento).order_by(TipoDocumento.ordem)).all()
+    # uma consulta por tabela para o período inteiro (não uma por competência)
+    ids = [lv.id for lv in levs.values()]
+    itens_por_lev, grupos_por_lev, docs_por_lev = {}, {}, {}
+    if ids:
+        for lid, x in db.execute(select(LevantamentoItem.levantamento_id, LevantamentoItem.item_despesa_id)
+                                 .where(LevantamentoItem.levantamento_id.in_(ids))):
+            itens_por_lev.setdefault(lid, set()).add(x)
+        for lid, x in db.execute(select(LevantamentoGrupo.levantamento_id, LevantamentoGrupo.grupo_id)
+                                 .where(LevantamentoGrupo.levantamento_id.in_(ids))):
+            grupos_por_lev.setdefault(lid, set()).add(x)
+        for lid, x in db.execute(select(Documento.levantamento_id, Documento.tipo_documento_id)
+                                 .where(Documento.levantamento_id.in_(ids))):
+            docs_por_lev.setdefault(lid, set()).add(x)
     for c in comps:
         lv = levs.get(c)
-        preenchidos = set()
-        grupos_resp = set()
-        docs = set()
-        if lv:
-            preenchidos = set(db.scalars(select(LevantamentoItem.item_despesa_id).where(
-                LevantamentoItem.levantamento_id == lv.id)))
-            grupos_resp = set(db.scalars(select(LevantamentoGrupo.grupo_id).where(
-                LevantamentoGrupo.levantamento_id == lv.id)))
-            docs = set(db.scalars(select(Documento.tipo_documento_id).where(Documento.levantamento_id == lv.id)))
+        preenchidos = itens_por_lev.get(lv.id, set()) if lv else set()
+        grupos_resp = grupos_por_lev.get(lv.id, set()) if lv else set()
+        docs = docs_por_lev.get(lv.id, set()) if lv else set()
         for it in itens:
             b["DESPESAS"].ok() if it.id in preenchidos else b["DESPESAS"].falta(c, it.nome)
         for g in grupos:
