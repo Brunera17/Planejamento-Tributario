@@ -16,9 +16,11 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://planejador:planejador@db:5432/planejador
-      JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-de-desenvolvimento-32c}
+      JWT_SECRET: ${JWT_SECRET:-segredo-local-do-docker-compose-nao-usar-em-producao}
       UPLOAD_DIR: /data/uploads
       CORS_ORIGINS: http://localhost:5173
+    # local: com os usuários e planejamentos de demonstração
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seeds.carga --demo && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     ports: ["8000:8000"]
     volumes: [uploads:/data/uploads]
     depends_on:

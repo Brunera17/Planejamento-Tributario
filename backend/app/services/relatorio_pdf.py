@@ -61,7 +61,7 @@ TIPOS_BEM = {"VEICULOS": "Veículos", "MOVEIS_UTENSILIOS": "Móveis e utensílio
              "MAQUINAS_EQUIPAMENTOS": "Máquinas e equipamentos", "IMOVEL": "Imóvel"}
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 FONTES_LEGAIS = [
-    "LC 123/2006 (Simples Nacional, Anexo I)",
+    "LC 123/2006 (Simples Nacional, Anexos I e II)",
     "Leis 9.249/1995, 9.430/1996 e 9.718/1998 (IRPJ, CSLL e PIS/COFINS cumulativos)",
     "Leis 10.637/2002 e 10.833/2003 (PIS/COFINS não cumulativos)",
     "Lei 10.485/2002 (PIS/COFINS monofásico de autopeças)",
@@ -86,7 +86,7 @@ COR = {
     "aviso_texto": colors.HexColor("#744210"),
 }
 GRUPOS = [
-    ("ICMS", ("ICMS",), colors.HexColor("#155E75")),
+    ("ICMS", ("ICMS", "IPI"), colors.HexColor("#155E75")),  # IPI só no DAS da indústria (Anexo II)
     ("PIS e COFINS", ("PIS", "COFINS", "PIS/COFINS"), colors.HexColor("#4F8FA4")),
     ("IRPJ e CSLL", ("IRPJ", "CSLL"), colors.HexColor("#9EC5D3")),
     ("CPP e INSS", ("CPP", "INSS patronal"), colors.HexColor("#52606D")),
@@ -207,6 +207,21 @@ def resumo_ncm(linhas: list[dict], receita: float) -> list[str]:
             extra = ", sem benefício na Reforma (alíquota padrão)." if b.startswith("Não") else f", com benefício na Reforma: {b}."
         frases.append(f"IBS/CBS: CST {cst} e cClassTrib {ccl} para todos os NCMs{extra}")
     return frases
+
+
+def enquadramento_simples(simples: dict, receita: float | None = None) -> str:
+    """Anexo, faixa e alíquota efetiva do DAS."""
+    d = simples["detalhes"]
+    anexo = {1: "Anexo I (comércio)", 2: "Anexo II (indústria)"}.get(int(d.get("anexo", 1)), f"Anexo {int(d['anexo'])}")
+    # o monofásico e a ST saem do DAS: a carga sobre a receita fica abaixo da alíquota da tabela
+    menor = bool(receita) and float(simples["estadual"]) + float(simples["federal"]) < float(receita) * float(d["aliquota_efetiva_das"]) - 0.01
+    segregacao = "; a carga fica menor porque o monofásico e a ST saem do DAS" if menor and not d.get("acima_sublimite") else ""
+    rbt12 = f"RBT12 de {brl(d['rbt12'])}" + (", estimado pela média do período" if d.get("rbt12_estimado") else "")
+    if not simples.get("elegivel", True):
+        return f"No Simples: acima do teto de R$ 4,8 milhões ({rbt12}), a empresa não pode optar."
+    sublimite = "; acima do sublimite, o ICMS é pago fora do DAS" if d.get("acima_sublimite") else ""
+    return (f"No Simples: {anexo}, {int(d['faixa'])}ª faixa ({rbt12}), alíquota efetiva de "
+            f"{pct(d['aliquota_efetiva_das'])} no DAS{sublimite}{segregacao}.")
 
 
 def cnpj_fmt(c: str) -> str:
@@ -558,6 +573,7 @@ def montar_pdf(d: DadosRelatorio) -> bytes:
         s.append(Paragraph(t(f"{REGIMES[melhor]} tem a menor carga"), E["veredito"]))
         s.append(Paragraph(f"Economia estimada de <font name='{FONTE_FORTE}' color='#22543D'>{t(brl(economia))} por ano</font> "
                            f"em relação ao {t(REGIMES[d.regime_atual])}, regime atual da empresa. {base}", E["lead"]))
+    s.append(Paragraph(t(enquadramento_simples(r["simples"], receita)), E["apoio"]))
     s.append(Spacer(1, 6 * mm))
     s.append(BarrasComposicao(r, L, d.regime_atual))
     s.append(Paragraph(t(f"Carga do período por regime; percentuais sobre a receita líquida de {brl(receita)}."), E["apoio"]))

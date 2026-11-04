@@ -108,3 +108,10 @@ def test_cst_de_st(cst, st):
     from app.services.premissas_auto import eh_st
 
     assert eh_st(cst or None) is st
+
+
+@pytest.mark.parametrize("chave, valor", [("rat", 0.025), ("fap", 2.5), ("fap", 0.4), ("terceiros", 0.2)])
+def test_encargos_da_folha_fora_da_lei_sao_recusados(cliente, contador, chave, valor):
+    pid = cliente.get("/api/planejamentos", headers=contador).json()[0]["id"]
+    r = cliente.put(f"/api/planejamentos/{pid}/premissas", headers=contador, json={chave: valor})
+    assert r.status_code == 422 and chave in r.json()["campos"]

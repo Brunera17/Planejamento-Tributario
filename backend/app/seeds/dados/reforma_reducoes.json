@@ -1,0 +1,1554 @@
+{
+ "fonte": "LC 214/2025, Anexos I (alíquota zero, art. 125), VII (alimentos, 60%), VIII (higiene e limpeza, 60%) e XV (hortícolas, frutas e ovos, alíquota zero); textos do Senado Federal e da Modelo Inicial (LC 214 consolidada), conferidos em 03/11/2026",
+ "regras": [
+  {
+   "anexo": "Anexo I",
+   "item": "1",
+   "descricao": "Arroz",
+   "ncm": "100620",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "1",
+   "descricao": "Arroz",
+   "ncm": "100630",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "1",
+   "descricao": "Arroz",
+   "ncm": "10064000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "2",
+   "descricao": "Leite para consumo direto",
+   "ncm": "04011010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica para consumo direto"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "2",
+   "descricao": "Leite para consumo direto",
+   "ncm": "04011090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica para consumo direto"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "2",
+   "descricao": "Leite para consumo direto",
+   "ncm": "04012010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica para consumo direto"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "2",
+   "descricao": "Leite para consumo direto",
+   "ncm": "04012090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica para consumo direto"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "2",
+   "descricao": "Leite para consumo direto",
+   "ncm": "04014010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica para consumo direto"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "2",
+   "descricao": "Leite para consumo direto",
+   "ncm": "04015010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica para consumo direto"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "3",
+   "descricao": "Leite em pó",
+   "ncm": "04021010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "3",
+   "descricao": "Leite em pó",
+   "ncm": "04021090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "3",
+   "descricao": "Leite em pó",
+   "ncm": "04022110",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "3",
+   "descricao": "Leite em pó",
+   "ncm": "04022120",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "3",
+   "descricao": "Leite em pó",
+   "ncm": "04022910",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "3",
+   "descricao": "Leite em pó",
+   "ncm": "04022920",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "4",
+   "descricao": "Fórmulas infantis",
+   "ncm": "19011010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "4",
+   "descricao": "Fórmulas infantis",
+   "ncm": "19011090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "4",
+   "descricao": "Fórmulas infantis",
+   "ncm": "21069090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Conforme a legislação específica"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "5",
+   "descricao": "Manteiga",
+   "ncm": "04051000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "6",
+   "descricao": "Margarina",
+   "ncm": "15171000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "7",
+   "descricao": "Feijões",
+   "ncm": "07133319",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "7",
+   "descricao": "Feijões",
+   "ncm": "07133329",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "7",
+   "descricao": "Feijões",
+   "ncm": "07133399",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "7",
+   "descricao": "Feijões",
+   "ncm": "07133590",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "8",
+   "descricao": "Café",
+   "ncm": "0901",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "8",
+   "descricao": "Café",
+   "ncm": "21011",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "9",
+   "descricao": "Óleo de babaçu",
+   "ncm": "15132120",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "10",
+   "descricao": "Farinha de mandioca e tapioca",
+   "ncm": "11062000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "10",
+   "descricao": "Farinha de mandioca e tapioca",
+   "ncm": "19030000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "11",
+   "descricao": "Farinha, grumos e sêmolas de milho",
+   "ncm": "11022000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "11",
+   "descricao": "Farinha, grumos e sêmolas de milho",
+   "ncm": "11031300",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "12",
+   "descricao": "Grãos de milho",
+   "ncm": "11041900",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "12",
+   "descricao": "Grãos de milho",
+   "ncm": "11042300",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "13",
+   "descricao": "Farinha de trigo",
+   "ncm": "11010010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "14",
+   "descricao": "Açúcar",
+   "ncm": "17011400",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "14",
+   "descricao": "Açúcar",
+   "ncm": "17019900",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "15",
+   "descricao": "Massas alimentícias",
+   "ncm": "19021",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "16",
+   "descricao": "Pão francês e pré-mistura",
+   "ncm": "19059090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só o pão francês e a sua pré-mistura ou massa"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "16",
+   "descricao": "Pão francês e pré-mistura",
+   "ncm": "19012010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só o pão francês e a sua pré-mistura ou massa"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "16",
+   "descricao": "Pão francês e pré-mistura",
+   "ncm": "19012090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só o pão francês e a sua pré-mistura ou massa"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "17",
+   "descricao": "Grãos de aveia",
+   "ncm": "11041200",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "17",
+   "descricao": "Grãos de aveia",
+   "ncm": "11042200",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "18",
+   "descricao": "Farinha de aveia",
+   "ncm": "11029000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "0201",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "0202",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02061000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02062",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02102000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "0203",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02063000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02064",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "020910",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02101",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "0204",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02109920",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02109990",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02068000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02069000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "0207",
+   "excecoes": [
+    "02074300",
+    "02075300"
+   ],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "02099000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "19",
+   "descricao": "Carnes e miudezas",
+   "ncm": "0210991",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "20",
+   "descricao": "Peixes, exceto salmonídeos, atuns, bacalhaus e ovas",
+   "ncm": "0302",
+   "excecoes": [
+    "03021",
+    "03023",
+    "03025100",
+    "03025200",
+    "03025300",
+    "03029"
+   ],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "20",
+   "descricao": "Peixes, exceto salmonídeos, atuns, bacalhaus e ovas",
+   "ncm": "0303",
+   "excecoes": [
+    "03031",
+    "03034",
+    "03036300",
+    "03036400",
+    "03036500",
+    "03039"
+   ],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "20",
+   "descricao": "Peixes, exceto salmonídeos, atuns, bacalhaus e ovas",
+   "ncm": "0304",
+   "excecoes": [
+    "03044",
+    "03045",
+    "03047",
+    "03048",
+    "03049"
+   ],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "21",
+   "descricao": "Queijos",
+   "ncm": "04061010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só os tipos listados (muçarela, minas, prato, coalho, ricota, requeijão, provolone, parmesão, fresco e reino)"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "21",
+   "descricao": "Queijos",
+   "ncm": "04061090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só os tipos listados (muçarela, minas, prato, coalho, ricota, requeijão, provolone, parmesão, fresco e reino)"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "21",
+   "descricao": "Queijos",
+   "ncm": "04062000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só os tipos listados (muçarela, minas, prato, coalho, ricota, requeijão, provolone, parmesão, fresco e reino)"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "21",
+   "descricao": "Queijos",
+   "ncm": "04069010",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só os tipos listados (muçarela, minas, prato, coalho, ricota, requeijão, provolone, parmesão, fresco e reino)"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "21",
+   "descricao": "Queijos",
+   "ncm": "04069020",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só os tipos listados (muçarela, minas, prato, coalho, ricota, requeijão, provolone, parmesão, fresco e reino)"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "21",
+   "descricao": "Queijos",
+   "ncm": "04069030",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só os tipos listados (muçarela, minas, prato, coalho, ricota, requeijão, provolone, parmesão, fresco e reino)"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "22",
+   "descricao": "Sal iodado",
+   "ncm": "25010020",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "22",
+   "descricao": "Sal iodado",
+   "ncm": "25010090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "23",
+   "descricao": "Mate",
+   "ncm": "0903",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "24",
+   "descricao": "Farinha hipoproteica para doenças metabólicas",
+   "ncm": "19019090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só para aminoacidopatias, acidemias e defeitos do ciclo da ureia"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "25",
+   "descricao": "Massa hipoproteica para doenças metabólicas",
+   "ncm": "19021900",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": "Só para aminoacidopatias, acidemias e defeitos do ciclo da ureia"
+  },
+  {
+   "anexo": "Anexo I",
+   "item": "26",
+   "descricao": "Fórmulas dietoterápicas para erros inatos do metabolismo",
+   "ncm": "21069090",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": "200003",
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03061",
+   "excecoes": [
+    "030611",
+    "03061500"
+   ],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03063",
+   "excecoes": [
+    "03063100",
+    "03063400",
+    "03063910"
+   ],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03073100",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03073200",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03074200",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "030743",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03075100",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03075200",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03079100",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "1",
+   "descricao": "Crustáceos e moluscos",
+   "ncm": "03079200",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "2",
+   "descricao": "Leite fermentado, bebidas e compostos lácteos",
+   "ncm": "04032000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "2202.99.00: só bebidas e compostos lácteos"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "2",
+   "descricao": "Leite fermentado, bebidas e compostos lácteos",
+   "ncm": "04039000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "2202.99.00: só bebidas e compostos lácteos"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "2",
+   "descricao": "Leite fermentado, bebidas e compostos lácteos",
+   "ncm": "22029900",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "2202.99.00: só bebidas e compostos lácteos"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "3",
+   "descricao": "Mel natural",
+   "ncm": "04090000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "4",
+   "descricao": "Farinhas, grumos e sêmolas",
+   "ncm": "110100",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "4",
+   "descricao": "Farinhas, grumos e sêmolas",
+   "ncm": "1102",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "4",
+   "descricao": "Farinhas, grumos e sêmolas",
+   "ncm": "1105",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "4",
+   "descricao": "Farinhas, grumos e sêmolas",
+   "ncm": "1106",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "4",
+   "descricao": "Farinhas, grumos e sêmolas",
+   "ncm": "1208",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "5",
+   "descricao": "Grumos e sêmolas de cereais",
+   "ncm": "11031100",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "5",
+   "descricao": "Grumos e sêmolas de cereais",
+   "ncm": "11031900",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "6",
+   "descricao": "Grãos de cereais esmagados ou em flocos",
+   "ncm": "11041",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "6",
+   "descricao": "Grãos de cereais esmagados ou em flocos",
+   "ncm": "11042",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "7",
+   "descricao": "Amido de milho",
+   "ncm": "11081200",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "8",
+   "descricao": "Óleos vegetais",
+   "ncm": "150790",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "8",
+   "descricao": "Óleos vegetais",
+   "ncm": "1508",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "8",
+   "descricao": "Óleos vegetais",
+   "ncm": "1511",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "8",
+   "descricao": "Óleos vegetais",
+   "ncm": "1512",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "8",
+   "descricao": "Óleos vegetais",
+   "ncm": "1513",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "8",
+   "descricao": "Óleos vegetais",
+   "ncm": "1514",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "8",
+   "descricao": "Óleos vegetais",
+   "ncm": "1515",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "9",
+   "descricao": "Massas alimentícias",
+   "ncm": "19022000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "9",
+   "descricao": "Massas alimentícias",
+   "ncm": "19023000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "10",
+   "descricao": "Sucos naturais",
+   "ncm": "2009",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar ou conservantes"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "11",
+   "descricao": "Polpas de frutas",
+   "ncm": "2008",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar ou conservantes"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "12",
+   "descricao": "Pão de forma",
+   "ncm": "19059010",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "13",
+   "descricao": "Extrato de tomate",
+   "ncm": "20029000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "14",
+   "descricao": "Frutas e hortaliças",
+   "ncm": "07",
+   "excecoes": [
+    "0711"
+   ],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar ou conservantes"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "14",
+   "descricao": "Frutas e hortaliças",
+   "ncm": "08",
+   "excecoes": [
+    "0812",
+    "08140000"
+   ],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar ou conservantes"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "15",
+   "descricao": "Cereais, sementes e frutos oleaginosos",
+   "ncm": "10",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "15",
+   "descricao": "Cereais, sementes e frutos oleaginosos",
+   "ncm": "12",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "16",
+   "descricao": "Hortaliças cozidas ou preparadas",
+   "ncm": "2004",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar ou conservantes"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "16",
+   "descricao": "Hortaliças cozidas ou preparadas",
+   "ncm": "2005",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar ou conservantes"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "16",
+   "descricao": "Hortaliças cozidas ou preparadas",
+   "ncm": "20021000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar ou conservantes"
+  },
+  {
+   "anexo": "Anexo VII",
+   "item": "17",
+   "descricao": "Castanhas regionais torradas",
+   "ncm": "20081",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": "Só frutas de casca rija regionais"
+  },
+  {
+   "anexo": "Anexo VIII",
+   "item": "1",
+   "descricao": "Sabonete",
+   "ncm": "34011190",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VIII",
+   "item": "2",
+   "descricao": "Creme dental",
+   "ncm": "33061000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VIII",
+   "item": "3",
+   "descricao": "Escova de dentes",
+   "ncm": "96032100",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VIII",
+   "item": "4",
+   "descricao": "Papel higiênico",
+   "ncm": "48181000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VIII",
+   "item": "5",
+   "descricao": "Água sanitária",
+   "ncm": "38089419",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VIII",
+   "item": "6",
+   "descricao": "Sabão em barra",
+   "ncm": "34011900",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo VIII",
+   "item": "7",
+   "descricao": "Fraldas e artigos higiênicos semelhantes",
+   "ncm": "96190000",
+   "excecoes": [],
+   "reducao": "0.6",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "1",
+   "descricao": "Ovos de aves",
+   "ncm": "04072",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "0701",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "07020000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "0703",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "0704",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "0705",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "0706",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "07070000",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "0708",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "0709",
+   "excecoes": [
+    "07095"
+   ],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "2",
+   "descricao": "Hortaliças frescas, exceto cogumelos e trufas",
+   "ncm": "0710",
+   "excecoes": [
+    "07108000"
+   ],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0803",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0804",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0805",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0806",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0807",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0808",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0809",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0810",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "3",
+   "descricao": "Frutas frescas ou congeladas",
+   "ncm": "0811",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": "Sem adição de açúcar"
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "4",
+   "descricao": "Plantas e flores",
+   "ncm": "06",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "5",
+   "descricao": "Raízes e tubérculos",
+   "ncm": "0714",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  },
+  {
+   "anexo": "Anexo XV",
+   "item": "6",
+   "descricao": "Cocos",
+   "ncm": "08011",
+   "excecoes": [],
+   "reducao": "1",
+   "cclass_trib": null,
+   "condicao": null
+  }
+ ]
+}

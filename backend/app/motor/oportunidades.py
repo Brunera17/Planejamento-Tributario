@@ -46,7 +46,7 @@ def avaliar_oportunidades(
         cpp = next(t.valor for t in simples.tributos if t.tributo == "CPP")
         ops.append(Oportunidade(
             "CPP_DAS", "CPP (INSS patronal) embutida no DAS", cpp - inss_patronal(entrada), "ALTA",
-            f"No Anexo I, {_pct(f.p_cpp, 0)} do DAS é CPP, paga sobre o faturamento, haja ou não empregados. "
+            f"No Anexo {entrada.anexo_simples}, {_pct(f.p_cpp, 0)} do DAS é CPP, paga sobre o faturamento, haja ou não empregados. "
             "No LP/LR o INSS patronal incide só sobre folha e pró-labore. Valor = CPP do DAS − INSS estimado sobre a folha."))
 
         mono = sum((b.receita_monofasica for b in bases.values()), ZERO)
@@ -155,6 +155,10 @@ def pontos_criticos(entrada: EntradaSimulacao, simples: ResultadoRegime) -> list
         pts.append(PontoCritico("DIFAL", f"{_brl(sum((i.valor for i in difal), ZERO))} em vendas a consumidor final não contribuinte de "
                                          f"{len(ufs)} estado(s) ({', '.join(ufs)}). No Lucro Presumido e no Lucro Real o DIFAL dessas vendas, "
                                          "com o FCP, é pago ao estado de destino e já está no ICMS; no Simples não é devido (STF, ADI 5464)."))
+    if entrada.anexo_simples == "II":
+        pts.append(PontoCritico("IPI", "Indústria (Anexo II): o DAS inclui o IPI, mas no Lucro Presumido e no Lucro Real o IPI não está no "
+                                       "cálculo, porque depende da alíquota de cada produto na TIPI. A comparação favorece esses dois "
+                                       "regimes; confira o IPI das saídas antes de recomendar a mudança."))
     if not entrada.folha_informada:
         pts.append(PontoCritico("FOLHA", "Folha e pró-labore não informados: LP e LR calculados sem INSS sobre folha; "
                                          "cada R$ 1.000/mês de pró-labore acrescenta R$ 600 de INSS por trimestre."))

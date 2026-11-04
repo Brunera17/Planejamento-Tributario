@@ -1,8 +1,10 @@
-"""Simples Nacional — LC 123/2006 (Anexo I, comércio)."""
+"""Simples Nacional — LC 123/2006, Anexos I (comércio) e II (indústria)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+
+from app.utils.simples import ROMANOS
 
 from .base import BaseCompetencia, ItemCalculado
 from .icms import ResultadoIcms
@@ -16,7 +18,7 @@ from .tipos import (
     TributoValor,
 )
 
-FUNDAMENTO = "LC 123/2006, art. 18 e Anexo I"
+FUNDAMENTO = "LC 123/2006, art. 18 e Anexos I (comércio) e II (indústria)"
 
 
 @dataclass(frozen=True)
@@ -69,7 +71,7 @@ def calcular_simples(
     f = aliq.faixa
     memoria.registrar("Simples", "RBT12 " + ("estimado (média do período × 12)" if estimado else "informado (PGDAS-D)"),
                       "Σ receita líquida ÷ nº de meses × 12" if estimado else "premissa", rbt12, fundamento=FUNDAMENTO)
-    memoria.registrar("Simples", f"Faixa {f.faixa} do Anexo I", "maior faixa com RBT12 inicial ≤ RBT12", Decimal(f.faixa))
+    memoria.registrar("Simples", f"Faixa {f.faixa} do Anexo {entrada.anexo_simples}", "maior faixa com RBT12 inicial ≤ RBT12", Decimal(f.faixa))
     memoria.registrar("Simples", "Alíquota efetiva do DAS", "(RBT12 × alíquota nominal − parcela a deduzir) ÷ RBT12",
                       aliq.efetiva, fundamento=FUNDAMENTO)
 
@@ -89,6 +91,7 @@ def calcular_simples(
     irpj = receita * aliq.parcela(f.p_irpj)
     csll = receita * aliq.parcela(f.p_csll)
     cpp = receita * aliq.parcela(f.p_cpp)
+    ipi = receita * aliq.parcela(f.p_ipi)  # Anexo II: o IPI da indústria vai no DAS
 
     icms_fora_das = ZERO
     if acima_sublimite:
@@ -105,11 +108,12 @@ def calcular_simples(
         ("IRPJ no DAS", irpj, "receita × alíquota efetiva × %IRPJ"),
         ("CSLL no DAS", csll, "receita × alíquota efetiva × %CSLL"),
         ("CPP no DAS", cpp, "receita × alíquota efetiva × %CPP"),
+        *([("IPI no DAS", ipi, "receita × alíquota efetiva × %IPI")] if ipi else []),
     ]:
         memoria.registrar("Simples", nome, formula, valor)
 
     estadual = icms + icms_fora_das
-    federal = pis + cofins + irpj + csll + cpp
+    federal = pis + cofins + irpj + csll + cpp + ipi
     tributos = [
         TributoValor("ICMS", estadual),
         TributoValor("PIS", pis),
@@ -117,8 +121,10 @@ def calcular_simples(
         TributoValor("IRPJ", irpj),
         TributoValor("CSLL", csll),
         TributoValor("CPP", cpp),
+        *([TributoValor("IPI", ipi)] if ipi else []),
     ]
     detalhes = {
+        "anexo": Decimal(ROMANOS[entrada.anexo_simples]),
         "rbt12": rbt12,
         "rbt12_estimado": Decimal(int(estimado)),
         "faixa": Decimal(f.faixa),

@@ -3,15 +3,17 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from .base import BaseCompetencia
+from .base import BaseCompetencia, ItemCalculado
 from .comparativo import melhor_regime
 from .icms import ResultadoIcms
 from .simples import AliquotaSimples
 from .tipos import ZERO, EntradaSimulacao, LinhaReforma, Memoria, Regime, ResultadoRegime
 
 
-def base_credito_ibs_cbs(entrada: EntradaSimulacao, bases: dict[str, BaseCompetencia]) -> Decimal:
-    compras = sum((b.compras for b in bases.values()), ZERO) * entrada.premissas.pct_compras_credito_ibs_cbs
+def base_credito_ibs_cbs(entrada: EntradaSimulacao, bases: dict[str, BaseCompetencia], reducao_media: Decimal = ZERO) -> Decimal:
+    """Compras para revenda creditam com a mesma redução média das vendas (o comércio revende o que compra);
+    despesas creditam pela alíquota cheia."""
+    compras = sum((b.compras for b in bases.values()), ZERO) * entrada.premissas.pct_compras_credito_ibs_cbs * (1 - reducao_media)
     despesas = sum((d.valor for d in entrada.despesas if d.credito_ibs_cbs), ZERO)
     return compras + despesas
 
@@ -19,6 +21,7 @@ def base_credito_ibs_cbs(entrada: EntradaSimulacao, bases: dict[str, BaseCompete
 def calcular_reforma(
     entrada: EntradaSimulacao,
     bases: dict[str, BaseCompetencia],
+    itens: list[ItemCalculado],
     icms: ResultadoIcms,
     aliq_simples: AliquotaSimples,
     simples: ResultadoRegime,
@@ -27,10 +30,17 @@ def calcular_reforma(
     memoria: Memoria,
 ) -> list[LinhaReforma]:
     receita = sum((b.receita_liquida for b in bases.values()), ZERO)
-    base_cred = base_credito_ibs_cbs(entrada, bases)
-    valor_agregado = max(ZERO, receita - base_cred)
-    memoria.registrar("Reforma", "Base de créditos de IBS/CBS", "compras × % creditável + despesas com crédito", base_cred,
-                      fundamento="LC 214/2025 (não cumulatividade plena)")
+    # reduções dos anexos da LC 214/2025: a receita de cada item entra com (1 − redução)
+    receita_tributada = sum((i.receita_liquida * (1 - i.item.reducao_ibs_cbs) for i in itens if i.item.gera_receita), ZERO)
+    reducao_media = ZERO if receita == 0 else 1 - receita_tributada / receita
+    if reducao_media > 0:
+        memoria.registrar("Reforma", "Receita com CBS e IBS após as reduções dos anexos",
+                          "Σ receita do item × (1 − redução do anexo: 60% ou 100%)", receita_tributada,
+                          fundamento="LC 214/2025, Anexos I, VII, VIII e XV")
+    base_cred = base_credito_ibs_cbs(entrada, bases, reducao_media)
+    valor_agregado = max(ZERO, receita_tributada - base_cred)
+    memoria.registrar("Reforma", "Base de créditos de IBS/CBS", "compras × % creditável × (1 − redução média) + despesas com crédito",
+                      base_cred, fundamento="LC 214/2025 (não cumulatividade plena)")
     irpj_csll_lp = presumido.detalhes["irpj_normal"] + presumido.detalhes["irpj_adicional"] + _tributo(presumido, "CSLL")
     irpj_csll_lr = real.detalhes["irpj_normal"] + real.detalhes["irpj_adicional"] + _tributo(real, "CSLL")
     inss_lp = _tributo(presumido, "INSS patronal")
@@ -56,7 +66,7 @@ def calcular_reforma(
         }
         linhas.append(_linha(a.ano, a.cbs, a.ibs, a.fator_icms, cargas, receita, simples.elegivel))
         memoria.registrar("Reforma", f"Carga {a.ano} – Lucro Presumido",
-                          "ICMS × fator mantido + (CBS + IBS) × (receita − base de créditos) + IRPJ + CSLL",
+                          "ICMS × fator mantido + (CBS + IBS) × (receita após reduções − base de créditos) + IRPJ + CSLL",
                           cargas[Regime.LUCRO_PRESUMIDO])
     return linhas
 

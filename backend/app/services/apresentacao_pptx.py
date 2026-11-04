@@ -17,7 +17,7 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
-from app.services.relatorio_pdf import REGIMES, DadosRelatorio, mes
+from app.services.relatorio_pdf import REGIMES, DadosRelatorio, enquadramento_simples, mes
 
 # paleta do sistema (paleta A): petróleo domina, verde só para o regime de menor carga
 ESCURO = RGBColor(0x0E, 0x3A, 0x49)
@@ -35,7 +35,7 @@ BRANCO = RGBColor(0xFF, 0xFF, 0xFF)
 CLARO = RGBColor(0xCF, 0xE3, 0xEA)  # texto de apoio sobre o fundo escuro
 
 GRUPOS = [  # grupo de tributo, tributos do resultado, cor
-    ("ICMS", ("ICMS",), RGBColor(0x15, 0x5E, 0x75)),
+    ("ICMS", ("ICMS", "IPI"), RGBColor(0x15, 0x5E, 0x75)),  # IPI só no DAS da indústria (Anexo II)
     ("PIS e COFINS", ("PIS", "COFINS", "PIS/COFINS"), RGBColor(0x4F, 0x8F, 0xA4)),
     ("IRPJ e CSLL", ("IRPJ", "CSLL"), RGBColor(0x9E, 0xC5, 0xD3)),
     ("INSS patronal", ("CPP", "INSS patronal"), RGBColor(0x52, 0x60, 0x6D)),
@@ -348,8 +348,9 @@ def montar(d: DadosRelatorio) -> bytes:
         + ". Valores anuais são a média do período multiplicada por 12."))
     _texto(s, MARGEM, Inches(2.0), Inches(4.3), Inches(1.1), destaque, tamanho=54, negrito=True, cor=MELHOR, nome="Número em destaque")
     _texto(s, MARGEM, Inches(3.15), Inches(4.0), Inches(1.2), legenda, tamanho=17, cor=APOIO)
-    _texto(s, MARGEM, Inches(5.75), Inches(4.0), Inches(0.9),
-           f"Base: {brl(receita)} de receita líquida em {_meses(meses)} ({deck.periodo}).", tamanho=12, cor=SUAVE)
+    _texto(s, MARGEM, Inches(5.45), Inches(4.0), Inches(1.3),
+           f"Base: {brl(receita)} de receita líquida em {_meses(meses)} ({deck.periodo}). {enquadramento_simples(r['simples'], receita)}",
+           tamanho=12, cor=SUAVE)
     # uma rosca por regime: o arco é a parte da receita que vai para tributos
     coluna = Inches(2.62)
     x_col = LARGURA - MARGEM - 3 * coluna

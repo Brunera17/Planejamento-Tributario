@@ -27,7 +27,7 @@ def simular(entrada: EntradaSimulacao) -> ResultadoSimulacao:
 
     receita = sum((b.receita_liquida for b in bases.values()), ZERO)
     comparativo, melhor = montar_comparativo([simples, presumido, real], receita, entrada.premissas.regime_atual)
-    reforma = calcular_reforma(entrada, bases, icms, aliq, simples, presumido, real, memoria)
+    reforma = calcular_reforma(entrada, bases, itens, icms, aliq, simples, presumido, real, memoria)
 
     return ResultadoSimulacao(
         base=_resumo_base(bases, icms, pc_lr),

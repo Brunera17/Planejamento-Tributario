@@ -275,6 +275,12 @@ def _validar_premissa(chave: str, valor) -> str:
         raise ErroNegocio("Valor inválido", campos={chave: "não pode ser negativo"})
     if chave == "pct_compras_credito_ibs_cbs" and numero > 1:
         raise ErroNegocio("Valor inválido", campos={chave: "precisa ficar entre 0% e 100%"})
+    if chave == "rat" and numero not in (Decimal("0.01"), Decimal("0.02"), Decimal("0.03")):
+        raise ErroNegocio("Valor inválido", campos={chave: "o RAT é 1%, 2% ou 3%"})
+    if chave == "fap" and not Decimal("0.5") <= numero <= Decimal("2"):
+        raise ErroNegocio("Valor inválido", campos={chave: "o FAP vai de 0,5000 a 2,0000"})
+    if chave == "terceiros" and numero > Decimal("0.1"):
+        raise ErroNegocio("Valor inválido", campos={chave: "terceiros acima de 10%: confira o FPAS"})
     return json.dumps(str(numero))
 
 

@@ -10,14 +10,24 @@ const UFS = "AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR R
 const ATIVIDADES = { COMERCIO: "Comércio", INDUSTRIA: "Indústria", SERVICO: "Serviço" };
 const campo = "mt-1 block w-full rounded border border-border bg-white px-2 py-1.5";
 
-const vazio = () => ({ razao_social: "", cnpj: "", regime_tributario: "SIMPLES_NACIONAL", anexo_simples: "I", uf: "SP", cnae: "", atividade: "COMERCIO", representante_legal: "", telefone: "" });
+const ANEXOS = { I: "Anexo I (comércio)", II: "Anexo II (indústria)", III: "Anexo III (serviços)", IV: "Anexo IV (serviços)", V: "Anexo V (serviços)" };
+
+/** Mesma regra do backend (app/utils/simples.py): comércio (CNAE 45 a 47) no I, indústria (10 a 33) no II. */
+function anexoPeloCnae(cnae: string, atividade: string): string | null {
+  const divisao = Number(cnae.replace(/\D/g, "").slice(0, 2));
+  if (divisao >= 45 && divisao <= 47) return "I";
+  if (divisao >= 10 && divisao <= 33) return "II";
+  return atividade === "INDUSTRIA" ? "II" : atividade === "COMERCIO" ? "I" : null;
+}
+
+const vazio = () => ({ razao_social: "", cnpj: "", regime_tributario: "SIMPLES_NACIONAL", anexo_simples: "", uf: "SP", cnae: "", atividade: "COMERCIO", representante_legal: "", telefone: "" });
 
 /** Inclusão e correção pontual; a carga em volume continua sendo a importação da planilha. */
 export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fechar: () => void }) {
   const qc = useQueryClient();
   const [f, setF] = useState(() =>
     empresa
-      ? { ...vazio(), ...empresa, anexo_simples: empresa.anexo_simples ?? "I", cnae: empresa.cnae ?? "", representante_legal: empresa.representante_legal ?? "", telefone: empresa.telefone ?? "" }
+      ? { ...vazio(), ...empresa, anexo_simples: empresa.anexo_simples ?? "", cnae: empresa.cnae ?? "", representante_legal: empresa.representante_legal ?? "", telefone: empresa.telefone ?? "" }
       : vazio(),
   );
   const [erro, setErro] = useState<string | null>(null);
@@ -25,7 +35,7 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
     mutationFn: () => {
       const corpo = {
         razao_social: f.razao_social.trim(), cnpj: f.cnpj, regime_tributario: f.regime_tributario, uf: f.uf, atividade: f.atividade,
-        anexo_simples: f.regime_tributario === "SIMPLES_NACIONAL" ? f.anexo_simples : null,
+        anexo_simples: f.anexo_simples || null,
         cnae: f.cnae || null, representante_legal: f.representante_legal.trim() || null, telefone: f.telefone || null,
       };
       return empresa ? api.put(`/empresas/${empresa.id}`, corpo) : api.post("/empresas", corpo);
@@ -44,7 +54,8 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
     setErro(null);
     salvar.mutate();
   }
-  const muda = empresa && (empresa.regime_tributario !== f.regime_tributario || empresa.uf !== f.uf);
+  const muda = empresa && (empresa.regime_tributario !== f.regime_tributario || empresa.uf !== f.uf || (empresa.anexo_simples ?? "") !== f.anexo_simples);
+  const sugerido = anexoPeloCnae(f.cnae, f.atividade);
 
   return (
     <Modal aberto titulo={empresa ? "Editar empresa" : "Nova empresa"} descricao={empresa?.razao_social} fechar={fechar} largura="max-w-3xl">
@@ -89,6 +100,20 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
           CNAE principal
           <input className={campo} maxLength={10} placeholder="4530-7/03" value={f.cnae} onChange={(e) => setF({ ...f, cnae: e.target.value })} />
         </label>
+        <label className="md:col-span-2">
+          Anexo do Simples
+          <select className={campo} value={f.anexo_simples} onChange={(e) => setF({ ...f, anexo_simples: e.target.value })}>
+            <option value="">{sugerido ? `Pelo CNAE: ${ANEXOS[sugerido as keyof typeof ANEXOS]}` : "Pelo CNAE (sem sugestão)"}</option>
+            {Object.entries(ANEXOS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-text-muted">
+            {f.regime_tributario === "SIMPLES_NACIONAL" ? "O do PGDAS-D da empresa." : "O que a empresa teria se optasse pelo Simples."}
+          </span>
+        </label>
         <label className="md:col-span-4">
           Representante legal
           <input className={campo} maxLength={120} value={f.representante_legal} onChange={(e) => setF({ ...f, representante_legal: e.target.value })} />
@@ -98,8 +123,11 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
           <input className={campo} maxLength={16} placeholder="(11) 3333-4444" value={f.telefone} onChange={(e) => setF({ ...f, telefone: e.target.value })} />
         </label>
         <div className="space-y-2 md:col-span-6">
-          {f.atividade !== "COMERCIO" && <p className="text-warning-ink">O cálculo está validado só para comércio (Anexo I do Simples e presunção de 8% e 12%).</p>}
-          {muda && <p className="text-warning-ink">Mudar o regime ou a UF deixa as simulações desta empresa desatualizadas.</p>}
+          {(f.atividade === "SERVICO" || ["III", "IV", "V"].includes(f.anexo_simples)) && (
+            <p className="text-warning-ink">O sistema ainda não calcula serviços (Anexos III a V do Simples, ISS e NFS-e): o Simples sairia pelo Anexo I.</p>
+          )}
+          {f.atividade === "INDUSTRIA" && <p className="text-warning-ink">Na indústria, o IPI entra no DAS (Anexo II), mas ainda não no Lucro Presumido e no Lucro Real.</p>}
+          {muda && <p className="text-warning-ink">Mudar o regime, a UF ou o anexo deixa as simulações desta empresa desatualizadas.</p>}
           <Erro mensagem={erro} />
           <div className="flex items-center justify-between gap-2 border-t border-surface pt-3">
             <LegendaObrigatorio />

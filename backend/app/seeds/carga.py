@@ -1,12 +1,16 @@
 """Carga inicial do banco.
 
 Uso:
-    python -m app.seeds.carga            # tabelas legais, catálogo, documentos, pesos e usuários de demonstração
-    python -m app.seeds.carga --demo     # + planejamento de demonstração (caso de referência)
+    python -m app.seeds.carga            # tabelas legais, catálogo, documentos e pesos (produção)
+    python -m app.seeds.carga --demo     # + usuários e planejamentos de demonstração (desenvolvimento)
+
+Em produção, o primeiro usuário (contador) vem de ADMIN_USUARIO, ADMIN_SENHA e ADMIN_NOME, só enquanto não houver
+nenhum usuário cadastrado; depois disso, os usuários são mantidos pela tela.
 """
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import date
 from decimal import Decimal
 
@@ -33,6 +37,7 @@ from app.models import (
     PesoProgresso,
     Planejamento,
     ReformaCronograma,
+    RegraReforma,
     RegraSt,
     SimplesFaixa,
     TipoDocumento,
@@ -88,11 +93,12 @@ def _incluir_se_falta(db: Session, modelo, chave: dict, valores: dict):
 
 
 def carregar_tabelas(db: Session) -> None:
-    s = ler("simples_anexo1.json")
-    inicio = date.fromisoformat(s["vigencia_inicio"])
-    for f in s["faixas"]:
-        _upsert(db, SimplesFaixa, {"anexo": s["anexo"], "faixa": f["faixa"], "vigencia_inicio": inicio},
-                {k: Decimal(v) for k, v in f.items() if k != "faixa"})
+    for arquivo in ("simples_anexo1.json", "simples_anexo2.json"):
+        s = ler(arquivo)
+        inicio = date.fromisoformat(s["vigencia_inicio"])
+        for f in s["faixas"]:
+            _upsert(db, SimplesFaixa, {"anexo": s["anexo"], "faixa": f["faixa"], "vigencia_inicio": inicio},
+                    {k: Decimal(v) for k, v in f.items() if k != "faixa"})
     for p in ler("parametros.json"):
         _incluir_se_falta(db, ParametroTributario, {"chave": p["chave"], "vigencia_inicio": date(2000, 1, 1)},
                 {"valor": Decimal(p["valor"]), "descricao": p["descricao"], "fundamento": p["fundamento"]})
@@ -109,6 +115,16 @@ def carregar_tabelas(db: Session) -> None:
             "observacao", "requer_revisao", "acao_recomendada", "cst_ibs_cbs", "cclass_trib", "beneficio_reforma")})
     carregar_normas(db)
     carregar_aliquotas_uf(db)
+    carregar_reducoes_reforma(db)
+
+
+def carregar_reducoes_reforma(db: Session) -> None:
+    lc214 = db.scalar(select(Norma.id).where(Norma.codigo == "lc214-2025"))
+    for r in ler("reforma_reducoes.json")["regras"]:
+        _incluir_se_falta(db, RegraReforma, {"ncm": r["ncm"], "anexo": r["anexo"], "item": r["item"]}, {
+            "descricao": r["descricao"], "excecoes": ",".join(r["excecoes"]) or None, "reducao": Decimal(r["reducao"]),
+            "condicao": r["condicao"], "cst": "200", "cclass_trib": r["cclass_trib"], "norma_id": lc214,
+            "vigencia_inicio": date(2000, 1, 1)})
 
 
 def carregar_aliquotas_uf(db: Session) -> None:
@@ -146,6 +162,17 @@ def carregar_catalogo(db: Session) -> None:
     for bloco, peso in PESOS_PADRAO.items():
         if db.get(PesoProgresso, bloco) is None:
             db.add(PesoProgresso(bloco=bloco, peso=peso))
+
+
+def carregar_primeiro_usuario(db: Session) -> None:
+    usuario, senha = os.environ.get("ADMIN_USUARIO", "").strip(), os.environ.get("ADMIN_SENHA", "")
+    if not usuario or db.scalar(select(Usuario.id).limit(1)) is not None:
+        return
+    if len(senha) < 12:
+        raise SystemExit("ADMIN_SENHA precisa ter pelo menos 12 caracteres")
+    db.add(Usuario(nome=os.environ.get("ADMIN_NOME", "Contador").strip() or "Contador", usuario=usuario,
+                   senha_hash=gerar_hash(senha), perfil="CONTADOR"))
+    print(f"Primeiro usuário criado: {usuario}")
 
 
 def carregar_usuarios_demo(db: Session) -> None:
@@ -208,7 +235,10 @@ def main() -> None:
     with SessionLocal() as db:
         carregar_tabelas(db)
         carregar_catalogo(db)
-        carregar_usuarios_demo(db)
+        if args.demo:
+            carregar_usuarios_demo(db)
+        else:
+            carregar_primeiro_usuario(db)
         db.flush()
         if args.demo:
             p = carregar_demo(db)

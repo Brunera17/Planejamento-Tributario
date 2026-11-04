@@ -14,7 +14,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import CompraMensal, CompraOrigem, NotaFiscal, NotaItem, ParametroTributario, Planejamento, PremissaPlanejamento
-from app.services import substituicao
+from app.services import pgdas, substituicao
 from app.services.relatorio_contabil import CFOP_COMPRA_REVENDA
 
 ZERO = Decimal("0")
@@ -116,6 +116,12 @@ def derivar(db: Session, p: Planejamento) -> Automaticas:
     uf = p.empresa.uf
     out = Automaticas()
     comps = p.competencias()
+
+    # ---- extrato do PGDAS-D enviado em Documentos: RBT12 declarado
+    extrato = pgdas.do_planejamento(db, p)
+    if extrato:
+        pa = f"{extrato.competencia[5:]}/{extrato.competencia[:4]}" if extrato.competencia else "período não identificado"
+        out.premissas["rbt12_informado"] = Derivada(extrato.rbt12, f"extrato do PGDAS-D de {pa} ({extrato.arquivo}): RBT12 de {_brl(extrato.rbt12)}")
 
     # ---- entradas (XML): origem das compras e regime dos fornecedores
     entradas = db.execute(

@@ -1,0 +1,36 @@
+# Blueprint do Render: API (Docker) com disco para os arquivos enviados e Postgres.
+# No Render: New > Blueprint > este repositório. Preencha CORS_ORIGINS, ADMIN_USUARIO e ADMIN_SENHA no painel.
+services:
+  - type: web
+    name: planejador-api
+    runtime: docker
+    rootDir: backend
+    plan: starter  # o disco persistente exige plano pago
+    healthCheckPath: /openapi.json
+    disk:
+      name: uploads
+      mountPath: /data/uploads
+      sizeGB: 5
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: planejador-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: UPLOAD_DIR
+        value: /data/uploads
+      - key: CORS_ORIGINS
+        sync: false  # endereço da tela na Vercel, ex.: https://planejador.vercel.app
+      - key: ADMIN_USUARIO
+        sync: false
+      - key: ADMIN_SENHA
+        sync: false  # pelo menos 12 caracteres; só vale para criar o primeiro usuário
+      - key: ADMIN_NOME
+        sync: false
+
+databases:
+  - name: planejador-db
+    plan: basic-256mb
+    databaseName: planejador
+    user: planejador
