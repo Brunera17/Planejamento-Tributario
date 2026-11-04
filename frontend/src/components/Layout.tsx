@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
-import { api, gravarSessao, lerSessao } from "../api/cliente";
+import { lerSessao, sair as encerrarSessao } from "../api/cliente";
 
 const MENU = [
   { para: "/", rotulo: "Visão geral" },
@@ -14,8 +14,7 @@ export function Layout() {
   const navegar = useNavigate();
 
   async function sair() {
-    await api.post("/auth/logout").catch(() => undefined);
-    gravarSessao(null);
+    await encerrarSessao();
     navegar("/login");
   }
 

@@ -5,6 +5,10 @@ import tempfile
 os.environ["DATABASE_URL"] = "sqlite://"  # banco em memória para os testes de API
 os.environ["UPLOAD_DIR"] = tempfile.mkdtemp(prefix="planejador-testes-")
 
+os.environ["REDIS_URL"] = ""  # nunca usa um Redis de verdade nos testes
+os.environ["COOKIE_SECURE"] = "false"  # o TestClient fala HTTP; cookie Secure não voltaria
+
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
@@ -12,10 +16,26 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import app.models  # noqa: F401 – registra os modelos
+from app.core import redis as redis_cliente
 from app.db import session as db_session
 from app.db.session import Base, get_db
 from app.main import app
 from app.seeds import carga
+
+
+_REDIS = fakeredis.FakeRedis(decode_responses=True)
+
+
+@pytest.fixture(autouse=True)
+def redis_falso():
+    """Redis em memória único na suíte (as sessões dos fixtures contador/analista vivem nele). A cada teste
+    volta o cliente (um teste pode trocá-lo por um Redis fora do ar) e zeram os contadores de tentativa."""
+    redis_cliente.definir_cliente(_REDIS)
+    yield _REDIS
+    for padrao in ("login_falhas:*", "aud_bloqueio:*"):
+        for k in _REDIS.scan_iter(padrao):
+            _REDIS.delete(k)
+    redis_cliente.definir_cliente(_REDIS)
 
 
 @pytest.fixture(scope="session")
@@ -49,7 +69,7 @@ def cliente(fabrica_sessao):
 def _token(cliente, usuario):
     r = cliente.post("/api/auth/login", json={"usuario": usuario, "senha": "demo123"})
     assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['token']}"}
+    return {"Authorization": f"Bearer {r.json()['access']}"}
 
 
 @pytest.fixture(scope="session")

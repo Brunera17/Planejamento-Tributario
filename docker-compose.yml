@@ -12,10 +12,21 @@ services:
       interval: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    # noeviction: com Redis cheio, recusa gravar em vez de apagar sessões sozinho
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
   api:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://planejador:planejador@db:5432/planejador
+      REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-segredo-local-do-docker-compose-nao-usar-em-producao}
       UPLOAD_DIR: /data/uploads
       CORS_ORIGINS: http://localhost:5173
@@ -25,6 +36,7 @@ services:
     volumes: [uploads:/data/uploads]
     depends_on:
       db: {condition: service_healthy}
+      redis: {condition: service_healthy}
 
   web:
     build:
@@ -37,3 +49,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  redisdata:

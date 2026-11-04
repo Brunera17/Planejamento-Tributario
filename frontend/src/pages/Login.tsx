@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { api, gravarSessao, mensagemErro, type Sessao } from "../api/cliente";
+import { api, gravarSessao, mensagemErro } from "../api/cliente";
 import { Botao, Erro } from "../components/ui";
 
 export function Login() {
@@ -14,7 +14,7 @@ export function Login() {
     e.preventDefault();
     setErro(null);
     try {
-      const { data } = await api.post<Sessao>("/auth/login", { usuario, senha });
+      const { data } = await api.post("/auth/login", { usuario, senha });
       gravarSessao(data);
       navegar("/");
     } catch (err) {
@@ -34,11 +34,11 @@ export function Login() {
         <h1>Entrar no Planejador Tributário</h1>
         <label className="block text-sm">
           Usuário
-          <input className="mt-1 w-full rounded border border-border px-2 py-2" value={usuario} onChange={(e) => setUsuario(e.target.value)} autoFocus />
+          <input className="mt-1 w-full rounded border border-border px-2 py-2" value={usuario} onChange={(e) => setUsuario(e.target.value)} autoComplete="username" autoFocus />
         </label>
         <label className="block text-sm">
           Senha
-          <input type="password" className="mt-1 w-full rounded border border-border px-2 py-2" value={senha} onChange={(e) => setSenha(e.target.value)} />
+          <input type="password" className="mt-1 w-full rounded border border-border px-2 py-2" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="current-password" />
         </label>
         <Erro mensagem={erro} />
         <Botao type="submit" className="w-full py-2">

@@ -12,3 +12,5 @@ python-multipart>=0.0.9
 reportlab>=4.2
 xlrd>=2.0
 python-pptx>=1.0
+redis>=5.0
+pypdf>=4.0

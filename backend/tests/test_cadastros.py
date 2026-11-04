@@ -86,7 +86,7 @@ def test_ciclo_do_usuario(cliente, contador):
     assert cliente.put(f"/api/usuarios/{u['id']}", headers=contador, json={**base, "nome": "Sem Senha"}).status_code == 200
     assert login(cliente, "nova.analista", "outra-senha").status_code == 200  # sem senha nova, mantém
 
-    token = login(cliente, "nova.analista", "outra-senha").json()["token"]
+    token = login(cliente, "nova.analista", "outra-senha").json()["access"]
     assert cliente.put(f"/api/usuarios/{u['id']}", headers=contador, json={**base, "ativo": False}).status_code == 200
     assert login(cliente, "nova.analista", "outra-senha").status_code == 401
     assert cliente.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401  # sessão aberta cai

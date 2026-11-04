@@ -26,7 +26,9 @@ class UsuarioSaida(Esquema):
 
 
 class LoginSaida(Esquema):
-    token: str
+    access: str  # JWT de 15 min; o front guarda só em memória
+    expira_em: datetime
+    sessao_expira_em: int  # epoch do fim absoluto da sessão (12 h após o login)
     usuario: UsuarioSaida
 
 

@@ -1,4 +1,5 @@
 """Importa todos os modelos para registrá-los no metadata (Alembic e create_all)."""
+from .auditoria import AuditoriaCheckpoint, EventoAuditoria
 from .cadastro import Empresa, ImportacaoEmpresa, Usuario
 from .coleta import (
     Bem,
@@ -23,7 +24,7 @@ from .tabelas import (AliquotaUf, CfopRegra, NcmRegra, Norma, ParametroTributari
                       SimplesFaixa)
 
 __all__ = [
-    "AliquotaUf", "Bem", "CfopRegra", "CompraMensal", "CompraOrigem", "DevolucaoMensal", "Documento", "Empresa", "FolhaMensal",
+    "AliquotaUf", "AuditoriaCheckpoint", "EventoAuditoria", "Bem", "CfopRegra", "CompraMensal", "CompraOrigem", "DevolucaoMensal", "Documento", "Empresa", "FolhaMensal",
     "GrupoDespesa", "HistoricoStatus", "ImportacaoEmpresa", "ImportacaoNfe", "ItemDespesa", "Levantamento",
     "LevantamentoGrupo", "LevantamentoItem", "MemoriaCalculo", "NcmRegra", "NotaFiscal", "NotaItem",
     "OportunidadeRegistro", "OutraDespesa", "ParametroTributario", "PesoProgresso", "Planejamento",

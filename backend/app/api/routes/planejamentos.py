@@ -46,6 +46,7 @@ from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
 from app.services.entrada import PREMISSAS
+from app.services.auditoria import auditar, auditar_uma_vez
 from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
 from app.utils.upload import ler_limitado
@@ -124,8 +125,12 @@ def criar(dados: PlanejamentoEntrada, db: DB, u: Contador):
 
 
 @router.get("/{pid}", response_model=PlanejamentoSaida)
-def detalhar(pid: int, db: DB, _: UsuarioAtual):
-    return _saida(obter_planejamento(db, pid))
+def detalhar(pid: int, db: DB, u: UsuarioAtual):
+    p = obter_planejamento(db, pid)
+    # a tela dispara vários GETs do mesmo planejamento; registra a abertura uma vez por sessão
+    auditar_uma_vez(f"planejamento:{pid}", "PLANEJAMENTO_ABERTO", usuario=u, planejamento=p,
+                    recurso_tipo="planejamento", recurso_id=pid)
+    return _saida(p)
 
 
 @router.post("/{pid}/status", response_model=PlanejamentoSaida)
@@ -448,6 +453,9 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     imp.status = "CONCLUIDA"
     imp.log = "\n".join(log) or None
     _alterou(db, p)
+    auditar("NFE_IMPORTADA", usuario=u, planejamento=p, recurso_tipo="importacao_nfe", recurso_id=imp.id,
+            detalhes={"arquivo": nome, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados,
+                      "erros": len(erros)})
     return {"id": imp.id, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados, "log": log}
 
 
@@ -465,6 +473,9 @@ def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: Usuari
         db.rollback()
         raise ErroNegocio(str(e), 422, {"arquivo": str(e)}) from e
     _alterou(db, p)
+    auditar("RELATORIO_CONTABIL_IMPORTADO", usuario=u, planejamento=p, recurso_tipo="relatorio_contabil",
+            detalhes={"arquivo": nome, "tipo": resumo.tipo, "linhas": resumo.linhas,
+                      "notas_importadas": resumo.notas_importadas, "notas_ignoradas": resumo.notas_ignoradas})
     return {
         "tipo": resumo.tipo, "empresa_relatorio": resumo.empresa_relatorio, "linhas": resumo.linhas,
         "notas_importadas": resumo.notas_importadas, "notas_ignoradas": resumo.notas_ignoradas,
@@ -490,9 +501,10 @@ def ver_revisao(pid: int, db: DB, _: UsuarioAtual):
 
 
 @router.get("/{pid}/revisao/exportar")
-def exportar_revisao(pid: int, db: DB, _: UsuarioAtual):
+def exportar_revisao(pid: int, db: DB, u: UsuarioAtual):
     p = obter_planejamento(db, pid)
     texto = revisao_produtos.exportar_csv(revisao_produtos.analisar(db, p))
+    auditar("REVISAO_EXPORTADA", usuario=u, planejamento=p, recurso_tipo="planejamento", recurso_id=pid)
     return Response("\ufeff" + texto, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="REVISAO_{p.empresa.cnpj}.csv"'})
 

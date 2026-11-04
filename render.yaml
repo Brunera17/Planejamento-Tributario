@@ -16,18 +16,36 @@ services:
         fromDatabase:
           name: planejador-db
           property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: planejador-redis
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: UPLOAD_DIR
         value: /data/uploads
       - key: CORS_ORIGINS
-        sync: false  # endereço da tela na Vercel, ex.: https://planejador.vercel.app
+        sync: false  # vazio com o proxy da Vercel (mesma origem); só se a tela chamar a API direto
+      - key: ORIGEM_PUBLICA
+        value: https://planejamento-tributario.domingosassessoria.com.br
+      - key: IP_POR_X_FORWARDED_FOR
+        value: "true"  # o Render acrescenta o IP real; sem isso, todos aparecem com o IP do proxy
+      - key: PROXIES_CONFIAVEIS
+        sync: false  # faixas do proxy da Vercel, se ela aparecer como último salto (conferir no deploy)
       - key: ADMIN_USUARIO
         sync: false
       - key: ADMIN_SENHA
         sync: false  # pelo menos 12 caracteres; só vale para criar o primeiro usuário
       - key: ADMIN_NOME
         sync: false
+
+  # Redis (Key Value) das sessões. Gratuito e sem persistência: um reinício desloga todos (decisão D3).
+  - type: keyvalue
+    name: planejador-redis
+    plan: free
+    ipAllowList: []  # só a rede interna do Render
+    maxmemoryPolicy: noeviction  # nunca apagar sessões sozinho
 
 databases:
   - name: planejador-db
