@@ -4,7 +4,8 @@ Sistema web que compara **Simples Nacional × Lucro Presumido × Lucro Real** a 
 despesas e folha de uma empresa, recomenda o regime de menor carga, projeta a **Reforma Tributária (2027–2033)** e
 aponta oportunidades de economia e recuperação — com memória de cálculo auditável.
 
-Especificação completa: [docs/ESPECIFICACAO_Planejador_Tributario.md](docs/ESPECIFICACAO_Planejador_Tributario.md).
+Especificação completa: [docs/ESPECIFICACAO_Planejador_Tributario.md](docs/ESPECIFICACAO_Planejador_Tributario.md) ·
+[Evidências (capturas de tela)](docs/evidencias/README.md).
 
 ## Estrutura
 
