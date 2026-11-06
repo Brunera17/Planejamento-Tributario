@@ -310,34 +310,43 @@ function Despesas({ pid }: { pid: number }) {
     queryFn: async () => (await api.get<LevantamentoDados>(`/planejamentos/${pid}/levantamentos/${atual}`)).data,
   });
   const [erro, setErro] = useState<string | null>(null);
-  // Cada campo editado entra num lote do mês; o lote vai num único PUT quando a digitação para (ESPERA_LOTE_MS),
-  // ao trocar de mês ou ao sair da tela. O total e os subtotais mudam na hora, pelo cache.
+  // Cada campo editado (ao sair dele) entra num lote do mês; o lote vai num único PUT ESPERA_LOTE_MS depois da
+  // última edição, ao trocar de mês, ao sair da tela ou ao esconder a aba. O total e os subtotais mudam na hora.
   const gravar = useMutation({
-    mutationFn: (lote: { comp: string; itens: { item_despesa_id: number; valor: number | null }[] }) =>
-      api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens: lote.itens }),
-    onSuccess: (_r, lote) => {
+    // um envio de cada vez: um lote antigo não pode chegar depois de um novo e gravar o valor velho
+    scope: { id: `despesas-${pid}` },
+    mutationKey: ["despesas", pid],
+    mutationFn: (lote: { comp: string; itens: { item_despesa_id: number; valor: number | null }[]; saindo?: boolean }) =>
+      api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens: lote.itens },
+        // ao esconder ou fechar a aba, keepalive deixa o navegador terminar o envio
+        lote.saindo ? { adapter: "fetch", fetchOptions: { keepalive: true } } : undefined),
+    onSuccess: (_r, enviado) => {
       setErro(null);
-      qc.invalidateQueries({ queryKey: ["levantamento", pid, lote.comp] });
+      // com outra edição do mesmo mês esperando (no lote ou na fila), recarregar agora apagaria o valor já mostrado:
+      // quem recarrega é o último envio
+      const outroNaFila = qc.isMutating({ mutationKey: ["despesas", pid] }) > 1;
+      if (!outroNaFila && lote.current?.comp !== enviado.comp) qc.invalidateQueries({ queryKey: ["levantamento", pid, enviado.comp] });
       atualizar();
     },
-    onError: (e, lote) => {
+    onError: (e, enviado) => {
       setErro(mensagemErro(e));
-      qc.invalidateQueries({ queryKey: ["levantamento", pid, lote.comp] }); // desfaz o valor mostrado antes da resposta
+      qc.invalidateQueries({ queryKey: ["levantamento", pid, enviado.comp] }); // desfaz o valor mostrado antes da resposta
     },
   });
   const lote = useRef<{ comp: string; itens: Map<number, number | null> } | null>(null);
   const espera = useRef<number | undefined>(undefined);
-  const enviarLote = useRef(() => {});
-  enviarLote.current = () => {
+  const enviarLote = useRef((_saindo?: boolean) => {});
+  enviarLote.current = (saindo = false) => {
     window.clearTimeout(espera.current);
     const atualLote = lote.current;
     lote.current = null;
     if (atualLote && atualLote.itens.size > 0)
-      gravar.mutate({ comp: atualLote.comp, itens: [...atualLote.itens].map(([item_despesa_id, valor]) => ({ item_despesa_id, valor })) });
+      gravar.mutate({ comp: atualLote.comp, saindo,
+                      itens: [...atualLote.itens].map(([item_despesa_id, valor]) => ({ item_despesa_id, valor })) });
   };
   useEffect(() => () => enviarLote.current(), [atual]); // troca de mês ou saída da tela: envia o que faltou
   useEffect(() => {
-    const aoEsconder = () => document.visibilityState === "hidden" && enviarLote.current();
+    const aoEsconder = () => document.visibilityState === "hidden" && enviarLote.current(true);
     document.addEventListener("visibilitychange", aoEsconder);
     return () => document.removeEventListener("visibilitychange", aoEsconder);
   }, []);

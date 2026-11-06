@@ -94,3 +94,13 @@ def test_consultas_nao_crescem_com_o_numero_de_notas(cliente, contador, pid, fab
         parar()
     # nota a nota eram ~3 consultas por nota (busca da chave, flush da nota, flush dos itens): +165 aqui
     assert muitas - poucas < 20, (poucas, muitas)
+
+
+def test_copia_com_st_no_mesmo_zip_completa_a_nota_nova(cliente, contador, pid, fabrica_sessao):
+    r = _importar(cliente, contador, pid, _zip(_nfe(20, st=False), _nfe(20)))
+    assert (r["importados"], r["ignorados"]) == (1, 1)
+    assert r["log"] == ["NF 20: já importada; base do ICMS-ST completada em 2 item(ns)"]
+    with fabrica_sessao() as db:
+        bases = db.scalars(select(NotaItem.bc_st).join(NotaFiscal).where(
+            NotaFiscal.planejamento_id == pid, NotaFiscal.numero == "20")).all()
+        assert len(bases) == 2 and all(b is not None for b in bases)

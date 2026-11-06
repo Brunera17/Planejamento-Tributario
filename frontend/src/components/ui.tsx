@@ -323,8 +323,14 @@ export function CampoMoeda({
   desabilitado?: boolean;
 }) {
   const [texto, setTexto] = useState(editarMoeda(valor));
+  const campo = useRef<HTMLInputElement>(null);
+  // o valor pode mudar por fora (gravação recusada, dado recarregado): acompanha, mas não enquanto se digita
+  useEffect(() => {
+    if (document.activeElement !== campo.current) setTexto(editarMoeda(valor));
+  }, [valor]);
   return (
     <input
+      ref={campo}
       aria-label={rotulo}
       disabled={desabilitado}
       inputMode="decimal"

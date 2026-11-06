@@ -416,7 +416,7 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     # em lote: uma consulta para as chaves já importadas e uma inserção para todas as notas e itens novos
     existentes = _notas_existentes(db, pid, [n.chave_acesso for n in notas if n.competencia in comps])
     sem_st = _itens_sem_st(db, list(existentes.values()))
-    vistas: set[str] = set()  # a mesma nota repetida dentro do .zip
+    vistas: dict[str, list] = {}  # chave -> itens da nota nova; a mesma nota pode vir repetida no .zip
     novas: list[tuple[dict, list]] = []
     for n in notas:
         if n.competencia not in comps:
@@ -427,9 +427,14 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
         if nota is not None or n.chave_acesso in vistas:
             imp.ignorados += 1
             completados = 0
-            if nota is not None:
-                # notas importadas antes de o sistema ler o ICMS-ST: a nova importação completa a base da ST
-                com_st = {i.n_item: i for i in n.itens if i.bc_st}
+            # notas importadas antes de o sistema ler o ICMS-ST (ou repetidas no .zip sem a ST): esta cópia completa a base
+            com_st = {i.n_item: i for i in n.itens if i.bc_st}
+            if nota is None:
+                for item in vistas[n.chave_acesso]:
+                    if item.n_item in com_st and item.bc_st is None:
+                        item.bc_st, item.vl_icms_st = com_st[item.n_item].bc_st, com_st[item.n_item].vl_icms_st
+                        completados += 1
+            else:
                 for item in sem_st.get(nota.id, []):
                     if item.n_item in com_st and item.bc_st is None:
                         item.bc_st, item.vl_icms_st = com_st[item.n_item].bc_st, com_st[item.n_item].vl_icms_st
@@ -446,7 +451,7 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
             imp.ignorados += 1
             log.append(f"NF {n.numero}: empresa não é emitente nem destinatária")
             continue
-        vistas.add(n.chave_acesso)
+        vistas[n.chave_acesso] = n.itens
         novas.append((dict(planejamento_id=pid, importacao_id=imp.id, chave_acesso=n.chave_acesso, numero=n.numero,
                            data_emissao=n.data_emissao, competencia=n.competencia, tipo=tipo,
                            uf_emitente=n.uf_emitente, uf_destinatario=n.uf_destinatario,
