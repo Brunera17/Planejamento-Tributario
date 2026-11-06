@@ -34,11 +34,9 @@ jobs:
       - run: python -m pytest -q
 
   backend-testes-postgres:
-    name: Backend · testes no Postgres (aviso)
+    name: Backend · testes no Postgres
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # ainda não bloqueia: a suíte foi escrita em SQLite; vira obrigatório quando ficar verde
-    continue-on-error: true
     defaults:
       run:
         working-directory: backend
