@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
@@ -45,29 +45,33 @@ export function Planejamento() {
           ]}
         />
       </Cabecalho>
-      <AcoesStatus p={p} />
-      <nav className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border" role="tablist">
-        {ABAS.map((a) => (
-          <button
-            key={a.id}
-            role="tab"
-            aria-selected={aba === a.id}
-            onClick={() => setParams({ aba: a.id })}
-            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm ${aba === a.id ? "border-brand font-medium text-brand" : "border-transparent text-text-muted hover:text-text"}`}
-          >
-            {a.rotulo}
-          </button>
-        ))}
-      </nav>
-      {aba === "coleta" && <Coleta pid={p.id} />}
-      {/* key: outro planejamento é outra tela; o lote pendente do anterior sai para ele ao desmontar */}
-      {aba === "despesas" && <Despesas key={p.id} pid={p.id} />}
-      {aba === "bens" && <Bens pid={p.id} />}
-      {aba === "documentos" && <Documentos pid={p.id} />}
-      {aba === "premissas" && <Premissas pid={p.id} />}
-      {aba === "revisao" && <Revisao pid={p.id} />}
-      {aba === "pendencias" && <Pendencias pid={p.id} />}
-      {aba === "simulacoes" && <Simulacoes pid={p.id} />}
+      {/* key: outro planejamento é outra tela. Sem ela, o React reaproveita os componentes e o estado do anterior
+          (motivo de devolução, bem ou produto em edição, documento aberto, premissas não salvas) iria para o novo.
+          Ao desmontar, o lote pendente das Despesas sai para o planejamento anterior. */}
+      <Fragment key={p.id}>
+        <AcoesStatus p={p} />
+        <nav className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border" role="tablist">
+          {ABAS.map((a) => (
+            <button
+              key={a.id}
+              role="tab"
+              aria-selected={aba === a.id}
+              onClick={() => setParams({ aba: a.id })}
+              className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm ${aba === a.id ? "border-brand font-medium text-brand" : "border-transparent text-text-muted hover:text-text"}`}
+            >
+              {a.rotulo}
+            </button>
+          ))}
+        </nav>
+        {aba === "coleta" && <Coleta pid={p.id} />}
+        {aba === "despesas" && <Despesas pid={p.id} />}
+        {aba === "bens" && <Bens pid={p.id} />}
+        {aba === "documentos" && <Documentos pid={p.id} />}
+        {aba === "premissas" && <Premissas pid={p.id} />}
+        {aba === "revisao" && <Revisao pid={p.id} />}
+        {aba === "pendencias" && <Pendencias pid={p.id} />}
+        {aba === "simulacoes" && <Simulacoes pid={p.id} />}
+      </Fragment>
     </>
   );
 }
