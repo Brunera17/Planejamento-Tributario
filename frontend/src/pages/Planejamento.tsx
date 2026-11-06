@@ -60,7 +60,8 @@ export function Planejamento() {
         ))}
       </nav>
       {aba === "coleta" && <Coleta pid={p.id} />}
-      {aba === "despesas" && <Despesas pid={p.id} />}
+      {/* key: outro planejamento é outra tela; o lote pendente do anterior sai para ele ao desmontar */}
+      {aba === "despesas" && <Despesas key={p.id} pid={p.id} />}
       {aba === "bens" && <Bens pid={p.id} />}
       {aba === "documentos" && <Documentos pid={p.id} />}
       {aba === "premissas" && <Premissas pid={p.id} />}
@@ -319,8 +320,11 @@ function Despesas({ pid }: { pid: number }) {
   const desejado = useRef(new Map<string, Map<number, number | null>>());
   const pendentes = useRef(new Map<string, Set<number>>());
   const espera = useRef<number | undefined>(undefined);
-  const corpo = (comp: string, ids: Iterable<number>): Item[] =>
-    [...ids].map((id) => ({ item_despesa_id: id, valor: desejado.current.get(comp)?.get(id) ?? null }));
+  // só sai o que tem valor desejado: um id sem ele nunca vira "apagar" por engano
+  const corpo = (comp: string, ids: Iterable<number>): Item[] => {
+    const doMes = desejado.current.get(comp);
+    return [...ids].filter((id) => doMes?.has(id)).map((id) => ({ item_despesa_id: id, valor: doMes!.get(id) ?? null }));
+  };
   const tirar = (comp: string): number[] => {
     const ids = [...(pendentes.current.get(comp) ?? [])];
     pendentes.current.delete(comp);
@@ -332,7 +336,8 @@ function Despesas({ pid }: { pid: number }) {
   };
   /** Depois da resposta: o que mudou enquanto o envio viajava volta para a fila. */
   const conferir = (comp: string, enviados: Item[]) => {
-    const atrasados = enviados.filter((x) => desejado.current.get(comp)?.get(x.item_despesa_id) !== x.valor);
+    const doMes = desejado.current.get(comp);
+    const atrasados = enviados.filter((x) => doMes?.has(x.item_despesa_id) && (doMes.get(x.item_despesa_id) ?? null) !== x.valor);
     if (atrasados.length === 0) return false;
     const fila = pendentes.current.get(comp) ?? new Set<number>();
     atrasados.forEach((x) => fila.add(x.item_despesa_id));
@@ -346,7 +351,7 @@ function Despesas({ pid }: { pid: number }) {
     mutationKey: ["despesas", pid],
     mutationFn: async (lote: { comp: string; ids: number[] }) => {
       const itens = corpo(lote.comp, lote.ids);
-      await api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens });
+      if (itens.length > 0) await api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens });
       return itens;
     },
     onSuccess: (itens, lote) => {
@@ -377,6 +382,7 @@ function Despesas({ pid }: { pid: number }) {
       }
       // Aba escondida ou fechando: sai na hora, fora da fila (na fila esperaria o envio em voo, e a aba pode fechar).
       const itens = corpo(comp, ids);
+      if (itens.length === 0) continue;
       api.put(`/planejamentos/${pid}/levantamentos/${comp}`, { itens }, { adapter: "fetch", fetchOptions: { keepalive: true } })
         .then(() => {
           if (!conferir(comp, itens)) qc.invalidateQueries({ queryKey: ["levantamento", pid, comp] });
