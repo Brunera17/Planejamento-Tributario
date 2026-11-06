@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
@@ -60,7 +60,8 @@ export function Planejamento() {
         ))}
       </nav>
       {aba === "coleta" && <Coleta pid={p.id} />}
-      {aba === "despesas" && <Despesas pid={p.id} />}
+      {/* key: outro planejamento é outra tela; o lote pendente do anterior sai para ele ao desmontar */}
+      {aba === "despesas" && <Despesas key={p.id} pid={p.id} />}
       {aba === "bens" && <Bens pid={p.id} />}
       {aba === "documentos" && <Documentos pid={p.id} />}
       {aba === "premissas" && <Premissas pid={p.id} />}
@@ -287,6 +288,8 @@ function ImportarDocumentos({
 type OutraDespesa = { grupo_id: number; descricao: string; valor: number };
 type LevantamentoDados = { status: string | null; itens: Record<string, number>; grupos_sem_outras: number[]; outras: OutraDespesa[] };
 
+const ESPERA_LOTE_MS = 800;
+
 function Despesas({ pid }: { pid: number }) {
   const atualizar = useAtualizar(pid);
   const { data: coleta } = useQuery({
@@ -299,6 +302,7 @@ function Despesas({ pid }: { pid: number }) {
   const { data: catalogo = [] } = useQuery({
     queryKey: ["catalogo"],
     queryFn: async () => (await api.get<Catalogo>("/tabelas/catalogo-despesas")).data,
+    staleTime: 5 * 60_000, // o catálogo quase não muda: não buscar de novo a cada troca de aba
   });
   const qc = useQueryClient();
   const { data: lev } = useQuery({
@@ -307,16 +311,112 @@ function Despesas({ pid }: { pid: number }) {
     queryFn: async () => (await api.get<LevantamentoDados>(`/planejamentos/${pid}/levantamentos/${atual}`)).data,
   });
   const [erro, setErro] = useState<string | null>(null);
+  // Gravação em lote. `desejado` guarda o último valor de cada campo editado (ao sair dele); `pendentes`, os campos
+  // que ainda precisam sair. Todo envio monta o corpo NA HORA DE SAIR, a partir de `desejado`: um lote que esperou na
+  // fila nunca leva um valor já superado. Se a resposta confirmar um valor que mudou depois, o campo volta a sair.
+  // O lote vai num único PUT ESPERA_LOTE_MS depois da última edição, ao trocar de mês ou ao sair da tela; ao esconder
+  // a aba, sai na hora, fora da fila e com keepalive. Total e subtotais mudam na hora, pelo cache.
+  type Item = { item_despesa_id: number; valor: number | null };
+  const desejado = useRef(new Map<string, Map<number, number | null>>());
+  const pendentes = useRef(new Map<string, Set<number>>());
+  const espera = useRef<number | undefined>(undefined);
+  // só sai o que tem valor desejado: um id sem ele nunca vira "apagar" por engano
+  const corpo = (comp: string, ids: Iterable<number>): Item[] => {
+    const doMes = desejado.current.get(comp);
+    return [...ids].filter((id) => doMes?.has(id)).map((id) => ({ item_despesa_id: id, valor: doMes!.get(id) ?? null }));
+  };
+  const tirar = (comp: string): number[] => {
+    const ids = [...(pendentes.current.get(comp) ?? [])];
+    pendentes.current.delete(comp);
+    return ids;
+  };
+  const agendar = () => {
+    window.clearTimeout(espera.current);
+    espera.current = window.setTimeout(() => enviarLote.current(), ESPERA_LOTE_MS);
+  };
+  /** Depois da resposta: o que mudou enquanto o envio viajava volta para a fila. */
+  const conferir = (comp: string, enviados: Item[]) => {
+    const doMes = desejado.current.get(comp);
+    const atrasados = enviados.filter((x) => doMes?.has(x.item_despesa_id) && (doMes.get(x.item_despesa_id) ?? null) !== x.valor);
+    if (atrasados.length === 0) return false;
+    const fila = pendentes.current.get(comp) ?? new Set<number>();
+    atrasados.forEach((x) => fila.add(x.item_despesa_id));
+    pendentes.current.set(comp, fila);
+    agendar();
+    return true;
+  };
   const gravar = useMutation({
-    mutationFn: (item: { item_despesa_id: number; valor: number | null }) =>
-      api.put(`/planejamentos/${pid}/levantamentos/${atual}`, { itens: [item] }),
-    onSuccess: () => {
+    // um envio de cada vez pela fila; o corpo sai do `desejado` só quando chega a vez
+    scope: { id: `despesas-${pid}` },
+    mutationKey: ["despesas", pid],
+    mutationFn: async (lote: { comp: string; ids: number[] }) => {
+      const itens = corpo(lote.comp, lote.ids);
+      if (itens.length > 0) await api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens });
+      return itens;
+    },
+    onSuccess: (itens, lote) => {
       setErro(null);
-      qc.invalidateQueries({ queryKey: ["levantamento", pid, atual] });
+      const voltou = conferir(lote.comp, itens);
+      // com outra edição do mesmo mês esperando, recarregar agora apagaria o valor já mostrado: quem recarrega é o último envio
+      const outroNaFila = qc.isMutating({
+        mutationKey: ["despesas", pid],
+        predicate: (m) => (m.state.variables as { comp: string } | undefined)?.comp === lote.comp,
+      }) > 1;
+      if (!voltou && !outroNaFila && !pendentes.current.has(lote.comp)) qc.invalidateQueries({ queryKey: ["levantamento", pid, lote.comp] });
       atualizar();
     },
-    onError: (e) => setErro(mensagemErro(e)),
+    onError: (e, lote) => {
+      setErro(mensagemErro(e));
+      qc.invalidateQueries({ queryKey: ["levantamento", pid, lote.comp] }); // o campo volta ao valor do servidor
+    },
   });
+  const enviarLote = useRef((_saindo?: boolean) => {});
+  enviarLote.current = (saindo = false) => {
+    window.clearTimeout(espera.current);
+    for (const comp of [...pendentes.current.keys()]) {
+      const ids = tirar(comp);
+      if (ids.length === 0) continue;
+      if (!saindo) {
+        gravar.mutate({ comp, ids });
+        continue;
+      }
+      // Aba escondida ou fechando: sai na hora, fora da fila (na fila esperaria o envio em voo, e a aba pode fechar).
+      const itens = corpo(comp, ids);
+      if (itens.length === 0) continue;
+      api.put(`/planejamentos/${pid}/levantamentos/${comp}`, { itens }, { adapter: "fetch", fetchOptions: { keepalive: true } })
+        .then(() => {
+          if (!conferir(comp, itens)) qc.invalidateQueries({ queryKey: ["levantamento", pid, comp] });
+          atualizar();
+        })
+        .catch((e) => {
+          setErro(mensagemErro(e));
+          qc.invalidateQueries({ queryKey: ["levantamento", pid, comp] });
+        });
+    }
+  };
+  useEffect(() => () => enviarLote.current(), [atual]); // troca de mês ou saída da tela: envia o que faltou
+  useEffect(() => {
+    const aoEsconder = () => document.visibilityState === "hidden" && enviarLote.current(true);
+    document.addEventListener("visibilitychange", aoEsconder);
+    return () => document.removeEventListener("visibilitychange", aoEsconder);
+  }, []);
+  const editar = (item_despesa_id: number, valor: number | null) => {
+    if (!atual) return;
+    const doMes = desejado.current.get(atual) ?? new Map<number, number | null>();
+    doMes.set(item_despesa_id, valor);
+    desejado.current.set(atual, doMes);
+    const fila = pendentes.current.get(atual) ?? new Set<number>();
+    fila.add(item_despesa_id);
+    pendentes.current.set(atual, fila);
+    qc.setQueryData<LevantamentoDados>(["levantamento", pid, atual], (antes) => {
+      if (!antes) return antes;
+      const itens = { ...antes.itens };
+      if (valor == null) delete itens[String(item_despesa_id)];
+      else itens[String(item_despesa_id)] = valor;
+      return { ...antes, itens };
+    });
+    agendar();
+  };
 
   const gravarOutras = useMutation({
     mutationFn: (corpo: { outras: OutraDespesa[]; grupos_sem_outras: number[] }) => api.put(`/planejamentos/${pid}/levantamentos/${atual}`, corpo),
@@ -356,7 +456,7 @@ function Despesas({ pid }: { pid: number }) {
               {g.itens.filter((i) => i.ativo).map((i) => (
                 <label key={`${atual}-${i.id}`} className="flex items-center justify-between gap-2 border-b border-surface/50 py-1 text-sm">
                   <span>{i.nome}</span>
-                  <CampoMoeda rotulo={i.nome} valor={valor(i.id)} desabilitado={!editavel} onChange={(v) => gravar.mutate({ item_despesa_id: i.id, valor: v })} />
+                  <CampoMoeda rotulo={i.nome} valor={valor(i.id)} desabilitado={!editavel} onChange={(v) => editar(i.id, v)} />
                 </label>
               ))}
             </div>
@@ -674,7 +774,13 @@ function AcoesStatus({ p }: { p: TPlanejamento }) {
       setErro(null);
       setDevolvendo(false);
       setMotivo("");
-      qc.invalidateQueries();
+      // só o que depende do status deste planejamento, e as listas que mostram o status
+      qc.invalidateQueries({
+        predicate: (q) => {
+          const [chave, id] = q.queryKey;
+          return chave === "planejamentos" || chave === "dashboard" || String(id) === String(p.id);
+        },
+      });
     },
     onError: (e) => setErro(mensagemErro(e)),
   });

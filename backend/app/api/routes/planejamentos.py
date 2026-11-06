@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import Response
 from pydantic import Field
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual, obter_planejamento
@@ -413,24 +413,34 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     db.flush()
     comps = set(p.competencias())
     log = list(erros)
+    # em lote: uma consulta para as chaves já importadas e uma inserção para todas as notas e itens novos
+    existentes = _notas_existentes(db, pid, [n.chave_acesso for n in notas if n.competencia in comps])
+    sem_st = _itens_sem_st(db, list(existentes.values()))
+    vistas: dict[str, list] = {}  # chave -> itens da nota nova; a mesma nota pode vir repetida no .zip
+    novas: list[tuple[dict, list]] = []
     for n in notas:
         if n.competencia not in comps:
             imp.ignorados += 1
             log.append(f"NF {n.numero}: competência {n.competencia} fora do período")
             continue
-        existente = db.scalar(select(NotaFiscal.id).where(NotaFiscal.planejamento_id == pid, NotaFiscal.chave_acesso == n.chave_acesso))
-        if existente:
+        nota = existentes.get(n.chave_acesso)
+        if nota is not None or n.chave_acesso in vistas:
             imp.ignorados += 1
-            # notas importadas antes de o sistema ler o ICMS-ST: a nova importação completa a base da ST
-            com_st = {i.n_item: i for i in n.itens if i.bc_st}
             completados = 0
-            for item in db.scalars(select(NotaItem).where(NotaItem.nota_fiscal_id == existente, NotaItem.bc_st.is_(None))):
-                if item.n_item in com_st:
-                    item.bc_st, item.vl_icms_st = com_st[item.n_item].bc_st, com_st[item.n_item].vl_icms_st
-                    completados += 1
-            nota = db.get(NotaFiscal, existente)
-            if nota.dest_contribuinte is None and n.dest_contribuinte is not None:
-                nota.dest_contribuinte = n.dest_contribuinte  # notas de antes da leitura do indIEDest (DIFAL)
+            # notas importadas antes de o sistema ler o ICMS-ST (ou repetidas no .zip sem a ST): esta cópia completa a base
+            com_st = {i.n_item: i for i in n.itens if i.bc_st}
+            if nota is None:
+                for item in vistas[n.chave_acesso]:
+                    if item.n_item in com_st and item.bc_st is None:
+                        item.bc_st, item.vl_icms_st = com_st[item.n_item].bc_st, com_st[item.n_item].vl_icms_st
+                        completados += 1
+            else:
+                for item in sem_st.get(nota.id, []):
+                    if item.n_item in com_st and item.bc_st is None:
+                        item.bc_st, item.vl_icms_st = com_st[item.n_item].bc_st, com_st[item.n_item].vl_icms_st
+                        completados += 1
+                if nota.dest_contribuinte is None and n.dest_contribuinte is not None:
+                    nota.dest_contribuinte = n.dest_contribuinte  # notas de antes da leitura do indIEDest (DIFAL)
             log.append(f"NF {n.numero}: já importada" + (f"; base do ICMS-ST completada em {completados} item(ns)" if completados else ""))
             continue
         if n.cnpj_emitente == p.empresa.cnpj and n.tipo_nf == 1:
@@ -441,15 +451,22 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
             imp.ignorados += 1
             log.append(f"NF {n.numero}: empresa não é emitente nem destinatária")
             continue
-        nf = NotaFiscal(planejamento_id=pid, importacao_id=imp.id, chave_acesso=n.chave_acesso, numero=n.numero,
-                        data_emissao=n.data_emissao, competencia=n.competencia, tipo=tipo,
-                        uf_emitente=n.uf_emitente, uf_destinatario=n.uf_destinatario,
-                        crt_emitente=n.crt_emitente, consumidor_final=n.consumidor_final,
-                        dest_contribuinte=n.dest_contribuinte)
-        db.add(nf)
-        db.flush()
-        db.add_all(NotaItem(nota_fiscal_id=nf.id, **vars(i)) for i in n.itens)
+        vistas[n.chave_acesso] = n.itens
+        novas.append((dict(planejamento_id=pid, importacao_id=imp.id, chave_acesso=n.chave_acesso, numero=n.numero,
+                           data_emissao=n.data_emissao, competencia=n.competencia, tipo=tipo,
+                           uf_emitente=n.uf_emitente, uf_destinatario=n.uf_destinatario,
+                           crt_emitente=n.crt_emitente, consumidor_final=n.consumidor_final,
+                           dest_contribuinte=n.dest_contribuinte), n.itens))
         imp.importados += 1
+    if novas:
+        # INSERT em lote sem RETURNING (no SQLite o ORM inseriria nota a nota para saber cada id);
+        # os ids vêm depois numa consulta pelas chaves
+        for k in range(0, len(novas), LOTE_ITENS):
+            db.execute(insert(NotaFiscal), [nf for nf, _ in novas[k:k + LOTE_ITENS]])
+        ids = {chave: nf.id for chave, nf in _notas_existentes(db, pid, [nf["chave_acesso"] for nf, _ in novas]).items()}
+        itens = [{"nota_fiscal_id": ids[nf["chave_acesso"]], **vars(i)} for nf, lidos in novas for i in lidos]
+        for k in range(0, len(itens), LOTE_ITENS):
+            db.execute(insert(NotaItem), itens[k:k + LOTE_ITENS])
     imp.status = "CONCLUIDA"
     imp.log = "\n".join(log) or None
     _alterou(db, p)
@@ -457,6 +474,31 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
             detalhes={"arquivo": nome, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados,
                       "erros": len(erros)})
     return {"id": imp.id, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados, "log": log}
+
+
+LOTE_ITENS = 1000  # itens por INSERT na importação de NF-e
+LOTE_CHAVES = 500  # chaves por IN na consulta das notas já importadas
+
+
+def _notas_existentes(db: Session, pid: int, chaves: list[str]) -> dict[str, NotaFiscal]:
+    out: dict[str, NotaFiscal] = {}
+    unicas = list(dict.fromkeys(chaves))
+    for k in range(0, len(unicas), LOTE_CHAVES):
+        for nf in db.scalars(select(NotaFiscal).where(NotaFiscal.planejamento_id == pid,
+                                                      NotaFiscal.chave_acesso.in_(unicas[k:k + LOTE_CHAVES]))):
+            out[nf.chave_acesso] = nf
+    return out
+
+
+def _itens_sem_st(db: Session, notas: list[NotaFiscal]) -> dict[int, list[NotaItem]]:
+    """Itens das notas já importadas que ainda não têm a base do ICMS-ST, por nota."""
+    out: dict[int, list[NotaItem]] = {}
+    ids = [nf.id for nf in notas]
+    for k in range(0, len(ids), LOTE_CHAVES):
+        for item in db.scalars(select(NotaItem).where(NotaItem.nota_fiscal_id.in_(ids[k:k + LOTE_CHAVES]),
+                                                      NotaItem.bc_st.is_(None))):
+            out.setdefault(item.nota_fiscal_id, []).append(item)
+    return out
 
 
 @router.post("/{pid}/relatorio-contabil")
