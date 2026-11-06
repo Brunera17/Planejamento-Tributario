@@ -80,10 +80,9 @@ jobs:
         run: alembic upgrade head
       - name: Carga inicial com demonstração
         run: python -m app.seeds.carga --demo
-      # models × migrations; começa como aviso até confirmar que não há divergência antiga
+      # models × migrations: falha se algum model mudou sem a migration correspondente
       - name: alembic check
         run: alembic check
-        continue-on-error: true
 
   frontend:
     name: Frontend · tipos, build e testes
