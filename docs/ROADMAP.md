@@ -73,7 +73,7 @@ Ordem de execução. "Aguarda" significa que espera o usuário liberar ou outro 
 | 5 | Validar o leitor do extrato do PGDAS-D com um extrato real. | Bugs e revisão | Aguarda o arquivo do usuário |
 | 6 | Tirar a memória de cálculo do `resultado_json` da simulação, que hoje é gravada duas vezes. Mexe no relatório, na apresentação e no Excel, e lê o dashboard (item 7): avisar a gerente antes. | Desempenho | Aguarda liberação |
 | 7 | Tela inicial e lista de planejamentos sem consultas repetidas (N+1), junto com o escopo por empresa. | Desempenho | Aguarda a etapa 6 da segurança |
-| 8 | Tornar obrigatório o job de testes no Postgres, que já está verde na `main`: um PR que tira o `continue-on-error`. Depois, o usuário marca o job como obrigatório na proteção da `main`, no GitHub. | CI e dependências | Aguarda liberação |
+| 8 | Tornar obrigatório o job de testes no Postgres, que já está verde na `main`: um PR que tira o `continue-on-error`. Depois, o usuário marca o job como obrigatório na proteção da `main`, no GitHub. | CI e dependências | Em andamento (liberado em 06/11/2026) |
 
 ## Registrado, sem urgência
 
