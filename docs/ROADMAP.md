@@ -36,6 +36,30 @@ Leia antes de começar qualquer trabalho.
 Os nomes são os das sessões, que servem de endereço para mensagens. Relatório PDF, apresentação PPTX e exportação
 Excel não têm área fixa: quem precisar mexer neles avisa a gerente antes.
 
+## Rotina dos sinalizadores
+
+As áreas de **Bugs e revisão** e de **Desempenho** são transversais: avaliam o projeto todo, cada uma pela sua
+ótica, e consertam pontos específicos. As outras áreas são construtoras: entregam a fila e são donas dos arquivos.
+
+1. **Quando avaliar:** a cada PR mergeado na `main`, as duas revisam o que mudou. Não há rotina agendada; uma
+   varredura geral só quando o usuário pedir.
+2. **O que fazer com o achado:**
+   - PR da entrega ainda aberto: comentário no PR, e o dono da área corrige no mesmo PR.
+   - PR já mergeado e conserto pequeno (um ou dois arquivos, sem migração, sem mudar a API e sem mudança visível na
+     tela): o sinalizador corrige.
+   - Conserto maior: vira item da fila, com o dono da área.
+3. **Urgência:**
+   - Crítico (cálculo errado, dado de cliente exposto, falha de segurança): para a fila e avisa o usuário na hora,
+     pela gerente.
+   - Médio: entra no topo da fila da área.
+   - Baixo: fica em "Registrado, sem urgência".
+4. **Revisão cruzada:** o conserto feito por um sinalizador é revisado pelo dono da área do arquivo, ou pelo outro
+   sinalizador quando a área não tiver dono. Quem achou não é o único a conferir.
+5. **Um PR por rodada:** os consertos pequenos de uma mesma avaliação vão num único PR, "Correções após o PR #X".
+6. **Mesmo arquivo:** se os dois sinalizadores forem mexer no mesmo arquivo, a gerente define a ordem.
+7. **Trabalho planejado primeiro:** quando a área de Desempenho estiver com um item da fila (6 ou 7), a avaliação
+   de desempenho dos merges espera, porque a prioridade é bug > segurança > função > desempenho.
+
 ## Fila
 
 Ordem de execução. "Aguarda" significa que espera o usuário liberar ou outro item terminar.
@@ -67,6 +91,7 @@ Ordem de execução. "Aguarda" significa que espera o usuário liberar ou outro 
 |---|---|
 | 06/11/2026 | Um PR por entrega; o Dependabot abre um PR agrupado por mês por ecossistema. |
 | 06/11/2026 | Donos por área fixa; prioridade bug > segurança > função > desempenho. |
+| 06/11/2026 | Bugs e Desempenho são sinalizadores: avaliam cada merge e consertam pontos pequenos, com revisão cruzada (seção "Rotina dos sinalizadores"). |
 | 06/11/2026 | Tarefas em segundo plano têm um dono só: a área de segurança, na etapa 6b. A área de desempenho não repete esse trabalho. |
 | 06/11/2026 | Deploy fica com a área de segurança, porque depende das etapas 4 a 8 para ir ao ar com dados de clientes. |
 | 06/11/2026 | O cálculo do Simples usa o anexo do cadastro (Anexos I e II), com sugestão pelo CNAE e conferência pelo extrato do PGDAS-D. |
