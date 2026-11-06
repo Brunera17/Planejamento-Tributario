@@ -1,31 +1,34 @@
+# Um PR por ecossistema, uma vez por mês: todas as atualizações juntas num só (grupo "todas").
 version: 2
 updates:
   - package-ecosystem: pip
     directory: /backend
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    # o requirements usa ">=": o CI já instala a versão mais nova, o PR só sobe o piso
+    open-pull-requests-limit: 2
     groups:
-      menores:
-        update-types: [minor, patch]
+      todas:
+        patterns: ["*"]
 
   - package-ecosystem: npm
     directory: /frontend
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    # versões principais (React 19, TypeScript 7, vite/vitest novos) entram numa migração planejada, não por PR solto
+      interval: monthly
+    open-pull-requests-limit: 2
+    # versões principais entram numa migração planejada, não por PR solto
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     groups:
-      # react e react-dom sempre juntos (versões separadas quebram a tela)
-      react:
-        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
-      menores:
-        update-types: [minor, patch]
+      todas:
+        patterns: ["*"]
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      todas:
+        patterns: ["*"]
