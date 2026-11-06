@@ -114,6 +114,9 @@ jobs:
         run: alembic upgrade head
       - name: Carga inicial com demonstração
         run: python -m app.seeds.carga --demo
+      # o mesmo comando do start do container (Dockerfile): leitura dos extratos do PGDAS-D já enviados
+      - name: Leitura do PGDAS no Postgres
+        run: python -m app.services.pgdas
       # models × migrations: falha se algum model mudou sem a migration correspondente
       - name: alembic check
         run: alembic check

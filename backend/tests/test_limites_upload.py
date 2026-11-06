@@ -64,21 +64,26 @@ def test_zip_corrompido_e_recusado():
     assert e.value.status == 415
 
 
-def _pid(cliente, contador):
-    return next(x for x in cliente.get("/api/planejamentos", headers=contador).json() if x["cnpj"] == "11444777000161")["id"]
+@pytest.fixture(scope="module")
+def pid_limites(cliente, contador):
+    """Planejamento próprio: o arquivo roda sozinho, sem depender da ordem dos outros."""
+    emp = cliente.post("/api/empresas", headers=contador, json={
+        "razao_social": "LIMITES DE UPLOAD LTDA", "cnpj": "81520477000442", "regime_tributario": "LUCRO_REAL"}).json()
+    return cliente.post("/api/planejamentos", headers=contador, json={
+        "empresa_id": emp["id"], "competencia_inicial": "2026-01", "competencia_final": "2026-01"}).json()["id"]
 
 
-def test_upload_de_nfe_acima_do_limite_responde_413(cliente, contador, limites):
+def test_upload_de_nfe_acima_do_limite_responde_413(cliente, contador, limites, pid_limites):
     limites(nfe_xml_max_mb=1)
     arq = {"arquivo": ("nota.xml", b"<a>" + b" " * (MB + 1) + b"</a>", "text/xml")}
-    r = cliente.post(f"/api/planejamentos/{_pid(cliente, contador)}/nfe", headers=contador, files=arq)
+    r = cliente.post(f"/api/planejamentos/{pid_limites}/nfe", headers=contador, files=arq)
     assert r.status_code == 413
 
 
-def test_upload_de_relatorio_contabil_acima_do_limite_responde_413(cliente, contador, limites):
+def test_upload_de_relatorio_contabil_acima_do_limite_responde_413(cliente, contador, limites, pid_limites):
     limites(relatorio_contabil_max_mb=1)
     arq = {"arquivo": ("rel.xlsx", b"PK\x03\x04" + b"0" * (MB + 1), "application/octet-stream")}
-    r = cliente.post(f"/api/planejamentos/{_pid(cliente, contador)}/relatorio-contabil", headers=contador, files=arq)
+    r = cliente.post(f"/api/planejamentos/{pid_limites}/relatorio-contabil", headers=contador, files=arq)
     assert r.status_code == 413
 
 

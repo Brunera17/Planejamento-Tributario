@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -154,6 +154,8 @@ class Documento(Base):
     tipo_documento_id: Mapped[int] = mapped_column(ForeignKey("tipo_documento.id"))
     arquivo: Mapped[str | None] = mapped_column(String(255))  # nome gerado no armazenamento
     arquivo_nome: Mapped[str | None] = mapped_column(String(255))  # nome original enviado
+    # leitura do extrato do PGDAS-D feita no envio (RBT12, PA, anexos): o PDF não é relido a cada cálculo
+    pgdas_extrato: Mapped[dict | None] = mapped_column(JSON(none_as_null=True))
     nao_se_aplica: Mapped[bool] = mapped_column(default=False)
     justificativa: Mapped[str | None] = mapped_column(Text)
     enviado_em: Mapped[Momento]

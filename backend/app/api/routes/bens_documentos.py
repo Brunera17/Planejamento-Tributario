@@ -18,7 +18,7 @@ from app.core.config import get_settings
 from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import Bem, Documento, Levantamento, Planejamento, TipoDocumento
 from app.schemas.comum import Esquema
-from app.services import documentos, progresso
+from app.services import documentos, pgdas, progresso
 from app.services.auditoria import auditar
 from app.utils.upload import ler_limitado
 
@@ -167,6 +167,7 @@ def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFi
     doc = _documento(db, _levantamento(db, p, competencia, u.id), tipo_id)
     anterior = doc.arquivo
     doc.arquivo, doc.arquivo_nome = documentos.gravar(conteudo, ext), nome
+    doc.pgdas_extrato = pgdas.leitura_no_envio(db, tipo_id, nome, conteudo)
     doc.nao_se_aplica, doc.justificativa, doc.enviado_em = False, None, datetime.now(UTC)
     _progresso(db, p)
     documentos.apagar(anterior)
@@ -181,7 +182,7 @@ def marcar_nao_se_aplica(pid: int, competencia: str, tipo_id: int, dados: NaoSeA
     p = obter_planejamento(db, pid)
     doc = _documento(db, _levantamento(db, p, competencia, u.id), tipo_id)
     anterior = doc.arquivo
-    doc.arquivo, doc.arquivo_nome = None, None
+    doc.arquivo, doc.arquivo_nome, doc.pgdas_extrato = None, None, None
     doc.nao_se_aplica, doc.justificativa, doc.enviado_em = True, dados.justificativa.strip(), datetime.now(UTC)
     _progresso(db, p)
     documentos.apagar(anterior)
