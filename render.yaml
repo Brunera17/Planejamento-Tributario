@@ -7,6 +7,7 @@ services:
     rootDir: backend
     plan: starter  # o disco persistente exige plano pago
     healthCheckPath: /openapi.json
+    autoDeployTrigger: checksPass  # só publica depois que o CI do GitHub passar no commit
     disk:
       name: uploads
       mountPath: /data/uploads
