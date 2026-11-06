@@ -312,19 +312,20 @@ function Despesas({ pid }: { pid: number }) {
   const [erro, setErro] = useState<string | null>(null);
   // Cada campo editado (ao sair dele) entra num lote do mês; o lote vai num único PUT ESPERA_LOTE_MS depois da
   // última edição, ao trocar de mês, ao sair da tela ou ao esconder a aba. O total e os subtotais mudam na hora.
+  type LoteDespesas = { comp: string; itens: { item_despesa_id: number; valor: number | null }[] };
   const gravar = useMutation({
     // um envio de cada vez: um lote antigo não pode chegar depois de um novo e gravar o valor velho
     scope: { id: `despesas-${pid}` },
     mutationKey: ["despesas", pid],
-    mutationFn: (lote: { comp: string; itens: { item_despesa_id: number; valor: number | null }[]; saindo?: boolean }) =>
-      api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens: lote.itens },
-        // ao esconder ou fechar a aba, keepalive deixa o navegador terminar o envio
-        lote.saindo ? { adapter: "fetch", fetchOptions: { keepalive: true } } : undefined),
+    mutationFn: (lote: LoteDespesas) => api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens: lote.itens }),
     onSuccess: (_r, enviado) => {
       setErro(null);
       // com outra edição do mesmo mês esperando (no lote ou na fila), recarregar agora apagaria o valor já mostrado:
       // quem recarrega é o último envio
-      const outroNaFila = qc.isMutating({ mutationKey: ["despesas", pid] }) > 1;
+      const outroNaFila = qc.isMutating({
+        mutationKey: ["despesas", pid],
+        predicate: (m) => (m.state.variables as LoteDespesas | undefined)?.comp === enviado.comp,
+      }) > 1;
       if (!outroNaFila && lote.current?.comp !== enviado.comp) qc.invalidateQueries({ queryKey: ["levantamento", pid, enviado.comp] });
       atualizar();
     },
@@ -340,9 +341,23 @@ function Despesas({ pid }: { pid: number }) {
     window.clearTimeout(espera.current);
     const atualLote = lote.current;
     lote.current = null;
-    if (atualLote && atualLote.itens.size > 0)
-      gravar.mutate({ comp: atualLote.comp, saindo,
-                      itens: [...atualLote.itens].map(([item_despesa_id, valor]) => ({ item_despesa_id, valor })) });
+    if (!atualLote || atualLote.itens.size === 0) return;
+    const envio: LoteDespesas = { comp: atualLote.comp, itens: [...atualLote.itens].map(([item_despesa_id, valor]) => ({ item_despesa_id, valor })) };
+    if (!saindo) {
+      gravar.mutate(envio);
+      return;
+    }
+    // Aba escondida ou fechando: sai na hora, fora da fila (na fila esperaria o envio em voo, e a aba pode fechar antes).
+    // keepalive deixa o navegador terminar. Vai depois do que está em voo, então um item repetido sai com o valor mais novo.
+    api.put(`/planejamentos/${pid}/levantamentos/${envio.comp}`, { itens: envio.itens }, { adapter: "fetch", fetchOptions: { keepalive: true } })
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["levantamento", pid, envio.comp] });
+        atualizar();
+      })
+      .catch((e) => {
+        setErro(mensagemErro(e));
+        qc.invalidateQueries({ queryKey: ["levantamento", pid, envio.comp] });
+      });
   };
   useEffect(() => () => enviarLote.current(), [atual]); // troca de mês ou saída da tela: envia o que faltou
   useEffect(() => {
