@@ -173,7 +173,7 @@ POST /auth/login {usuario, senha}
 | `POST /usuarios/{id}/mfa/resetar` | Contador | Desativa o MFA de outro usuário (que recadastra no próximo login) e derruba as sessões dele |
 | `python -m app.seeds.carga --resetar-mfa <login>` | shell do Render | Saída de emergência se o único contador perder o celular e os códigos |
 
-### 2.4 Banco (migração `0015`)
+### 2.4 Banco (migração `0016`)
 - `usuario`: + `mfa_segredo` (bytes, cifrado), `mfa_ativo` (bool, padrão falso), `mfa_ativado_em`.
 - Nova tabela `codigo_recuperacao`: `id`, `usuario_id`, `hash`, `usado_em`.
 
@@ -246,7 +246,7 @@ Por enquanto **todos os analistas continuam vendo todas as empresas**. A estrutu
 
 | Construído agora | Fica para quando ligar |
 |---|---|
-| Tabela `usuario_empresa` (vazia) e migração `0015` | Carga inicial das carteiras (4.2) |
+| Tabela `usuario_empresa` (vazia) e migração `0017` | Carga inicial das carteiras (4.2) |
 | Dependências `…Autorizado` em `deps.py` e as 48 buscas por id trocadas por elas — com a chave desligada, `empresas_visiveis()` devolve "todas" para todo mundo e o comportamento é idêntico ao de hoje | — |
 | Filtro nas listagens e no dashboard (inofensivo com a chave desligada) | — |
 | Teste de cobertura de rotas e testes rodando **com a chave ligada e desligada** | — |
@@ -261,7 +261,7 @@ Vale fazer a troca das 48 buscas já: centraliza num lugar só a resposta "não 
 - Tabelas de regras globais (`tabelas.py`: alíquotas, NCM, normas, ST) não pertencem a empresa — continuam visíveis a todos.
 - Fora da carteira a API responde **404**, não 403 (não confirma que o id existe) e grava `ACESSO_NEGADO`.
 
-### 4.2 Banco (migração `0016`)
+### 4.2 Banco (migração `0017`)
 Tabela `usuario_empresa`: `usuario_id`, `empresa_id`, `concedido_por`, `concedido_em` — PK `(usuario_id, empresa_id)`.
 
 **Carga inicial (E3)**: cada analista recebe as empresas em que já criou planejamento ou levantamento; o Contador revisa na tela antes de ativar a regra. A regra liga por variável (`ESCOPO_POR_EMPRESA=true`) para dar esse tempo de revisão.
@@ -361,8 +361,8 @@ Cada etapa termina com testes passando e pode ir para produção sozinha.
 | 1 ✅ | *feito em 04/11/2026, sem commit; `/api/saude` sempre 200 com o estado do Redis no corpo* — Redis no docker-compose, `fakeredis` nos testes, config nova; cliente síncrono com timeouts e disjuntor (achado 3); `noeviction` no `render.yaml` (achado 11) | 0 | Não |
 | 2 ✅ | *feito em 04/11/2026, sem commit; migração 0013; eventos gravados pelo middleware depois do commit da rota, 503 se não gravar; trigger do Postgres não testado (sem Postgres local)* — **Auditoria**: tabela, serviço `auditar()`, encadeamento, eventos de documentos/exportações; deduplicação no Redis e checkpoint (achados 5, 7) | 1 | Não (tela vem na 8) |
 | 3 ✅ | *feito em 04/11/2026, sem commit; inclui o front mínimo (access em memória, refresh automático, proxy do Vite, rewrite /api no vercel.json) e a contingência da auditoria; `db.get(Usuario)` mantido (combinado com a sessão Gargalos)* — **Sessões**: access/refresh, rotação, logout real, revogação, limite de login + eventos de acesso; `perfil`/`ativo` no hash da sessão, sem `db.get(Usuario)` por requisição (achado 4) | 1, 2 | Login de novo uma vez |
-| 3b | **PGDAS no banco** (achado 1): extrair RBT12/PA/anexos no upload e gravar no `Documento`; `pgdas.do_planejamento` lê só o banco | — | Não (fica mais rápido) |
-| 4 | **Criptografia**: `cripto.py`, documentos e relatórios cifrados, comando de migração | 0, 3b | Não |
+| 3b ✅ | *feito em 06/11/2026 na branch `pgdas-no-banco`, migração 0015; extratos antigos: `python -m app.services.pgdas`* — **PGDAS no banco** (achado 1): extrair RBT12/PA/anexos no upload e gravar no `Documento`; `pgdas.do_planejamento` lê a leitura gravada e só abre o PDF de documento antigo ainda sem ela (sem gravar); o start do container roda `python -m app.services.pgdas`, que grava a leitura dos antigos (só leitura bem-sucedida; falha não impede a API de subir) | — | Não (fica mais rápido) |
+| 4 | **Atenção da 3b:** `pgdas._ler_arquivo` passa a ler por `documentos.ler()` (decifrando) e o preenchimento do PGDAS roda antes de `--cifrar-existentes`. A marca `PTC1` vai para `cripto.py` e o `pgdas.MARCA_CIFRADO` passa a importá-la de lá. **Criptografia**: `cripto.py`, documentos e relatórios cifrados, comando de migração | 0, 3b | Não |
 | 5 | **MFA**: rotas, tabelas, segredo cifrado, recuperação com HMAC (achado 8) | 3, 4 | Cadastro do 2º fator no próximo login |
 | 6 | **Escopo por empresa (desligado)**: tabela, dependências `…Autorizado`, refatoração das 48 buscas, filtros, teste de cobertura de rotas; dashboard reescrito como consulta agregada (achado 10) | 2 | Não |
 | 6b | **Fila no Postgres** (8.1): tabela `tarefa`, linha de execução por processo, recuperação de tarefa interrompida, ZIP em fluxo e por lotes, NF-e/relatório contábil/PDF/PPTX/Excel passando pela fila, tela de progresso | 0, 4 | Sim (barra de progresso) |
@@ -378,7 +378,7 @@ O proxy na Vercel (etapa 9) pode ser configurado por você a qualquer momento an
 - Front: nenhuma.
 
 ### Migrações
-`0013` auditoria (+ trigger no Postgres) · `0014` índices de desempenho (sessão Gargalos) · `0015` MFA · `0016` carteira · `0017` tarefa. Sessões não usam banco.
+`0013` auditoria (+ trigger no Postgres) · `0014` índices de desempenho (sessão Gargalos) · `0015` PGDAS no banco · `0016` MFA · `0017` carteira · `0018` tarefa. Sessões não usam banco.
 
 ### Novas variáveis de ambiente
 `REDIS_URL`, `ACCESS_TTL_MIN=15`, `SESSAO_ABSOLUTA_H=12`, `COOKIE_SECURE`, `JWT_SECRET_ANTERIOR`, `PROXIES_CONFIAVEIS`, `ORIGEM_PUBLICA=https://planejamento-tributario.domingosassessoria.com.br`, `ESCOPO_POR_EMPRESA=false`, `CHAVE_ARQUIVOS`, `CHAVE_ARQUIVOS_ID`, `CHAVES_ARQUIVOS_ANTIGAS`, `ACEITAR_ARQUIVO_SEM_CIFRA`, `AUDITORIA_RETENCAO_ANOS=5`. Sai: `JWT_EXPIRA_MINUTOS`. Muda: `CORS_ORIGINS` vazio em produção; `VITE_API_URL=/api`.
@@ -421,7 +421,7 @@ Decisão do usuário (04/11/2026): **fila no próprio Postgres**, sem serviço n
 
 **Vai para a fila**: importação de NF-e (XML/ZIP), importação do relatório contábil, geração do relatório PDF, da apresentação PPTX e do Excel da simulação. Fica síncrono: envio de documento avulso, que é só validar, cifrar e gravar.
 
-**Tabela `tarefa`** (migração `0017`):
+**Tabela `tarefa`** (migração `0018`):
 | Coluna | Observação |
 |---|---|
 | `id`, `tipo`, `situacao` | `PENDENTE` → `EXECUTANDO` → `CONCLUIDA` / `FALHOU` / `CANCELADA` |

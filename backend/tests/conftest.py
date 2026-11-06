@@ -24,6 +24,8 @@ from app.seeds import carga
 
 
 _REDIS = fakeredis.FakeRedis(decode_responses=True)
+# já no carregamento: os fixtures de sessão (contador, analista) fazem login antes de qualquer autouse de função
+redis_cliente.definir_cliente(_REDIS)
 
 
 @pytest.fixture(autouse=True)

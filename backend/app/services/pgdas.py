@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from pypdf import PdfReader
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Documento, Levantamento, Planejamento, TipoDocumento
@@ -68,24 +68,97 @@ def ler(conteudo: bytes, arquivo: str = "") -> ExtratoPgdas:
     return e
 
 
+def para_json(e: ExtratoPgdas) -> dict:
+    """Forma gravada em Documento.pgdas_extrato (Decimal como texto, para não perder centavos)."""
+    return {"lido": e.lido, "competencia": e.competencia, "rbt12": str(e.rbt12) if e.rbt12 is not None else None,
+            "anexos": sorted(e.anexos), "servicos": e.servicos}
+
+
+def de_json(dados: dict, arquivo: str) -> ExtratoPgdas:
+    return ExtratoPgdas(arquivo, competencia=dados.get("competencia"),
+                        rbt12=Decimal(dados["rbt12"]) if dados.get("rbt12") else None,
+                        anexos=set(dados.get("anexos") or []), servicos=bool(dados.get("servicos")))
+
+
+# um só critério para "este tipo é o extrato do PGDAS-D", no envio, no cálculo e no preenchimento
+# (upper: o LIKE do Postgres diferencia maiúsculas)
+TIPO_PGDAS = func.upper(TipoDocumento.nome).like("%PGDAS%")
+
+
+def eh_tipo_pgdas(db: Session, tipo_documento_id: int) -> bool:
+    return db.scalar(select(TipoDocumento.id).where(TipoDocumento.id == tipo_documento_id, TIPO_PGDAS)) is not None
+
+
+def leitura_no_envio(db: Session, tipo_documento_id: int, nome: str, conteudo: bytes) -> dict | None:
+    """Chamada no upload, com os bytes já em memória: lê o extrato uma vez e devolve o que gravar no Documento."""
+    if not nome.lower().endswith(".pdf") or not eh_tipo_pgdas(db, tipo_documento_id):
+        return None
+    return para_json(ler(conteudo, nome))
+
+
+MARCA_CIFRADO = b"PTC1"  # cabeçalho dos arquivos cifrados (etapa 4)
+
+
+def _ler_arquivo(arquivo: str, nome: str) -> ExtratoPgdas | None:
+    """Documento enviado antes da leitura no upload: lê o arquivo (sem gravar — o GET não escreve).
+    None = não deu para tentar (arquivo sumido ou já cifrado): fica NULL e é tentado de novo depois.
+    Um PDF que abre mas não é extrato devolve "não lido" de verdade, e isso pode ser gravado.
+    Etapa 4 (criptografia): trocar por documentos.ler(), que decifra."""
+    caminho = documentos.caminho(arquivo)
+    if not caminho.exists():
+        return None
+    conteudo = caminho.read_bytes()
+    if conteudo.startswith(MARCA_CIFRADO):
+        return None  # sem decifrar, "ilegível" seria falso — e marcaria o documento como não lido para sempre
+    return ler(conteudo, nome)
+
+
 @por_planejamento
 def do_planejamento(db: Session, p: Planejamento) -> ExtratoPgdas | None:
-    """O extrato lido mais recente entre os enviados na aba Documentos (pelo período de apuração)."""
+    """O extrato lido mais recente entre os enviados na aba Documentos (pelo período de apuração).
+    Vem da leitura gravada no envio; o PDF só é aberto para documentos antigos ainda sem ela."""
     linhas = db.execute(
-        select(Documento.arquivo, Documento.arquivo_nome, Levantamento.competencia)
+        select(Documento.arquivo, Documento.arquivo_nome, Documento.pgdas_extrato, Levantamento.competencia)
         .join(Levantamento, Levantamento.id == Documento.levantamento_id)
         .join(TipoDocumento, TipoDocumento.id == Documento.tipo_documento_id)
-        .where(Levantamento.planejamento_id == p.id, TipoDocumento.nome.like("%PGDAS%"), Documento.arquivo.is_not(None))
+        .where(Levantamento.planejamento_id == p.id, TIPO_PGDAS, Documento.arquivo.is_not(None))
     ).all()
     lidos = []
-    for arquivo, nome, competencia in linhas:
+    for arquivo, nome, gravado, competencia in linhas:
         if not arquivo.lower().endswith(".pdf"):
             continue
-        caminho = documentos.caminho(arquivo)
-        if not caminho.exists():
-            continue
-        e = ler(caminho.read_bytes(), nome or arquivo)
-        if e.lido:
+        e = de_json(gravado, nome or arquivo) if gravado is not None else _ler_arquivo(arquivo, nome or arquivo)
+        if e is not None and e.lido:
             e.competencia = e.competencia or competencia
             lidos.append(e)
     return max(lidos, key=lambda x: x.competencia or "", default=None)
+
+
+def preencher(db: Session) -> int:
+    """Grava a leitura dos extratos enviados antes desta versão. Idempotente.
+    Grava o resultado sempre que o arquivo pôde ser lido — inclusive "não lido" (PDF que não é extrato), como no
+    envio, para não reabri-lo a cada cálculo. Arquivo sumido ou cifrado fica NULL e é tentado na próxima vez."""
+    linhas = db.execute(
+        select(Documento).join(TipoDocumento, TipoDocumento.id == Documento.tipo_documento_id)
+        .where(TIPO_PGDAS, Documento.arquivo.is_not(None), Documento.pgdas_extrato.is_(None))
+    ).scalars().all()
+    n = 0
+    for doc in linhas:
+        if not doc.arquivo.lower().endswith(".pdf"):
+            continue
+        e = _ler_arquivo(doc.arquivo, doc.arquivo_nome or doc.arquivo)
+        if e is not None:
+            doc.pgdas_extrato = para_json(e)
+            n += 1
+    db.commit()
+    return n
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from app.db.session import SessionLocal
+
+    argparse.ArgumentParser(description="Grava a leitura dos extratos do PGDAS-D já enviados").parse_args()
+    with SessionLocal() as sessao:
+        print(f"{preencher(sessao)} extrato(s) lido(s) e gravado(s)")
