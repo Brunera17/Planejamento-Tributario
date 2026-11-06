@@ -44,6 +44,10 @@ def fabrica_sessao():
     url_teste = os.environ.get("TEST_DATABASE_URL", "")
     if url_teste:
         engine = create_engine(url_teste)
+        # drop_all apaga tudo: só em banco com "test" no nome, nunca no de desenvolvimento ou produção
+        if "test" not in (engine.url.database or "").lower():
+            pytest.exit(f"TEST_DATABASE_URL aponta para '{engine.url.database}': use um banco com 'test' no nome "
+                        "(os testes apagam todas as tabelas dele)", returncode=2)
         Base.metadata.drop_all(engine)  # banco descartável: começa sempre vazio
     else:
         engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
