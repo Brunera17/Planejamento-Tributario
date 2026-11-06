@@ -52,6 +52,15 @@ python -m venv .venv
 
 (No Linux/macOS, troque `.venv/Scripts/` por `.venv/bin/`.)
 
+Dependências do backend: `requirements.in` tem os pisos (`>=`) e `requirements.txt` é o lock com as versões exatas,
+usado pelo Docker, pelo CI e pela instalação acima. Ao mudar o `requirements.in`, gere o lock de novo (o CI falha se
+os dois estiverem fora de sincronia):
+
+```bash
+cd backend
+uv pip compile requirements.in -o requirements.txt --universal --python-version 3.12
+```
+
 Frontend:
 
 ```bash

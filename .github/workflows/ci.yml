@@ -6,10 +6,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# um commit novo no mesmo branch/PR cancela a execução anterior
+# em PR, um commit novo cancela a execução anterior; na main, todo commit é verificado até o fim
+# (com merges em sequência, cancelar escondia a quebra de um merge intermediário, como no #13/#14)
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -29,6 +30,12 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements*.txt
+      # requirements.txt é o lock gerado de requirements.in: falha se alguém mudou um sem o outro
+      - name: Lock em dia com requirements.in
+        run: |
+          pip install uv==0.13.7
+          uv pip compile requirements.in -o requirements.txt --universal --python-version 3.12 -q
+          git diff --exit-code requirements.txt
       - run: pip install -r requirements-dev.txt
       # conftest.py já usa SQLite em memória e fakeredis: não precisa de serviços
       - run: python -m pytest -q
