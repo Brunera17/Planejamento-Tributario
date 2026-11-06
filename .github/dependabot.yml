@@ -14,7 +14,14 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # versões principais (React 19, TypeScript 7, vite/vitest novos) entram numa migração planejada, não por PR solto
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
+      # react e react-dom sempre juntos (versões separadas quebram a tela)
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
       menores:
         update-types: [minor, patch]
 
