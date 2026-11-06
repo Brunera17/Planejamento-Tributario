@@ -37,20 +37,24 @@ export function Usuarios() {
     setErro(null);
   }
   const salvar = useMutation({
-    mutationFn: () =>
-      editando
-        ? api.put(`/usuarios/${editando}`, {
-            nome: form.nome.trim(),
-            perfil: form.perfil,
-            ativo: form.ativo,
-            senha: form.senha || null,
-          })
-        : api.post("/usuarios", {
-            nome: form.nome.trim(),
-            usuario: form.usuario.trim(),
-            senha: form.senha,
-            perfil: form.perfil,
-          }),
+    // axios 1.21 tipa a resposta pelo corpo enviado: put e post viram tipos diferentes, então não há retorno
+    mutationFn: async () => {
+      if (editando) {
+        await api.put(`/usuarios/${editando}`, {
+          nome: form.nome.trim(),
+          perfil: form.perfil,
+          ativo: form.ativo,
+          senha: form.senha || null,
+        });
+      } else {
+        await api.post("/usuarios", {
+          nome: form.nome.trim(),
+          usuario: form.usuario.trim(),
+          senha: form.senha,
+          perfil: form.perfil,
+        });
+      }
+    },
     onSuccess: () => {
       fechar();
       qc.invalidateQueries({ queryKey: ["usuarios"] });
