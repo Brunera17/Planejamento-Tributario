@@ -310,54 +310,83 @@ function Despesas({ pid }: { pid: number }) {
     queryFn: async () => (await api.get<LevantamentoDados>(`/planejamentos/${pid}/levantamentos/${atual}`)).data,
   });
   const [erro, setErro] = useState<string | null>(null);
-  // Cada campo editado (ao sair dele) entra num lote do mês; o lote vai num único PUT ESPERA_LOTE_MS depois da
-  // última edição, ao trocar de mês, ao sair da tela ou ao esconder a aba. O total e os subtotais mudam na hora.
-  type LoteDespesas = { comp: string; itens: { item_despesa_id: number; valor: number | null }[] };
+  // Gravação em lote. `desejado` guarda o último valor de cada campo editado (ao sair dele); `pendentes`, os campos
+  // que ainda precisam sair. Todo envio monta o corpo NA HORA DE SAIR, a partir de `desejado`: um lote que esperou na
+  // fila nunca leva um valor já superado. Se a resposta confirmar um valor que mudou depois, o campo volta a sair.
+  // O lote vai num único PUT ESPERA_LOTE_MS depois da última edição, ao trocar de mês ou ao sair da tela; ao esconder
+  // a aba, sai na hora, fora da fila e com keepalive. Total e subtotais mudam na hora, pelo cache.
+  type Item = { item_despesa_id: number; valor: number | null };
+  const desejado = useRef(new Map<string, Map<number, number | null>>());
+  const pendentes = useRef(new Map<string, Set<number>>());
+  const espera = useRef<number | undefined>(undefined);
+  const corpo = (comp: string, ids: Iterable<number>): Item[] =>
+    [...ids].map((id) => ({ item_despesa_id: id, valor: desejado.current.get(comp)?.get(id) ?? null }));
+  const tirar = (comp: string): number[] => {
+    const ids = [...(pendentes.current.get(comp) ?? [])];
+    pendentes.current.delete(comp);
+    return ids;
+  };
+  const agendar = () => {
+    window.clearTimeout(espera.current);
+    espera.current = window.setTimeout(() => enviarLote.current(), ESPERA_LOTE_MS);
+  };
+  /** Depois da resposta: o que mudou enquanto o envio viajava volta para a fila. */
+  const conferir = (comp: string, enviados: Item[]) => {
+    const atrasados = enviados.filter((x) => desejado.current.get(comp)?.get(x.item_despesa_id) !== x.valor);
+    if (atrasados.length === 0) return false;
+    const fila = pendentes.current.get(comp) ?? new Set<number>();
+    atrasados.forEach((x) => fila.add(x.item_despesa_id));
+    pendentes.current.set(comp, fila);
+    agendar();
+    return true;
+  };
   const gravar = useMutation({
-    // um envio de cada vez: um lote antigo não pode chegar depois de um novo e gravar o valor velho
+    // um envio de cada vez pela fila; o corpo sai do `desejado` só quando chega a vez
     scope: { id: `despesas-${pid}` },
     mutationKey: ["despesas", pid],
-    mutationFn: (lote: LoteDespesas) => api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens: lote.itens }),
-    onSuccess: (_r, enviado) => {
+    mutationFn: async (lote: { comp: string; ids: number[] }) => {
+      const itens = corpo(lote.comp, lote.ids);
+      await api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens });
+      return itens;
+    },
+    onSuccess: (itens, lote) => {
       setErro(null);
-      // com outra edição do mesmo mês esperando (no lote ou na fila), recarregar agora apagaria o valor já mostrado:
-      // quem recarrega é o último envio
+      const voltou = conferir(lote.comp, itens);
+      // com outra edição do mesmo mês esperando, recarregar agora apagaria o valor já mostrado: quem recarrega é o último envio
       const outroNaFila = qc.isMutating({
         mutationKey: ["despesas", pid],
-        predicate: (m) => (m.state.variables as LoteDespesas | undefined)?.comp === enviado.comp,
+        predicate: (m) => (m.state.variables as { comp: string } | undefined)?.comp === lote.comp,
       }) > 1;
-      if (!outroNaFila && lote.current?.comp !== enviado.comp) qc.invalidateQueries({ queryKey: ["levantamento", pid, enviado.comp] });
+      if (!voltou && !outroNaFila && !pendentes.current.has(lote.comp)) qc.invalidateQueries({ queryKey: ["levantamento", pid, lote.comp] });
       atualizar();
     },
-    onError: (e, enviado) => {
+    onError: (e, lote) => {
       setErro(mensagemErro(e));
-      qc.invalidateQueries({ queryKey: ["levantamento", pid, enviado.comp] }); // desfaz o valor mostrado antes da resposta
+      qc.invalidateQueries({ queryKey: ["levantamento", pid, lote.comp] }); // o campo volta ao valor do servidor
     },
   });
-  const lote = useRef<{ comp: string; itens: Map<number, number | null> } | null>(null);
-  const espera = useRef<number | undefined>(undefined);
   const enviarLote = useRef((_saindo?: boolean) => {});
   enviarLote.current = (saindo = false) => {
     window.clearTimeout(espera.current);
-    const atualLote = lote.current;
-    lote.current = null;
-    if (!atualLote || atualLote.itens.size === 0) return;
-    const envio: LoteDespesas = { comp: atualLote.comp, itens: [...atualLote.itens].map(([item_despesa_id, valor]) => ({ item_despesa_id, valor })) };
-    if (!saindo) {
-      gravar.mutate(envio);
-      return;
+    for (const comp of [...pendentes.current.keys()]) {
+      const ids = tirar(comp);
+      if (ids.length === 0) continue;
+      if (!saindo) {
+        gravar.mutate({ comp, ids });
+        continue;
+      }
+      // Aba escondida ou fechando: sai na hora, fora da fila (na fila esperaria o envio em voo, e a aba pode fechar).
+      const itens = corpo(comp, ids);
+      api.put(`/planejamentos/${pid}/levantamentos/${comp}`, { itens }, { adapter: "fetch", fetchOptions: { keepalive: true } })
+        .then(() => {
+          if (!conferir(comp, itens)) qc.invalidateQueries({ queryKey: ["levantamento", pid, comp] });
+          atualizar();
+        })
+        .catch((e) => {
+          setErro(mensagemErro(e));
+          qc.invalidateQueries({ queryKey: ["levantamento", pid, comp] });
+        });
     }
-    // Aba escondida ou fechando: sai na hora, fora da fila (na fila esperaria o envio em voo, e a aba pode fechar antes).
-    // keepalive deixa o navegador terminar. Vai depois do que está em voo, então um item repetido sai com o valor mais novo.
-    api.put(`/planejamentos/${pid}/levantamentos/${envio.comp}`, { itens: envio.itens }, { adapter: "fetch", fetchOptions: { keepalive: true } })
-      .then(() => {
-        qc.invalidateQueries({ queryKey: ["levantamento", pid, envio.comp] });
-        atualizar();
-      })
-      .catch((e) => {
-        setErro(mensagemErro(e));
-        qc.invalidateQueries({ queryKey: ["levantamento", pid, envio.comp] });
-      });
   };
   useEffect(() => () => enviarLote.current(), [atual]); // troca de mês ou saída da tela: envia o que faltou
   useEffect(() => {
@@ -367,9 +396,12 @@ function Despesas({ pid }: { pid: number }) {
   }, []);
   const editar = (item_despesa_id: number, valor: number | null) => {
     if (!atual) return;
-    if (lote.current && lote.current.comp !== atual) enviarLote.current();
-    lote.current ??= { comp: atual, itens: new Map() };
-    lote.current.itens.set(item_despesa_id, valor);
+    const doMes = desejado.current.get(atual) ?? new Map<number, number | null>();
+    doMes.set(item_despesa_id, valor);
+    desejado.current.set(atual, doMes);
+    const fila = pendentes.current.get(atual) ?? new Set<number>();
+    fila.add(item_despesa_id);
+    pendentes.current.set(atual, fila);
     qc.setQueryData<LevantamentoDados>(["levantamento", pid, atual], (antes) => {
       if (!antes) return antes;
       const itens = { ...antes.itens };
@@ -377,8 +409,7 @@ function Despesas({ pid }: { pid: number }) {
       else itens[String(item_despesa_id)] = valor;
       return { ...antes, itens };
     });
-    window.clearTimeout(espera.current);
-    espera.current = window.setTimeout(() => enviarLote.current(), ESPERA_LOTE_MS);
+    agendar();
   };
 
   const gravarOutras = useMutation({
