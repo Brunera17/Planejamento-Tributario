@@ -40,7 +40,13 @@ def redis_falso():
 
 @pytest.fixture(scope="session")
 def fabrica_sessao():
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    # TEST_DATABASE_URL (ex.: Postgres do CI) troca só o banco dos testes; o Settings continua em SQLite
+    url_teste = os.environ.get("TEST_DATABASE_URL", "")
+    if url_teste:
+        engine = create_engine(url_teste)
+        Base.metadata.drop_all(engine)  # banco descartável: começa sempre vazio
+    else:
+        engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     fabrica = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with fabrica() as db:
