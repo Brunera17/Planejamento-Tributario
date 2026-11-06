@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
@@ -287,6 +287,8 @@ function ImportarDocumentos({
 type OutraDespesa = { grupo_id: number; descricao: string; valor: number };
 type LevantamentoDados = { status: string | null; itens: Record<string, number>; grupos_sem_outras: number[]; outras: OutraDespesa[] };
 
+const ESPERA_LOTE_MS = 800;
+
 function Despesas({ pid }: { pid: number }) {
   const atualizar = useAtualizar(pid);
   const { data: coleta } = useQuery({
@@ -299,6 +301,7 @@ function Despesas({ pid }: { pid: number }) {
   const { data: catalogo = [] } = useQuery({
     queryKey: ["catalogo"],
     queryFn: async () => (await api.get<Catalogo>("/tabelas/catalogo-despesas")).data,
+    staleTime: 5 * 60_000, // o catálogo quase não muda: não buscar de novo a cada troca de aba
   });
   const qc = useQueryClient();
   const { data: lev } = useQuery({
@@ -307,16 +310,52 @@ function Despesas({ pid }: { pid: number }) {
     queryFn: async () => (await api.get<LevantamentoDados>(`/planejamentos/${pid}/levantamentos/${atual}`)).data,
   });
   const [erro, setErro] = useState<string | null>(null);
+  // Cada campo editado entra num lote do mês; o lote vai num único PUT quando a digitação para (ESPERA_LOTE_MS),
+  // ao trocar de mês ou ao sair da tela. O total e os subtotais mudam na hora, pelo cache.
   const gravar = useMutation({
-    mutationFn: (item: { item_despesa_id: number; valor: number | null }) =>
-      api.put(`/planejamentos/${pid}/levantamentos/${atual}`, { itens: [item] }),
-    onSuccess: () => {
+    mutationFn: (lote: { comp: string; itens: { item_despesa_id: number; valor: number | null }[] }) =>
+      api.put(`/planejamentos/${pid}/levantamentos/${lote.comp}`, { itens: lote.itens }),
+    onSuccess: (_r, lote) => {
       setErro(null);
-      qc.invalidateQueries({ queryKey: ["levantamento", pid, atual] });
+      qc.invalidateQueries({ queryKey: ["levantamento", pid, lote.comp] });
       atualizar();
     },
-    onError: (e) => setErro(mensagemErro(e)),
+    onError: (e, lote) => {
+      setErro(mensagemErro(e));
+      qc.invalidateQueries({ queryKey: ["levantamento", pid, lote.comp] }); // desfaz o valor mostrado antes da resposta
+    },
   });
+  const lote = useRef<{ comp: string; itens: Map<number, number | null> } | null>(null);
+  const espera = useRef<number | undefined>(undefined);
+  const enviarLote = useRef(() => {});
+  enviarLote.current = () => {
+    window.clearTimeout(espera.current);
+    const atualLote = lote.current;
+    lote.current = null;
+    if (atualLote && atualLote.itens.size > 0)
+      gravar.mutate({ comp: atualLote.comp, itens: [...atualLote.itens].map(([item_despesa_id, valor]) => ({ item_despesa_id, valor })) });
+  };
+  useEffect(() => () => enviarLote.current(), [atual]); // troca de mês ou saída da tela: envia o que faltou
+  useEffect(() => {
+    const aoEsconder = () => document.visibilityState === "hidden" && enviarLote.current();
+    document.addEventListener("visibilitychange", aoEsconder);
+    return () => document.removeEventListener("visibilitychange", aoEsconder);
+  }, []);
+  const editar = (item_despesa_id: number, valor: number | null) => {
+    if (!atual) return;
+    if (lote.current && lote.current.comp !== atual) enviarLote.current();
+    lote.current ??= { comp: atual, itens: new Map() };
+    lote.current.itens.set(item_despesa_id, valor);
+    qc.setQueryData<LevantamentoDados>(["levantamento", pid, atual], (antes) => {
+      if (!antes) return antes;
+      const itens = { ...antes.itens };
+      if (valor == null) delete itens[String(item_despesa_id)];
+      else itens[String(item_despesa_id)] = valor;
+      return { ...antes, itens };
+    });
+    window.clearTimeout(espera.current);
+    espera.current = window.setTimeout(() => enviarLote.current(), ESPERA_LOTE_MS);
+  };
 
   const gravarOutras = useMutation({
     mutationFn: (corpo: { outras: OutraDespesa[]; grupos_sem_outras: number[] }) => api.put(`/planejamentos/${pid}/levantamentos/${atual}`, corpo),
@@ -356,7 +395,7 @@ function Despesas({ pid }: { pid: number }) {
               {g.itens.filter((i) => i.ativo).map((i) => (
                 <label key={`${atual}-${i.id}`} className="flex items-center justify-between gap-2 border-b border-surface/50 py-1 text-sm">
                   <span>{i.nome}</span>
-                  <CampoMoeda rotulo={i.nome} valor={valor(i.id)} desabilitado={!editavel} onChange={(v) => gravar.mutate({ item_despesa_id: i.id, valor: v })} />
+                  <CampoMoeda rotulo={i.nome} valor={valor(i.id)} desabilitado={!editavel} onChange={(v) => editar(i.id, v)} />
                 </label>
               ))}
             </div>
@@ -674,7 +713,13 @@ function AcoesStatus({ p }: { p: TPlanejamento }) {
       setErro(null);
       setDevolvendo(false);
       setMotivo("");
-      qc.invalidateQueries();
+      // só o que depende do status deste planejamento, e as listas que mostram o status
+      qc.invalidateQueries({
+        predicate: (q) => {
+          const [chave, id] = q.queryKey;
+          return chave === "planejamentos" || chave === "dashboard" || String(id) === String(p.id);
+        },
+      });
     },
     onError: (e) => setErro(mensagemErro(e)),
   });
