@@ -717,6 +717,7 @@ Mantém a stack sugerida no documento original, com acréscimos:
 | Gráficos | Recharts | Comparativo e evolução da Reforma |
 | Testes | pytest (motor, regras, caso de referência), Vitest | — |
 | Containers | Docker Compose | API, front, banco |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) + Dependabot | Em todo PR e push na `main`, todos obrigatórios: testes do backend em SQLite e em PostgreSQL 16, migrations num Postgres vazio (`alembic upgrade head`, carga `--demo`, leitura do PGDAS e `alembic check`), build e testes do frontend e build das imagens Docker. A API só vai para o Render com o CI verde (`autoDeployTrigger: checksPass`). O Dependabot abre um PR agrupado por mês por ecossistema, sem versões principais no npm |
 
 Camadas do backend: `rotas → serviços → motor (puro) / repositórios → modelos`. O motor recebe um objeto
 `EntradaSimulacao` (dados + premissas + tabelas vigentes) e devolve `ResultadoSimulacao` (resultados + memória +
@@ -795,7 +796,7 @@ Iguais ao documento original (pré-requisitos, instalação, `.env.example` com 
 
 ### Não obrigatórios
 
-- CI/CD (lint + testes, incluindo o caso de referência);
+- lint no CI (o CI com testes, incluindo o caso de referência, já existe: ver a linha "CI" da tabela acima);
 - responsividade para tablet;
 - importação das planilhas antigas de planejamento para popular o histórico;
 - gráfico de evolução mensal das despesas e da carga tributária.
