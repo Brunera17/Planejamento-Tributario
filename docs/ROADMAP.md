@@ -73,7 +73,7 @@ Ordem de execução. "Aguarda" significa que espera o usuário liberar ou outro 
 | 5 | Validar o leitor do extrato do PGDAS-D com um extrato real. | Bugs e revisão | Aguarda o arquivo do usuário |
 | 6 | Tirar a memória de cálculo do `resultado_json` da simulação, que hoje é gravada duas vezes. Mexe no relatório, na apresentação e no Excel, e lê o dashboard (item 7): avisar a gerente antes. | Desempenho | Em andamento (liberado em 06/11/2026) |
 | 7 | Tela inicial e lista de planejamentos sem consultas repetidas (N+1), junto com o escopo por empresa. | Desempenho | Aguarda a etapa 6 da segurança |
-| 8 | Tornar obrigatório o job de testes no Postgres, que já está verde na `main`: um PR que tira o `continue-on-error`. Depois, o usuário marca o job como obrigatório na proteção da `main`, no GitHub. | CI e dependências | Feito no código (PR #36). Falta a proteção da `main`, que num repositório privado de conta pessoal exige o plano GitHub Pro. |
+| 8 | Tornar obrigatório o job de testes no Postgres, que já está verde na `main`: um PR que tira o `continue-on-error`. Depois, o usuário marca o job como obrigatório na proteção da `main`, no GitHub. | CI e dependências | Feito no código (PR #36). Sem proteção da `main`: o usuário não vai assinar o GitHub Pro. O merge depende de não aceitar PR vermelho; o deploy só sobe com o CI verde. |
 | 9 | Travar as versões do backend: hoje o `requirements.txt` só tem pisos (`>=`), e o build do Docker instala o mais novo do dia, então uma versão nova pode quebrar o deploy sem passar pelo CI. Usar um lock (pip-compile ou uv) no Dockerfile, com o Dependabot atualizando o lock. Precisa estar pronto antes do deploy (item 4). No mesmo PR: o `concurrency` do CI passa a cancelar só os runs de PR (`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`), para que cada commit da `main` seja verificado; hoje, com merges em sequência, um run intermediário é cancelado e esconde a quebra (caso dos PRs #13 e #14). | CI e dependências | Feito (#37, 09/11/2026) |
 
 ## Registrado, sem urgência
@@ -93,6 +93,7 @@ Ordem de execução. "Aguarda" significa que espera o usuário liberar ou outro 
 | 06/11/2026 | Um PR por entrega; o Dependabot abre um PR agrupado por mês por ecossistema. |
 | 06/11/2026 | Donos por área fixa; prioridade bug > segurança > função > desempenho. |
 | 06/11/2026 | Bugs e Desempenho são sinalizadores: avaliam cada merge e consertam pontos pequenos, com revisão cruzada (seção "Rotina dos sinalizadores"). |
+| 09/11/2026 | Sem GitHub Pro: a `main` não tem proteção de branch. Regra do processo: nenhum PR é aceito com o CI vermelho. A sessão de CI ajusta a especificação. |
 | 06/11/2026 | Liberados juntos os itens 1, 2, 6 e 9. Ordem de merge para quem mexe na especificação: 9, 1, 6 e 2; quem entra depois atualiza a branch com a `main` antes. O item 6 não muda o contrato da API usado pela tela. |
 | 06/11/2026 | Tarefas em segundo plano têm um dono só: a área de segurança, na etapa 6b. A área de desempenho não repete esse trabalho. |
 | 06/11/2026 | Deploy fica com a área de segurança, porque depende das etapas 4 a 8 para ir ao ar com dados de clientes. |
