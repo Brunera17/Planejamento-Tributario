@@ -107,6 +107,8 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
       # só para passar na validação de produção do Settings (Postgres exige segredo ≥ 32 caracteres)
       JWT_SECRET: ci-segredo-descartavel-somente-para-o-workflow-0123456789
+      # a API não sobe sem chave de arquivos em Postgres; no CI vale a chave pública de desenvolvimento
+      CHAVE_ARQUIVOS: ZGVzZW52b2x2aW1lbnRvLXNvbWVudGUtbmFvLXVzYXI=
       UPLOAD_DIR: /tmp/planejador-uploads
     steps:
       - uses: actions/checkout@v7
