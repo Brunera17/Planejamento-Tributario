@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from app.core.config import get_settings
 from app.core.erros import ErroNegocio
+from app.services import cripto
 
 # extensão -> assinatura inicial do arquivo (None = texto, sem assinatura)
 ASSINATURAS: dict[str, bytes | None] = {
@@ -45,10 +46,30 @@ def validar(nome: str, conteudo: bytes) -> str:
 
 
 def gravar(conteudo: bytes, ext: str) -> str:
-    """Grava com nome gerado pelo sistema; o nome original fica só no banco."""
+    """Grava cifrado, com nome gerado pelo sistema; o nome original fica só no banco.
+    O nome gerado entra como dado associado: o arquivo não pode ser trocado pelo de outro documento."""
     nome = f"{uuid4().hex}{ext}"
-    (pasta() / nome).write_bytes(conteudo)
+    (pasta() / nome).write_bytes(cripto.cifrar(conteudo, nome.encode()))
     return nome
+
+
+def existe(arquivo: str | None) -> bool:
+    return bool(arquivo) and caminho(arquivo).exists()
+
+
+def ler(arquivo: str) -> bytes:
+    """Conteúdo original do documento (decifrado). Arquivo de antes da criptografia ainda é aceito em texto puro
+    enquanto ACEITAR_ARQUIVO_SEM_CIFRA estiver ligada (desligar depois de `cripto --cifrar-existentes`)."""
+    return ler_arquivo(caminho(arquivo))
+
+
+def ler_arquivo(arq: Path) -> bytes:
+    dados = arq.read_bytes()
+    if cripto.eh_cifrado(dados):
+        return cripto.decifrar(dados, arq.name.encode())
+    if get_settings().aceitar_arquivo_sem_cifra:
+        return dados
+    raise cripto.ErroCripto("arquivo sem criptografia recusado (ACEITAR_ARQUIVO_SEM_CIFRA=false)")
 
 
 def apagar(arquivo: str | None) -> None:

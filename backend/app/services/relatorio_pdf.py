@@ -53,7 +53,7 @@ from app.models import (
     TipoDocumento,
     Usuario,
 )
-from app.services import progresso
+from app.services import cripto, documentos, progresso
 
 FUSO = ZoneInfo("America/Sao_Paulo")
 REGIMES = {"SIMPLES_NACIONAL": "Simples Nacional", "LUCRO_PRESUMIDO": "Lucro Presumido", "LUCRO_REAL": "Lucro Real"}
@@ -766,7 +766,8 @@ def gerar(db: Session, sim: Simulacao, usuario: Usuario, recomendacao: list[str]
     pasta.mkdir(parents=True, exist_ok=True)
     periodo = f"{dados.competencias[0].replace('-', '')}-{dados.competencias[-1].replace('-', '')}"
     nome = f"PLANEJAMENTO_{dados.cnpj}_{periodo}_{dados.gerado_em:%Y%m%d-%H%M%S}.pdf"
-    (pasta / nome).write_bytes(conteudo)
+    # cifrado no disco; o hash continua sendo o do PDF original (a conferência no download não muda)
+    (pasta / nome).write_bytes(cripto.cifrar(conteudo, nome.encode()))
     rel = RelatorioPdf(planejamento_id=sim.planejamento_id, simulacao_id=sim.id, arquivo=nome,
                        hash_sha256=hashlib.sha256(conteudo).hexdigest(), preliminar=dados.preliminar, gerado_por=usuario.id)
     db.add(rel)
@@ -776,3 +777,8 @@ def gerar(db: Session, sim: Simulacao, usuario: Usuario, recomendacao: list[str]
 
 def caminho(rel: RelatorioPdf) -> Path:
     return Path(get_settings().upload_dir) / "relatorios" / rel.arquivo
+
+
+def ler(rel: RelatorioPdf) -> bytes:
+    """PDF original, decifrado (relatórios de antes da criptografia: ver documentos.ler_arquivo)."""
+    return documentos.ler_arquivo(caminho(rel))

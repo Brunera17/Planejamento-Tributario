@@ -5,6 +5,8 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 RAIZ_BACKEND = Path(__file__).resolve().parents[2]
+# só desenvolvimento/testes: está no repositório, não protege nada (produção exige CHAVE_ARQUIVOS)
+CHAVE_ARQUIVOS_DESENVOLVIMENTO = "ZGVzZW52b2x2aW1lbnRvLXNvbWVudGUtbmFvLXVzYXI="
 
 
 class Settings(BaseSettings):
@@ -27,6 +29,12 @@ class Settings(BaseSettings):
     proxies_confiaveis: str = ""  # CIDRs separados por vírgula (ex.: faixas do proxy da Vercel)
     origem_publica: str = ""  # ex.: https://planejamento-tributario.domingosassessoria.com.br
     upload_dir: str = str(RAIZ_BACKEND / "uploads")
+    # criptografia dos arquivos (envelope AES-256-GCM, app/services/cripto.py). Perder a chave = perder os arquivos:
+    # guarde uma cópia fora do Render. Gere com `python -m app.services.cripto --gerar-chave`.
+    chave_arquivos: str = ""  # base64 de 32 bytes; obrigatória em produção
+    chave_arquivos_id: str = "k1"  # muda a cada rotação; vai no cabeçalho de cada arquivo
+    chaves_arquivos_antigas: str = ""  # "id:base64,id:base64" — só leitura, durante a rotação
+    aceitar_arquivo_sem_cifra: bool = True  # false depois de rodar --cifrar-existentes
     escritorio_nome: str = "Planejador Tributário"  # aparece no cabeçalho do relatório PDF
     upload_max_mb: int = 10
     # NF-e: o .zip é lido entrada por entrada; os limites barram "zip bomb" e envios que não cabem na memória
@@ -62,7 +70,14 @@ class Settings(BaseSettings):
             raise ValueError("Em produção, defina JWT_SECRET com pelo menos 32 caracteres aleatórios")
         if not self.database_url.startswith("sqlite") and not self.redis_url:
             raise ValueError("Em produção, defina REDIS_URL")
+        if not self.database_url.startswith("sqlite") and not self.chave_arquivos:
+            raise ValueError("Em produção, defina CHAVE_ARQUIVOS (python -m app.services.cripto --gerar-chave)")
         return self
+
+    @property
+    def chave_arquivos_efetiva(self) -> str:
+        """Sem CHAVE_ARQUIVOS (só desenvolvimento e testes, em SQLite): uma chave fixa e pública — nunca em produção."""
+        return self.chave_arquivos or CHAVE_ARQUIVOS_DESENVOLVIMENTO
 
     @property
     def cors_lista(self) -> list[str]:
