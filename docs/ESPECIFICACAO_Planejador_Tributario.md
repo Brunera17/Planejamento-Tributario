@@ -262,6 +262,11 @@ Executa as fórmulas da seção 5 sobre os dados de um planejamento e grava uma 
 - Cada execução grava: versão das tabelas legais, premissas usadas, hash dos dados de entrada, usuário, data/hora,
   resultado por regime × tributo × competência × ano da Reforma e **memória de cálculo** (cada passo com a fórmula, os
   valores de entrada e o resultado — equivalente às colunas "Origem / fórmula" da `Memória dos Créditos`).
+  A memória fica **só na tabela `memoria_calculo`**: o `resultado_json` da simulação não a carrega, para que as
+  leituras do resultado (tela, dashboard, Excel, PDF) não desserializem os passos à toa. `GET /simulacoes/{id}/memoria`
+  lê da tabela e devolve o mesmo formato de sempre. A coluna `resultado` guarda 8 casas decimais e o motor gera até
+  10: nos passos das simulações novas a diferença está no 9º decimal. As simulações anteriores a essa mudança
+  mantêm a memória dentro do JSON, e a leitura usa o JSON delas, com todos os decimais.
 - Se os dados de entrada mudarem depois da simulação, ela é marcada como **desatualizada** e o relatório final fica
   bloqueado até nova execução.
 - O motor é um módulo de **funções puras** (entrada → saída, sem acesso a banco), testável isoladamente.

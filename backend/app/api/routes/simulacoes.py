@@ -14,7 +14,7 @@ from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import OportunidadeRegistro, Planejamento, RelatorioPdf, Simulacao, Usuario
 from app.motor import engine
 from app.schemas.comum import Esquema
-from app.services import apresentacao_pptx, exportacao_excel, relatorio_pdf
+from app.services import apresentacao_pptx, exportacao_excel, memoria_calculo, relatorio_pdf
 from app.services import simulacao as servico
 from app.services.auditoria import auditar
 from app.services.entrada import montar_entrada
@@ -72,7 +72,7 @@ def resultado(sid: int, db: DB, _: UsuarioAtual):
 
 @router.get("/simulacoes/{sid}/memoria")
 def memoria(sid: int, db: DB, _: UsuarioAtual, secao: str | None = None):
-    passos = json.loads(_simulacao(db, sid).resultado_json)["memoria"]["passos"]
+    passos = memoria_calculo.passos(db, _simulacao(db, sid))
     return [p for p in passos if secao is None or p["secao"] == secao]
 
 
