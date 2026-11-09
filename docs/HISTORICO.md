@@ -7,7 +7,7 @@ tributação"): a cada merge ela acrescenta a entrega à seção do agente. As d
 divisão abaixo foi feita pela branch, pelo título e pelo que cada sessão informou. Onde ficou dedução, está
 indicado. Daqui em diante cada commit termina com a linha `Sessão: <nome da sessão>` (ver `docs/ROADMAP.md`).
 
-Números gerais em 09/11/2026: 100 commits na `main`, 42 PRs (24 do Dependabot, 12 deles mergeados), migrações
+Números gerais em 09/11/2026: cerca de 110 commits na `main`, 45 PRs (24 do Dependabot, 12 deles mergeados), migrações
 0001 a 0015.
 
 ## Planejador automático de tributação (hoje a gerente)
@@ -36,7 +36,7 @@ Construiu a aplicação inteira até 04/11, antes de passar a coordenar os outro
 |---|---|
 | 04/11 | Dentro do PR #1: sessões com refresh em cookie HttpOnly, Redis, trilha de auditoria (migração 0013) e limite de tentativas de login. |
 | 06/11 | PR #20: leitura do extrato do PGDAS-D gravada no envio (migração 0015). |
-| em andamento | Etapa 4, arquivos dos clientes cifrados (item 2 do ROADMAP). |
+| 09/11 | PR #44, etapa 4: arquivos dos clientes cifrados (AES-256-GCM, marca `PTC1` centralizada, três comandos de chave) e a parte de segurança da especificação. Sem migração. |
 
 ## Planejamento de CI para aplicação (CI e dependências)
 
