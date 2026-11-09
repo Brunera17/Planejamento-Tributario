@@ -22,10 +22,16 @@ Leia antes de começar qualquer trabalho.
 - **Pendência sem dono:** avise a gerente, que sugere o dono ao usuário. Ninguém começa sem ele liberar.
 - **Prioridade:** bug que afeta resultado ou dado > segurança (dados de clientes, LGPD) > função nova > desempenho.
 - **Pasta de trabalho própria:** cada agente trabalha só numa pasta de trabalho (`git worktree`) dele, criada a
-  partir da `main`. A pasta principal do projeto fica sempre na `main`. Terminada a entrega, quem criou a pasta
+  partir da `main`, em local fora da pasta do projeto (por exemplo, `C:/dev/planejador-<área>` ou uma pasta
+  temporária). A pasta principal do projeto fica sempre na `main`. Terminada a entrega, quem criou a pasta
   remove a pasta e a branch.
 - **Quem fez o quê:** todos os commits saem com o mesmo autor, então cada commit termina com a linha
   `Sessão: <nome da sessão>`. O que cada agente entregou fica em `docs/HISTORICO.md`.
+- **Dúvidas para o usuário:** os agentes não fazem perguntas ao usuário no próprio chat, porque o cartão de
+  pergunta trava a sessão até alguém responder. Mande a dúvida à gerente por mensagem, com a pergunta, as opções
+  e a sua recomendação. A gerente leva ao usuário, junta as dúvidas de vários agentes numa pergunta só quando der e
+  devolve a resposta. Enquanto espera, o agente segue com o que não depende da resposta ou fica parado, sem
+  bloquear a sessão.
 - **Commit e push:** só quando o usuário pedir.
 
 ## Áreas
@@ -100,6 +106,7 @@ Ordem de execução. "Aguarda" significa que espera o usuário liberar ou outro 
 | 06/11/2026 | Bugs e Desempenho são sinalizadores: avaliam cada merge e consertam pontos pequenos, com revisão cruzada (seção "Rotina dos sinalizadores"). |
 | 09/11/2026 | Sem GitHub Pro: a `main` não tem proteção de branch. Regra do processo: nenhum PR é aceito com o CI vermelho. A sessão de CI ajusta a especificação. |
 | 09/11/2026 | Organização: pasta de trabalho própria por agente, linha `Sessão:` nos commits, `docs/HISTORICO.md` como histórico das entregas, limpeza de branches mergeadas pela gerente. |
+| 09/11/2026 | Dúvidas dos agentes ao usuário passam pela gerente, para nenhuma sessão ficar travada num cartão de pergunta. A pasta de trabalho de cada agente fica fora da pasta do projeto. |
 | 09/11/2026 | Item 6 aceito sem migração, com a memória das simulações novas em 8 casas decimais. A migração 0016 fica livre para a segurança. |
 | 06/11/2026 | Liberados juntos os itens 1, 2, 6 e 9. Ordem de merge para quem mexe na especificação: 9, 1, 6 e 2; quem entra depois atualiza a branch com a `main` antes. O item 6 não muda o contrato da API usado pela tela. |
 | 06/11/2026 | Tarefas em segundo plano têm um dono só: a área de segurança, na etapa 6b. A área de desempenho não repete esse trabalho. |
