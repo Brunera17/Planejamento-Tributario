@@ -262,6 +262,11 @@ Executa as fórmulas da seção 5 sobre os dados de um planejamento e grava uma 
 - Cada execução grava: versão das tabelas legais, premissas usadas, hash dos dados de entrada, usuário, data/hora,
   resultado por regime × tributo × competência × ano da Reforma e **memória de cálculo** (cada passo com a fórmula, os
   valores de entrada e o resultado — equivalente às colunas "Origem / fórmula" da `Memória dos Créditos`).
+  A memória fica **só na tabela `memoria_calculo`**: o `resultado_json` da simulação não a carrega, para que as
+  leituras do resultado (tela, dashboard, Excel, PDF) não desserializem os passos à toa. `GET /simulacoes/{id}/memoria`
+  lê da tabela e devolve o mesmo formato de sempre. A coluna `resultado` guarda 8 casas decimais e o motor gera até
+  10: nos passos das simulações novas a diferença está no 9º decimal. As simulações anteriores a essa mudança
+  mantêm a memória dentro do JSON, e a leitura usa o JSON delas, com todos os decimais.
 - Se os dados de entrada mudarem depois da simulação, ela é marcada como **desatualizada** e o relatório final fica
   bloqueado até nova execução.
 - O motor é um módulo de **funções puras** (entrada → saída, sem acesso a banco), testável isoladamente.
@@ -717,7 +722,7 @@ Mantém a stack sugerida no documento original, com acréscimos:
 | Gráficos | Recharts | Comparativo e evolução da Reforma |
 | Testes | pytest (motor, regras, caso de referência), Vitest | — |
 | Containers | Docker Compose | API, front, banco |
-| CI | GitHub Actions (`.github/workflows/ci.yml`) + Dependabot | Em todo PR e push na `main`, todos obrigatórios: testes do backend em SQLite e em PostgreSQL 16, migrations num Postgres vazio (`alembic upgrade head`, carga `--demo`, leitura do PGDAS e `alembic check`), build e testes do frontend e build das imagens Docker. A API só vai para o Render com o CI verde (`autoDeployTrigger: checksPass`). O Dependabot abre um PR agrupado por mês por ecossistema, sem versões principais no npm |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) + Dependabot | Em todo PR e push na `main`: testes do backend em SQLite e em PostgreSQL 16, migrations num Postgres vazio (`alembic upgrade head`, carga `--demo`, leitura do PGDAS e `alembic check`), build e testes do frontend e build das imagens Docker. Os checks bloqueiam o **deploy**: a API só vai para o Render com o CI verde (`autoDeployTrigger: checksPass`). O **merge** não é travado pelo GitHub (repositório privado sem GitHub Pro, então sem proteção de branch): só se aceita PR com o CI verde, por regra do processo (`docs/ROADMAP.md`). Na `main` todo commit é verificado até o fim; em PR, um commit novo cancela o run anterior. Versões do backend travadas: `backend/requirements.in` tem os pisos e `backend/requirements.txt` é o lock (`uv pip compile --universal --python-version 3.12`), usado pelo Docker e pelo CI, que falha se os dois não baterem. O Dependabot abre um PR agrupado por mês por ecossistema (no pip, atualizando o lock), sem versões principais no npm |
 
 Camadas do backend: `rotas → serviços → motor (puro) / repositórios → modelos`. O motor recebe um objeto
 `EntradaSimulacao` (dados + premissas + tabelas vigentes) e devolve `ResultadoSimulacao` (resultados + memória +

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select, update
@@ -17,7 +18,8 @@ from app.models import (
     SimulacaoResultado,
 )
 from app.motor import simular
-from app.services import progresso
+from app.motor.tipos import Memoria
+from app.services import memoria_calculo, progresso
 from app.services.entrada import montar_entrada
 from app.services.serializacao import hash_entrada, para_json
 
@@ -48,7 +50,8 @@ def executar(db: Session, p: Planejamento, usuario_id: int) -> Simulacao:
                                  "parametros": para_json(entrada.parametros),
                                  "faixas_simples": para_json(entrada.faixas_simples),
                                  "reforma": para_json(entrada.reforma)}, ensure_ascii=False),
-        resultado_json=json.dumps(para_json(r), ensure_ascii=False),
+        # a memória vai só para memoria_calculo (abaixo); o JSON fica com o resto do resultado
+        resultado_json=json.dumps(memoria_calculo.sem_memoria(para_json(replace(r, memoria=Memoria()))), ensure_ascii=False),
         regime_recomendado=r.melhor_regime.value,
         pendencias="\n".join(pendencias) or None,
         executada_por=usuario_id,

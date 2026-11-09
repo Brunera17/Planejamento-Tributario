@@ -8,7 +8,10 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from sqlalchemy.orm import Session
+
 from app.models import Empresa, Planejamento, Simulacao
+from app.services import memoria_calculo
 
 NOMES = {"SIMPLES_NACIONAL": "Simples Nacional", "LUCRO_PRESUMIDO": "Lucro Presumido", "LUCRO_REAL": "Lucro Real"}
 MOEDA = '#,##0.00'
@@ -128,7 +131,7 @@ def gerar(sim: Simulacao, p: Planejamento) -> bytes:
     # Memória de cálculo
     ws = wb.create_sheet("Memória de Cálculo")
     _cabecalho(ws, "MEMÓRIA DE CÁLCULO", emp, p, ["Seção", "Competência", "Etapa", "Fórmula", "Resultado", "Fundamento"])
-    for m in r["memoria"]["passos"]:
+    for m in memoria_calculo.passos(Session.object_session(sim), sim):
         ws.append([m["secao"], m["competencia"], m["descricao"], m["formula"], m["valor"], m["fundamento"]])
     _larguras(ws, [16, 12, 44, 70, 18, 36])
 

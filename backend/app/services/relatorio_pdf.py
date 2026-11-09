@@ -53,7 +53,7 @@ from app.models import (
     TipoDocumento,
     Usuario,
 )
-from app.services import cripto, documentos, progresso
+from app.services import cripto, documentos, memoria_calculo, progresso
 
 FUSO = ZoneInfo("America/Sao_Paulo")
 REGIMES = {"SIMPLES_NACIONAL": "Simples Nacional", "LUCRO_PRESUMIDO": "Lucro Presumido", "LUCRO_REAL": "Lucro Real"}
@@ -297,6 +297,7 @@ def coletar(db: Session, sim: Simulacao, usuario: Usuario, recomendacao: list[st
     p = db.get(Planejamento, sim.planejamento_id)
     emp = p.empresa
     r = json.loads(sim.resultado_json)
+    r["memoria"] = {"passos": memoria_calculo.passos(db, sim)}  # a memória fica na tabela, não no JSON
     comps = p.competencias()
     pct_prog, blocos = progresso.calcular(db, p)
 
