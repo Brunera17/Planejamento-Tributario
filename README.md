@@ -52,6 +52,15 @@ python -m venv .venv
 
 (No Linux/macOS, troque `.venv/Scripts/` por `.venv/bin/`.)
 
+Dependências do backend: `requirements.in` tem os pisos (`>=`) e `requirements.txt` é o lock com as versões exatas,
+usado pelo Docker, pelo CI e pela instalação acima. Ao mudar o `requirements.in`, gere o lock de novo (o CI falha se
+os dois estiverem fora de sincronia):
+
+```bash
+cd backend
+uv pip compile requirements.in -o requirements.txt --universal --python-version 3.12
+```
+
 Frontend:
 
 ```bash
@@ -91,6 +100,10 @@ A carga `--demo` cria dois planejamentos:
 cd backend && .venv/Scripts/python -m pytest
 cd frontend && npm test
 ```
+
+No GitHub, o CI (`.github/workflows/ci.yml`) roda tudo isso em todo PR e em todo commit da `main`, além dos testes
+no PostgreSQL, das migrations e do build das imagens Docker. A API só vai para o Render com o CI verde. O GitHub não
+impede o merge de PR com CI vermelho (o repositório não tem proteção de branch): não aceite PR que não esteja verde.
 
 `tests/test_motor_referencia.py` garante que o motor reproduz, até o centavo, a planilha final de planejamento:
 
