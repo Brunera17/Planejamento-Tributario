@@ -101,6 +101,10 @@ cd backend && .venv/Scripts/python -m pytest
 cd frontend && npm test
 ```
 
+No GitHub, o CI (`.github/workflows/ci.yml`) roda tudo isso em todo PR e em todo commit da `main`, além dos testes
+no PostgreSQL, das migrations e do build das imagens Docker. A API só vai para o Render com o CI verde. O GitHub não
+impede o merge de PR com CI vermelho (o repositório não tem proteção de branch): não aceite PR que não esteja verde.
+
 `tests/test_motor_referencia.py` garante que o motor reproduz, até o centavo, a planilha final de planejamento:
 
 | Regime | Carga do trimestre | Alíquota efetiva |
