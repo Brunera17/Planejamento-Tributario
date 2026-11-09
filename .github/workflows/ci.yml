@@ -7,9 +7,11 @@ on:
   workflow_dispatch:
 
 # em PR, um commit novo cancela a execução anterior; na main, todo commit é verificado até o fim
-# (com merges em sequência, cancelar escondia a quebra de um merge intermediário, como no #13/#14)
+# (com merges em sequência, cancelar escondia a quebra de um merge intermediário, como no #13/#14).
+# Fora de PR o grupo é o próprio commit: num grupo compartilhado, o GitHub cancela a execução que estiver
+# esperando quando chega outra, mesmo com cancel-in-progress false, e o merge do meio ficaria sem CI.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
