@@ -1,4 +1,5 @@
 """O exemplo da carga precisa chegar a 100%, sem pendências, aprovado e com PDF final."""
+import io
 from pypdf import PdfReader
 from sqlalchemy import select
 
@@ -25,7 +26,7 @@ def test_exemplo_completo(fabrica_sessao):
         assert sim.aprovada_em is not None
         rel = db.scalar(select(RelatorioPdf).where(RelatorioPdf.planejamento_id == p.id))
         assert rel.preliminar is False
-        texto = "\n".join(pag.extract_text() for pag in PdfReader(relatorio_pdf.caminho(rel)).pages)
+        texto = "\n".join(pag.extract_text() for pag in PdfReader(io.BytesIO(relatorio_pdf.ler(rel))).pages)  # cifrado no disco
         for trecho in ["Bens próprios", "Utilitário de entregas", "14/03/2023", "R$ 110.450,00", "Todos os 27 documentos",
                        "Não se aplica: A empresa não", "exemplo-doc-1-2026-06.pdf"]:
             assert trecho in texto, trecho

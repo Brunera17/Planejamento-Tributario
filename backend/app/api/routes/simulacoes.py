@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Query
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 from pydantic import Field
 from sqlalchemy import select
 
@@ -14,11 +14,12 @@ from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import OportunidadeRegistro, Planejamento, RelatorioPdf, Simulacao, Usuario
 from app.motor import engine
 from app.schemas.comum import Esquema
-from app.services import apresentacao_pptx, exportacao_excel, memoria_calculo, relatorio_pdf
+from app.services import apresentacao_pptx, cripto, exportacao_excel, memoria_calculo, relatorio_pdf
 from app.services import simulacao as servico
 from app.services.auditoria import auditar
 from app.services.entrada import montar_entrada
 from app.services.serializacao import para_json
+from app.utils.download import anexo
 
 router = APIRouter(tags=["Simulações"])
 
@@ -174,11 +175,14 @@ def baixar_relatorio(rid: int, db: DB, u: Contador):
     rel = db.get(RelatorioPdf, rid)
     if rel is None:
         raise NaoEncontrado("Relatório")
-    arq = relatorio_pdf.caminho(rel)
-    if not arq.exists():
+    if not relatorio_pdf.caminho(rel).exists():
         raise ErroNegocio("Arquivo do relatório não encontrado no armazenamento", 410)
-    if hashlib.sha256(arq.read_bytes()).hexdigest() != rel.hash_sha256:
+    try:
+        conteudo = relatorio_pdf.ler(rel)
+    except cripto.ErroCripto as e:
+        raise ErroNegocio("O arquivo arquivado não confere (integridade da criptografia)", 409) from e
+    if hashlib.sha256(conteudo).hexdigest() != rel.hash_sha256:
         raise ErroNegocio("O arquivo arquivado não confere com o hash registrado na emissão", 409)
     auditar("RELATORIO_BAIXADO", usuario=u, planejamento=db.get(Planejamento, rel.planejamento_id),
             recurso_tipo="relatorio_pdf", recurso_id=rel.id, detalhes={"arquivo": rel.arquivo})
-    return FileResponse(arq, media_type="application/pdf", filename=rel.arquivo)
+    return anexo(conteudo, rel.arquivo, media_type="application/pdf")

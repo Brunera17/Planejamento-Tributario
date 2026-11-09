@@ -8,7 +8,6 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, UploadFile
-from fastapi.responses import FileResponse
 from pydantic import Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,8 +17,9 @@ from app.core.config import get_settings
 from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import Bem, Documento, Levantamento, Planejamento, TipoDocumento
 from app.schemas.comum import Esquema
-from app.services import documentos, pgdas, progresso
+from app.services import cripto, documentos, pgdas, progresso
 from app.services.auditoria import auditar
+from app.utils.download import anexo
 from app.utils.upload import ler_limitado
 
 router = APIRouter(prefix="/planejamentos", tags=["Bens e documentos"])
@@ -205,9 +205,13 @@ def excluir_documento(pid: int, doc_id: int, db: DB, u: UsuarioAtual):
 @router.get("/{pid}/documentos/{doc_id}/download")
 def baixar_documento(pid: int, doc_id: int, db: DB, u: UsuarioAtual):
     doc, lv = _doc_do_planejamento(db, pid, doc_id)
-    if not doc.arquivo or not documentos.caminho(doc.arquivo).exists():
+    if not documentos.existe(doc.arquivo):
         raise ErroNegocio("O arquivo deste documento não está no armazenamento; envie-o novamente", 410)
+    try:
+        conteudo = documentos.ler(doc.arquivo)
+    except cripto.ErroCripto as e:
+        # adulterado, trocado de lugar ou chave errada: não entrega nada
+        raise ErroNegocio("O arquivo armazenado não confere (integridade da criptografia); envie-o novamente", 409) from e
     auditar("DOCUMENTO_BAIXADO", usuario=u, planejamento=obter_planejamento(db, pid), recurso_tipo="documento",
             recurso_id=doc.id, detalhes={"arquivo": doc.arquivo_nome or doc.arquivo, "competencia": lv.competencia})
-    return FileResponse(documentos.caminho(doc.arquivo), filename=doc.arquivo_nome or doc.arquivo,
-                        media_type="application/octet-stream")
+    return anexo(conteudo, doc.arquivo_nome or doc.arquivo)

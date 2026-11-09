@@ -67,8 +67,9 @@ A entrega deve conter:
 
 ### 3.1 Autenticação e perfis
 
-Mantém as regras do documento original: login com usuário e senha, sessão JWT, logout, sem autocadastro, permissões
-verificadas no backend em cada rota.
+Mantém as regras do documento original: login com usuário e senha, logout, sem autocadastro, permissões
+verificadas no backend em cada rota. A segurança da sessão, a trilha de auditoria e a guarda dos arquivos estão em
+3.1.1 (desenho completo em `docs/PLANO_Autenticacao_JWT_Refresh_Redis.md`).
 
 | Funcionalidade | Contador | Analista |
 |---|---|---|
@@ -86,6 +87,36 @@ verificadas no backend em cada rota.
 | Manter tabelas legais (Anexo I, alíquotas, Reforma, NCM, CFOP) | Sim | Não |
 | Ver progresso, pendências e dashboard | Sim | Sim |
 | Relatório PDF e exportação Excel | Sim | Não |
+| Consultar e exportar a trilha de auditoria | Sim | Não |
+
+### 3.1.1 Segurança: sessões, auditoria e arquivos
+
+**Sessão.** O login devolve um *access token* (JWT de 15 min, com emissor, audiência, tipo e id de sessão) que a
+tela guarda só em memória, e grava um *refresh token* opaco num cookie `HttpOnly`, `Secure`, `SameSite=Strict`,
+restrito a `/api/auth`. O refresh é trocado a cada uso; um refresh já usado que reaparece (fora de uma tolerância de
+20 s para abas simultâneas) derruba a sessão inteira e é registrado como suspeita de roubo. A sessão vive no Redis e
+expira **12 h após o login** (renovar não estende). Logout derruba a sessão na hora; troca de senha, de perfil e
+desativação derrubam as sessões do usuário. Há "sair de todos os dispositivos". Sem Redis, ninguém entra (503).
+
+**Login.** Até 5 erros por usuário e 20 por IP em 15 min; depois, 429 com `Retry-After`. A resposta leva o mesmo tempo
+com usuário inexistente ou senha errada e a mensagem é sempre genérica. O IP do cliente vem do `X-Forwarded-For` só
+atrás do proxy configurado (`IP_POR_X_FORWARDED_FOR`, `PROXIES_CONFIAVEIS`). O refresh exige o cabeçalho
+`X-Requested-With: planejador` e origem conhecida (proteção contra CSRF).
+
+**Trilha de auditoria.** Ficam registrados, com usuário, sessão, IP e navegador: logins (certos, errados e
+bloqueados), logout, reuso de refresh, alterações de usuários e empresas, envio, download e exclusão de documentos,
+importações, emissão e download de relatórios, exportações e a abertura de cada planejamento (uma vez por sessão).
+Cada evento é encadeado ao anterior por hash; no PostgreSQL um trigger impede alterar ou apagar eventos, e a
+verificação aponta qualquer adulteração. Um download não sai sem o registro (503); uma alteração já gravada cujo
+registro falhou vai para um arquivo de contingência e é gravada depois. Retenção de 5 anos. Consulta, verificação e
+exportação CSV (até um ano por vez) são do contador.
+
+**Arquivos cifrados.** Documentos enviados e relatórios PDF ficam cifrados no disco (AES-256-GCM, uma chave por
+arquivo protegida pela chave mestra `CHAVE_ARQUIVOS`). O nome do arquivo entra como dado associado: arquivo
+adulterado ou trocado pelo de outro documento não abre (409), em vez de entregar conteúdo errado. O hash do
+relatório continua sendo o do PDF original. **Perder a chave mestra é perder os arquivos:** ela precisa de cópia
+fora do servidor. Comandos: `python -m app.services.cripto --gerar-chave`, `--cifrar-existentes` (arquivos de antes
+da criptografia; idempotente) e `--recifrar-chaves` (rotação da chave mestra).
 
 ### 3.2 Empresas
 
@@ -225,7 +256,7 @@ grava a versão usada, para que um relatório antigo continue reproduzível.
 | `aliquota_uf` | alíquota interna geral de cada estado, FCP da regra geral, base dupla ou única e vigência (alíquotas modais de 2026 na carga; o contador inclui a nova alíquota com a data de início em Base legal › ICMS por estado). Usada no DIFAL: nas vendas a consumidor final não contribuinte de outro estado (`nota_fiscal.dest_contribuinte`, do indIEDest; sem o campo, consumidor final conta como não contribuinte), LP e LR recolhem ao destino base dupla × (alíquota + FCP) − ICMS interestadual (EC 87/2015; LC 190/2022). O DIFAL soma ao ICMS a recolher sem ser abatido pelo saldo credor; o Simples não recolhe (ADI 5464), nem acima do sublimite |
 | `regra_reforma` | reduções de CBS e IBS por NCM (capítulo, posição ou código, com exceções) dos anexos da LC 214/2025: I (cesta básica) e XV (hortícolas, frutas e ovos), alíquota zero; VII (alimentos) e VIII (higiene e limpeza), 60%. Com requisito quando o NCM sozinho não basta, CST 200 e cClassTrib. Mantida em Base legal › Reduções de CBS e IBS; no conflito entre anexos vale o maior benefício. Na projeção: receita tributada = Σ receita do item × (1 − redução); crédito das compras × (1 − redução média das vendas); despesas creditam pela alíquota cheia |
 | `simples_faixa` | faixas dos Anexos I (comércio) e II (indústria, com a parcela do IPI) da LC 123/2006. O anexo do cálculo é o do cadastro da empresa; vazio, o sugerido pelo CNAE (divisões 45 a 47 → I; 10 a 33 → II) ou pela atividade. Serviços (III a V) ainda não são calculados: a simulação sai pelo Anexo I com pendência. Na indústria, o IPI está no DAS mas não no LP/LR (ponto de atenção) |
-| extrato do PGDAS-D | o PDF enviado em Documentos é lido (período de apuração, RBT12 e atividades declaradas): o RBT12 vira premissa automática e, se o anexo declarado diverge do cadastro, a simulação fica com pendência |
+| extrato do PGDAS-D | o PDF enviado em Documentos é lido **uma vez, no envio** (período de apuração, RBT12 e atividades declaradas), e a leitura fica gravada no documento: o cálculo não reabre o PDF. O RBT12 vira premissa automática e, se o anexo declarado diverge do cadastro, a simulação fica com pendência. Extratos enviados antes dessa leitura são lidos pelo comando `python -m app.services.pgdas`, que roda no start do container |
 | `nota_item.bc_st`, `nota_item.vl_icms_st` | base e valor do ICMS-ST do item (vBCST/vICMSST ou vBCSTRet/vICMSSTRet). Reimportar o mesmo XML completa a base nos itens antigos. Usados no crédito do estoque que sai da ST: Portaria CAT 28/2020, Anexo IV (LP/LR: BC ST × alíquota interna; fornecedor do Simples: com dedução do valor da mercadoria) e Anexo V (Simples: (BC ST − valor da mercadoria) × alíquota interna). O planejamento estima o crédito por real de custo pelas entradas com ST até a véspera da exclusão e aplica ao estoque informado (premissa `estoque_st_valor`); LP/LR usam em 12 parcelas desde o mês da exclusão e o Simples abate no DAS a partir do mês seguinte. Aparece como a oportunidade `CREDITO_ESTOQUE_ST` |
 | `icms_aliquota` | por UF de origem × destino e, opcionalmente, por NCM |
 | `cfop_regra` | CFOP, natureza, gera receita?, CSOSN/CST por regime, CST IBS/CBS e cClassTrib — `Premissas` seção 7 |
@@ -634,7 +665,8 @@ Alterações e tabelas novas:
 
 | Recurso | Rotas |
 |---|---|
-| Auth | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
+| Auth | `POST /auth/login`, `POST /auth/refresh` (cookie), `POST /auth/logout`, `POST /auth/logout-todos`, `GET /auth/me` |
+| Auditoria (contador) | `GET /auditoria?filtros`, `GET /auditoria/acoes`, `GET /auditoria/exportar?desde&ate` (CSV), `GET /auditoria/verificar` |
 | Empresas | `GET/POST /empresas`, `PUT /empresas/{id}`, `POST /empresas/importacao/previa`, `POST /empresas/importacao/confirmar` |
 | Planejamentos | `GET/POST /planejamentos`, `GET /planejamentos/{id}`, `POST /planejamentos/{id}/status`, `GET /planejamentos/{id}/pendencias`, `GET /planejamentos/{id}/progresso` |
 | Coleta | `/planejamentos/{id}/levantamentos/...` (doc. original), `PUT /planejamentos/{id}/compras`, `PUT /planejamentos/{id}/devolucoes`, `PUT /planejamentos/{id}/folha`, `PUT /planejamentos/{id}/estoque`, `PUT /planejamentos/{id}/premissas` |
@@ -711,7 +743,9 @@ Mantém a stack sugerida no documento original, com acréscimos:
 | Backend | Python 3.12 + FastAPI | API, importação, motor, PDF e Excel |
 | ORM / migrations | SQLAlchemy 2 + Alembic | Modelos e carga das tabelas legais |
 | Validação | Pydantic | Schemas de entrada e saída |
-| Autenticação | JWT (PyJWT) + bcrypt | Login, perfis |
+| Autenticação | JWT (PyJWT) + bcrypt + refresh opaco em cookie | Login, perfis, sessões revogáveis (3.1.1) |
+| Sessões e limites | Redis (cliente síncrono, timeout curto e disjuntor) | Sessões, limite de tentativas de login, deduplicação da auditoria |
+| Criptografia | `cryptography` (AES-256-GCM, envelope) | Documentos e relatórios cifrados no disco |
 | Banco | PostgreSQL 16 | `NUMERIC` para valores monetários e alíquotas |
 | Motor de cálculo | Python puro + `decimal.Decimal` | Funções puras, sem dependência de banco |
 | Leitura de NF-e | `lxml` (XML NF-e 4.00) + openpyxl (relatório) | Importação de saídas e entradas |
@@ -791,6 +825,10 @@ a lado; alerta automático quando a empresa se aproxima do sublimite.
 Iguais ao documento original (pré-requisitos, instalação, `.env.example` com `DATABASE_URL`, `JWT_SECRET`,
 `UPLOAD_DIR`, `VITE_API_URL`, comandos de execução, usuários `contador/demo123` e `analista/demo123`,
 `empresas_exemplo.xlsx`), mais:
+
+- em produção a API não sobe sem `JWT_SECRET` forte, `REDIS_URL` e `CHAVE_ARQUIVOS`; os usuários de demonstração
+  não existem em produção (o primeiro contador vem de `ADMIN_USUARIO` e `ADMIN_SENHA`);
+- `CHAVE_ARQUIVOS` (gerada com `python -m app.services.cripto --gerar-chave`) tem cópia guardada fora do servidor;
 
 - carga das tabelas legais vigentes e do planejamento de demonstração (caso de referência da seção 9) com um comando;
 - pasta `exemplos/` com XML de NF-e anonimizados e um relatório de movimentação de exemplo para teste da importação.

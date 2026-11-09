@@ -28,6 +28,8 @@ services:
       DATABASE_URL: postgresql+psycopg://planejador:planejador@db:5432/planejador
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-segredo-local-do-docker-compose-nao-usar-em-producao}
+      # chave pública de desenvolvimento (a mesma do config.py): só para rodar local; produção usa a sua
+      CHAVE_ARQUIVOS: ${CHAVE_ARQUIVOS:-ZGVzZW52b2x2aW1lbnRvLXNvbWVudGUtbmFvLXVzYXI=}
       UPLOAD_DIR: /data/uploads
       CORS_ORIGINS: http://localhost:5173
     # local: com os usuários e planejamentos de demonstração

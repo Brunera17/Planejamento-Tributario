@@ -24,6 +24,12 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
+      # chave mestra dos arquivos cifrados: gere com `python -m app.services.cripto --gerar-chave` e GUARDE UMA
+      # CÓPIA FORA DO RENDER (gerenciador de senhas do escritório). Perder a chave = perder todos os documentos.
+      - key: CHAVE_ARQUIVOS
+        sync: false
+      - key: ACEITAR_ARQUIVO_SEM_CIFRA
+        value: "false"  # instalação nova: nenhum arquivo antigo em texto puro
       - key: UPLOAD_DIR
         value: /data/uploads
       - key: CORS_ORIGINS

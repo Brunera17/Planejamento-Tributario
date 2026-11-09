@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Documento, Levantamento, Planejamento, TipoDocumento
-from app.services import documentos
+from app.services import cripto, documentos
 from app.services.memo import por_planejamento
 
 NUMERO = r"\d{1,3}(?:\.\d{3})*,\d{2}"
@@ -96,20 +96,20 @@ def leitura_no_envio(db: Session, tipo_documento_id: int, nome: str, conteudo: b
     return para_json(ler(conteudo, nome))
 
 
-MARCA_CIFRADO = b"PTC1"  # cabeçalho dos arquivos cifrados (etapa 4)
+MARCA_CIFRADO = cripto.MARCA  # uma definição só, em cripto.py (uma versão nova do formato não passa despercebida)
 
 
 def _ler_arquivo(arquivo: str, nome: str) -> ExtratoPgdas | None:
-    """Documento enviado antes da leitura no upload: lê o arquivo (sem gravar — o GET não escreve).
-    None = não deu para tentar (arquivo sumido ou já cifrado): fica NULL e é tentado de novo depois.
-    Um PDF que abre mas não é extrato devolve "não lido" de verdade, e isso pode ser gravado.
-    Etapa 4 (criptografia): trocar por documentos.ler(), que decifra."""
-    caminho = documentos.caminho(arquivo)
-    if not caminho.exists():
+    """Documento enviado antes da leitura no upload: lê o arquivo, decifrando (sem gravar — o GET não escreve).
+    None = não deu para tentar (arquivo sumido, ou cifrado e impossível de decifrar: chave ausente/errada,
+    adulterado): fica NULL e é tentado de novo depois. Um PDF que abre mas não é extrato devolve "não lido"
+    de verdade, e isso pode ser gravado."""
+    if not documentos.existe(arquivo):
         return None
-    conteudo = caminho.read_bytes()
-    if conteudo.startswith(MARCA_CIFRADO):
-        return None  # sem decifrar, "ilegível" seria falso — e marcaria o documento como não lido para sempre
+    try:
+        conteudo = documentos.ler(arquivo)
+    except cripto.ErroCripto:
+        return None  # "ilegível" seria falso — e marcaria o documento como não lido para sempre
     return ler(conteudo, nome)
 
 
