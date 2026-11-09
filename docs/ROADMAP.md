@@ -32,6 +32,10 @@ Leia antes de começar qualquer trabalho.
   e a sua recomendação. A gerente leva ao usuário, junta as dúvidas de vários agentes numa pergunta só quando der e
   devolve a resposta. Enquanto espera, o agente segue com o que não depende da resposta ou fica parado, sem
   bloquear a sessão.
+- **Mensagens entre agentes:** cada mensagem acorda uma sessão e custa uma resposta inteira. Escreva à gerente só
+  para: PR aberto (com o número), bloqueio, dúvida para o usuário, achado crítico (na hora) ou entrega concluída
+  (numa mensagem só). Sem "recebido" nem "ciente": quem recebe uma instrução a cumpre. Detalhes em
+  `docs/GERENTE.md`.
 - **Commit e push:** só quando o usuário pedir.
 
 ## Áreas
@@ -78,9 +82,9 @@ Ordem de execução. "Aguarda" significa que espera o usuário liberar ou outro 
 | # | Item | Área | Situação |
 |---|---|---|---|
 | 1 | Troca de planejamento mantém o estado da tela anterior: o motivo de devolução pode ir para o planejamento errado. Recriar as abas ao trocar de planejamento (`key={p.id}` no contêiner das abas de `frontend/src/pages/Planejamento.tsx`, tirando a do `<Despesas>`). Conferir Bens, Documentos, Premissas e Revisao. | Tela | Feito (#38, 09/11/2026) |
-| 2 | Segurança, etapa 4: arquivos dos clientes cifrados. Inclui centralizar a marca `PTC1` (hoje em `pgdas.py`) em `cripto.py` e pôr na especificação o que os PRs #1 e #20 não registraram (sessões e refresh, auditoria, limite de login, PGDAS gravado no envio). | Segurança | Em andamento (liberado em 06/11/2026) |
+| 2 | Segurança, etapa 4: arquivos dos clientes cifrados. Inclui centralizar a marca `PTC1` (hoje em `pgdas.py`) em `cripto.py` e pôr na especificação o que os PRs #1 e #20 não registraram (sessões e refresh, auditoria, limite de login, PGDAS gravado no envio). | Segurança | PR #44 aberto (09/11/2026), aguardando o aceite. |
 | 3 | Segurança, etapas 5 a 8: segundo fator obrigatório, escopo por empresa, fila de tarefas (6b: a tabela `tarefa` e a importação de NF-e, o relatório contábil, o PDF, o PPTX e o Excel passando pela fila), telas de gestão. Ver `docs/PLANO_Autenticacao_JWT_Refresh_Redis.md`. | Segurança | Aguarda o item 2 |
-| 4 | Deploy (etapa 9): tela na Vercel, API no Render. Já existem `render.yaml`, `frontend/vercel.json` e a criação do primeiro usuário por `ADMIN_USUARIO`/`ADMIN_SENHA`. Avaliar a região dos dados (LGPD). | Segurança | Aguarda o item 3 e a escolha do usuário |
+| 4 | Deploy (etapa 9): tela na Vercel, API no Render. Já existem `render.yaml`, `frontend/vercel.json` e a criação do primeiro usuário por `ADMIN_USUARIO`/`ADMIN_SENHA`. Avaliar a região dos dados (LGPD). Antes de subir, guardar uma cópia da `CHAVE_ARQUIVOS` fora do Render: se ela se perder, os documentos cifrados se perdem. | Segurança | Aguarda o item 3 e a escolha do usuário |
 | 5 | Validar o leitor do extrato do PGDAS-D com um extrato real. | Bugs e revisão | Aguarda o arquivo do usuário |
 | 6 | Tirar a memória de cálculo do `resultado_json` da simulação, que hoje é gravada duas vezes. Mexe no relatório, na apresentação e no Excel, e lê o dashboard (item 7): avisar a gerente antes. | Desempenho | Feito (#42, 09/11/2026): sem migração; a memória fica com 8 casas nas simulações novas. |
 | 7 | Tela inicial e lista de planejamentos sem consultas repetidas (N+1), junto com o escopo por empresa. | Desempenho | Aguarda a etapa 6 da segurança |
@@ -106,6 +110,7 @@ Ordem de execução. "Aguarda" significa que espera o usuário liberar ou outro 
 | 06/11/2026 | Bugs e Desempenho são sinalizadores: avaliam cada merge e consertam pontos pequenos, com revisão cruzada (seção "Rotina dos sinalizadores"). |
 | 09/11/2026 | Sem GitHub Pro: a `main` não tem proteção de branch. Regra do processo: nenhum PR é aceito com o CI vermelho. A sessão de CI ajusta a especificação. |
 | 09/11/2026 | Organização: pasta de trabalho própria por agente, linha `Sessão:` nos commits, `docs/HISTORICO.md` como histórico das entregas, limpeza de branches mergeadas pela gerente. |
+| 09/11/2026 | Regra de mensagens para gastar menos: agentes escrevem à gerente só quando precisam de decisão ou ação, sem confirmações. A gerente passa para uma sessão nova com o briefing `docs/GERENTE.md`. |
 | 09/11/2026 | Dúvidas dos agentes ao usuário passam pela gerente, para nenhuma sessão ficar travada num cartão de pergunta. A pasta de trabalho de cada agente fica fora da pasta do projeto. |
 | 09/11/2026 | Item 6 aceito sem migração, com a memória das simulações novas em 8 casas decimais. A migração 0016 fica livre para a segurança. |
 | 06/11/2026 | Liberados juntos os itens 1, 2, 6 e 9. Ordem de merge para quem mexe na especificação: 9, 1, 6 e 2; quem entra depois atualiza a branch com a `main` antes. O item 6 não muda o contrato da API usado pela tela. |
