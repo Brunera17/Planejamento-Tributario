@@ -151,6 +151,19 @@ Em coleta ──► Em conferência ──► Pronto para simular ──► Simu
 
 Cada transição é gravada em `historico_status` (usuário, data, motivo).
 
+**Retenção das notas fiscais:** na aprovação, as notas e os itens de NF-e do planejamento (importados por XML ou pelo
+relatório contábil) são apagados, porque são a maior parte do banco. O motivo da aprovação no histórico registra quantos
+foram apagados. Ficam a simulação aprovada (resultado e memória de cálculo), o relatório PDF com o hash, as
+importações (`importacao_nfe`), as compras, as devoluções, a folha, as despesas e a revisão de produtos. Consequências:
+
+- o PDF da simulação aprovada mostra progresso de 100% e nenhuma pendência, como na aprovação, sem recalcular a partir
+  das notas;
+- a simulação de crescimento para outros RBT12 fica indisponível (422); os valores calculados continuam na tela;
+- a simulação aprovada não pode ser recalculada a partir das notas. Ela continua reproduzível pela memória de cálculo
+  gravada;
+- reabrir um planejamento aprovado (volta a "Em coleta") exige importar as notas de novo: sem notas de saída, a
+  simulação é recusada e o bloco de saídas fica pendente.
+
 ### 3.4 Módulo de coleta (entradas do motor)
 
 #### a) Levantamento de despesas — mantido do documento original

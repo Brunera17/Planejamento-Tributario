@@ -84,6 +84,9 @@ def crescimento(sid: int, db: DB, _: UsuarioAtual, rbt12: list[Decimal] = Query(
     if not rbt12:
         return json.loads(s.resultado_json)["crescimento"]
     entrada = montar_entrada(db, db.get(Planejamento, s.planejamento_id)).entrada
+    if not entrada.itens:  # notas apagadas na aprovação: sem elas o recálculo daria receita zero
+        raise ErroNegocio("As notas fiscais deste planejamento foram apagadas na aprovação; "
+                          "a simulação de crescimento mostra só os valores calculados")
     return para_json(engine.crescimento(entrada, sorted(rbt12)))
 
 

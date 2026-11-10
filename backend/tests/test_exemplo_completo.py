@@ -1,11 +1,12 @@
 """O exemplo da carga precisa chegar a 100%, sem pendências, aprovado e com PDF final."""
 import io
 from pypdf import PdfReader
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from decimal import Decimal
 
-from app.models import FolhaMensal, ItemDespesa, Levantamento, LevantamentoItem, RelatorioPdf, Simulacao
+from app.models import (FolhaMensal, HistoricoStatus, ItemDespesa, Levantamento, LevantamentoItem, NotaFiscal, NotaItem,
+                        Planejamento, RelatorioPdf, Simulacao, Usuario)
 from app.seeds.exemplo import carregar_exemplo, concluir_exemplo
 from app.services import progresso, relatorio_pdf
 from app.services.entrada import ITEM_FOLHA, montar_entrada
@@ -34,6 +35,37 @@ def test_exemplo_completo(fabrica_sessao):
 
         concluir_exemplo(db, carregar_exemplo(db))  # repetir a carga não duplica
         assert len(db.scalars(select(Simulacao).where(Simulacao.planejamento_id == p.id)).all()) == 1
+
+        # retenção: aprovada a simulação, as notas e os itens são apagados; o PDF final continua sem pendências
+        assert db.scalar(select(func.count()).select_from(NotaFiscal).where(NotaFiscal.planejamento_id == p.id)) == 0
+        assert db.scalar(select(func.count()).select_from(NotaItem)
+                         .where(NotaItem.nota_fiscal_id.not_in(select(NotaFiscal.id)))) == 0
+        motivo = db.scalar(select(HistoricoStatus.motivo).where(HistoricoStatus.planejamento_id == p.id,
+                                                                 HistoricoStatus.status_para == "APROVADO"))
+        assert "notas e" in motivo and "itens apagados" in motivo
+        contador = db.scalar(select(Usuario).where(Usuario.usuario == "contador"))
+        dados = relatorio_pdf.coletar(db, sim, contador, None)
+        assert (dados.progresso, dados.pendencias, dados.preliminar) == (100, [], False)
+
+
+def test_reabrir_aprovado_exige_notas_de_novo(cliente, contador, fabrica_sessao):
+    with fabrica_sessao() as db:
+        p = carregar_exemplo(db)
+        concluir_exemplo(db, p)
+        db.commit()
+        pid = p.id
+        sid = db.scalar(select(Simulacao.id).where(Simulacao.planejamento_id == pid))
+    r = cliente.get(f"/api/simulacoes/{sid}/crescimento", headers=contador, params={"rbt12": ["3000000"]})
+    assert r.status_code == 422 and "apagadas" in r.json()["erro"]
+    assert cliente.get(f"/api/simulacoes/{sid}/crescimento", headers=contador).status_code == 200  # valores gravados
+
+    r = cliente.post(f"/api/planejamentos/{pid}/status", headers=contador, json={"status": "EM_COLETA", "motivo": "Refazer"})
+    assert r.status_code == 200
+    r = cliente.post(f"/api/planejamentos/{pid}/simulacoes", headers=contador)
+    assert r.status_code == 422 and "Importe as notas" in r.json()["erro"]  # nunca simula com receita zero
+    with fabrica_sessao() as db:  # o exemplo é compartilhado pela suíte: volta a ficar aprovado
+        db.get(Planejamento, pid).status = "APROVADO"
+        db.commit()
 
 
 def test_folha_nao_e_deduzida_duas_vezes(fabrica_sessao):

@@ -77,18 +77,22 @@ def test_status_trava_e_libera_os_meses(cliente, contador, analista, pid):
 
 def test_nao_aprova_sem_passar_pela_conferencia(cliente, contador):
     from app.db.session import SessionLocal  # substituída pela sessão de teste no conftest
-    from app.models import Empresa, Planejamento
-    from app.seeds.exemplo import CNPJ, carregar_exemplo
+    from sqlalchemy import select
 
+    from app.models import Empresa, Planejamento, Simulacao
+    from app.seeds.exemplo import CNPJ, carregar_exemplo, concluir_exemplo
+
+    # usa a simulação FINAL já gravada: as notas do exemplo são apagadas na aprovação, então não dá para simular de novo
     with SessionLocal() as db:
         p = carregar_exemplo(db)
+        concluir_exemplo(db, p)
         db.commit()
         assert db.get(Empresa, p.empresa_id).cnpj == CNPJ
+        sid = db.scalar(select(Simulacao.id).where(Simulacao.planejamento_id == p.id, Simulacao.tipo == "FINAL"))
         estado_original = p.status
         db.get(Planejamento, p.id).status = "EM_COLETA"
         db.commit()
-    sim = cliente.post(f"/api/planejamentos/{p.id}/simulacoes", headers=contador).json()
-    r = cliente.post(f"/api/simulacoes/{sim['id']}/aprovar", headers=contador)
+    r = cliente.post(f"/api/simulacoes/{sid}/aprovar", headers=contador)
     assert r.status_code == 422 and "conferência" in r.json()["erro"]
     with SessionLocal() as db:
         db.get(Planejamento, p.id).status = estado_original
