@@ -36,6 +36,7 @@ from app.models import (
     ParametroTributario,
     PesoProgresso,
     Planejamento,
+    PremissaPlanejamento,
     ReformaCronograma,
     RegraReforma,
     RegraSt,
@@ -214,6 +215,9 @@ def carregar_demo(db: Session) -> Planejamento:
                                 vl_total=Decimal(i["valor"])) for n, i in enumerate(itens, start=1))
         db.add(CompraMensal(planejamento_id=p.id, competencia=c, valor=Decimal(fx["compras"][c])))
         db.add(DevolucaoMensal(planejamento_id=p.id, competencia=c, valor=Decimal(fx["devolucoes"][c])))
+
+    # a planilha de referência não exclui o ICMS da base do PIS/COFINS (o Tema 69 agora vem ligado por padrão)
+    db.add(PremissaPlanejamento(planejamento_id=p.id, chave="excluir_icms_base_pis_cofins", valor="false", alterado_por=contador.id))
 
     catalogo = {i.nome: i for i in db.scalars(select(ItemDespesa))}
     for ci, c in enumerate(comps):

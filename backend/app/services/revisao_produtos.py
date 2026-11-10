@@ -1,7 +1,8 @@
 """Revisão de produtos: confronta o que foi vendido com a Lei 10.485/2002 e segrega as inconsistências.
 
-A base legal é global; a revisão é do planejamento. Corrigir um NCM aqui vale só para o cálculo: o cadastro
-do cliente é corrigido por ele, com a lista exportada.
+A base legal é global. A revisão é gravada no planejamento e vale para a empresa: um produto revisado em outro
+planejamento da mesma empresa entra já revisado (vale a decisão mais recente); revisar de novo aqui grava uma
+decisão própria. Corrigir um NCM vale só para o cálculo: o cadastro do cliente é corrigido por ele, com a lista exportada.
 """
 from __future__ import annotations
 
@@ -49,6 +50,13 @@ class Produto:
     alertas: list[str] = field(default_factory=list)
 
     @property
+    def herdada(self) -> bool:
+        """Decisão tomada em outro planejamento da mesma empresa."""
+        return self.revisao is not None and self.revisao.planejamento_id != self._pid
+
+    _pid: int = 0
+
+    @property
     def revisado(self) -> bool:
         return self.revisao is not None
 
@@ -66,7 +74,12 @@ def familia(descricao: str) -> str:
 @por_planejamento
 def analisar(db: Session, p: Planejamento) -> list[Produto]:
     tabela = tabelas.lei_monofasico()
-    revisoes = {(r.cod_produto, r.ncm_nota): r for r in db.scalars(select(RevisaoProduto).where(RevisaoProduto.planejamento_id == p.id))}
+    # as da empresa primeiro, da mais antiga para a mais recente; as deste planejamento por cima
+    revisoes = {(r.cod_produto, r.ncm_nota): r for r in db.scalars(
+        select(RevisaoProduto).join(Planejamento, Planejamento.id == RevisaoProduto.planejamento_id)
+        .where(Planejamento.empresa_id == p.empresa_id, RevisaoProduto.planejamento_id != p.id)
+        .order_by(RevisaoProduto.revisado_em, RevisaoProduto.id))}
+    revisoes |= {(r.cod_produto, r.ncm_nota): r for r in db.scalars(select(RevisaoProduto).where(RevisaoProduto.planejamento_id == p.id))}
     linhas = db.execute(
         select(NotaItem.cod_produto, NotaItem.ncm, NotaItem.cst_pis, func.max(NotaItem.descricao), func.sum(NotaItem.vl_total), func.count())
         .join(NotaFiscal, NotaFiscal.id == NotaItem.nota_fiscal_id)
@@ -86,7 +99,7 @@ def analisar(db: Session, p: Planejamento) -> list[Produto]:
 
     lista = sorted(produtos.values(), key=lambda x: x.receita, reverse=True)
     for pr in lista:
-        pr.revisao = revisoes.get((pr.cod_produto, pr.ncm_nota))
+        pr.revisao, pr._pid = revisoes.get((pr.cod_produto, pr.ncm_nota)), p.id
         pr.ncm = (pr.revisao.ncm_corrigido if pr.revisao and pr.revisao.ncm_corrigido else pr.ncm_nota)
         pr.avaliacao = avaliar(pr.ncm, tabela)
         decidido = pr.revisao.monofasico if pr.revisao else None
@@ -133,11 +146,15 @@ def resumo(produtos: list[Produto]) -> dict:
 
 def serializar(db: Session, produtos: list[Produto]) -> list[dict]:
     nomes = {u.id: u.nome for u in db.scalars(select(Usuario))}
+    outros = {pr.revisao.planejamento_id for pr in produtos if pr.herdada}
+    periodos = {pl.id: f"{pl.competencia_inicial} a {pl.competencia_final}"
+                for pl in db.scalars(select(Planejamento).where(Planejamento.id.in_(outros)))} if outros else {}
     saida = []
     for pr in produtos:
         r, a = pr.revisao, pr.avaliacao
         saida.append({
-            "id_revisao": r.id if r else None,
+            "id_revisao": r.id if r and not pr.herdada else None,  # a herdada não se desfaz daqui: revisa-se de novo
+            "revisao_herdada": {"planejamento_id": r.planejamento_id, "periodo": periodos.get(r.planejamento_id)} if pr.herdada else None,
             "cod_produto": pr.cod_produto, "descricao": pr.descricao, "ncm_nota": pr.ncm_nota, "ncm": pr.ncm,
             "receita": pr.receita, "itens": pr.itens, "csts": sorted(pr.csts),
             "enquadramento": a.enquadramento.value, "fundamento": a.fundamento, "motivo_lei": a.motivo,

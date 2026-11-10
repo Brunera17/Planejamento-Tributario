@@ -18,14 +18,14 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import CompraMensal, DevolucaoMensal, ImportacaoNfe, NotaFiscal, NotaItem, Planejamento
 from app.utils.validacao import sem_acentos
 
 ZERO = Decimal("0")
-CFOP_DEVOLUCAO_VENDA = {1201, 1202, 2201, 2202}
+CFOP_DEVOLUCAO_VENDA = {1201, 1202, 2201, 2202, 1410, 1411, 2410, 2411}
 CFOP_COMPRA_REVENDA = {1102, 1403, 2102, 2403, 1101, 2101, 3102}
 CENTAVO = Decimal("0.01")
 
@@ -284,3 +284,46 @@ def _aplicar_entradas(db: Session, p: Planejamento, por_comp: dict, resumo: Resu
 
 def _brl(v: Decimal) -> str:
     return "R$ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def cfop_de_entrada(cfop: int) -> int:
+    """CFOP da nota do fornecedor (5xxx/6xxx/7xxx) visto por quem recebe (1xxx/2xxx/3xxx), como na escrituração:
+    5102 -> 1102 (compra para revenda), 5202 -> 1202 (devolução de venda), 5405 -> 1403 (compra com ST)."""
+    if cfop // 1000 in (5, 6, 7):
+        cfop -= 4000
+    return {1405: 1403, 2404: 2403, 2405: 2403}.get(cfop, cfop)
+
+
+def somar_entradas(db: Session, pid: int, comps) -> dict[str, tuple[Decimal, Decimal]]:
+    """Compras para revenda e devoluções de venda das notas de entrada, por competência."""
+    out: dict[str, list[Decimal]] = defaultdict(lambda: [ZERO, ZERO])
+    for c, cfop, v in db.execute(
+        select(NotaFiscal.competencia, NotaItem.cfop, func.sum(NotaItem.vl_total))
+        .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
+        .where(NotaFiscal.planejamento_id == pid, NotaFiscal.tipo == "ENTRADA", NotaFiscal.competencia.in_(list(comps)),
+               NotaItem.cfop.in_(CFOP_COMPRA_REVENDA | CFOP_DEVOLUCAO_VENDA))
+        .group_by(NotaFiscal.competencia, NotaItem.cfop)):
+        out[c][0 if cfop in CFOP_COMPRA_REVENDA else 1] += Decimal(str(v or 0))
+    return {c: (round(a, 2), round(b, 2)) for c, (a, b) in out.items()}
+
+
+def preencher_pelas_entradas(db: Session, p: Planejamento, antes: dict, depois: dict) -> list[str]:
+    """Compras e devoluções do mês pelas notas de entrada (XML). Preenche o mês vazio e atualiza o que veio das notas
+    numa importação anterior (o mesmo valor que as notas somavam); um valor digitado diferente é mantido, com aviso."""
+    avisos = []
+    for c in sorted(depois):
+        for i, modelo, nome in ((0, CompraMensal, "compras para revenda"), (1, DevolucaoMensal, "devoluções de venda")):
+            novo, anterior = depois[c][i], antes.get(c, (ZERO, ZERO))[i]
+            if novo == anterior:
+                continue
+            atual = db.scalar(select(modelo).where(modelo.planejamento_id == p.id, modelo.competencia == c))
+            if atual is None:
+                db.add(modelo(planejamento_id=p.id, competencia=c, valor=novo))
+                avisos.append(f"{c}: {nome} preenchidas com {_brl(novo)} pelas notas de entrada; confira se todas as notas do mês foram enviadas")
+            elif anterior and abs(atual.valor - anterior) <= CENTAVO:
+                atual.valor = novo
+                avisos.append(f"{c}: {nome} atualizadas para {_brl(novo)} com as notas novas")
+            elif abs(atual.valor - novo) > CENTAVO:
+                avisos.append(f"{c}: as notas de entrada somam {_brl(novo)} em {nome} e o informado é {_brl(atual.valor)}; "
+                              "o valor informado foi mantido")
+    return avisos
