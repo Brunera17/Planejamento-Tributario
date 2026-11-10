@@ -41,7 +41,7 @@ from app.schemas.planejamento import (
     StatusEntrada,
     ValorCompetencia,
 )
-from app.services import estoque_st, progresso, relatorio_contabil, retencao, revisao_produtos
+from app.services import estoque_st, planilha_mensal, progresso, relatorio_contabil, retencao, revisao_produtos
 from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
@@ -247,6 +247,54 @@ def gravar_folha(pid: int, valores: list[FolhaCompetencia], db: DB, _: UsuarioAt
     _alterou(db, p)
 
 
+def _movimento_atual(db: Session, pid: int) -> dict[str, dict]:
+    atuais: dict[str, dict] = {}
+    for modelo, campo in ((CompraMensal, "compras"), (DevolucaoMensal, "devolucoes")):
+        for m in db.scalars(select(modelo).where(modelo.planejamento_id == pid)):
+            atuais.setdefault(m.competencia, {})[campo] = m.valor
+    for f in db.scalars(select(FolhaMensal).where(FolhaMensal.planejamento_id == pid)):
+        atuais.setdefault(f.competencia, {}).update(folha=f.folha, pro_labore=f.pro_labore)
+    return atuais
+
+
+@router.get("/{pid}/planilha-mensal")
+def baixar_planilha_mensal(pid: int, db: DB, _: UsuarioAtual):
+    """Modelo .xlsx do movimento mensal, com as competências do planejamento e o que já foi informado."""
+    p = obter_planejamento(db, pid)
+    return Response(planilha_mensal.gerar_modelo(p.competencias(), _movimento_atual(db, pid)),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="movimento-mensal-{pid}.xlsx"'})
+
+
+@router.post("/{pid}/planilha-mensal")
+def importar_planilha_mensal(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
+    """Planilha padrão preenchida: grava compras, devoluções, folha e pró-labore; célula vazia não altera."""
+    p = obter_planejamento(db, pid)
+    _recusar_se_aprovado(db, p)
+    if not (arquivo.filename or "").lower().endswith(".xlsx"):
+        raise ErroNegocio("Envie a planilha padrão em .xlsx", 415)
+    try:
+        lidos = planilha_mensal.ler(ler_limitado(arquivo, get_settings().relatorio_contabil_max_mb))
+    except planilha_mensal.PlanilhaInvalida as e:
+        raise ErroNegocio(str(e), 422, {"arquivo": str(e)}) from e
+    for c in lidos:
+        _competencia_valida(p, c)
+    for modelo, campo in ((CompraMensal, "compras"), (DevolucaoMensal, "devolucoes")):
+        _gravar_mensal(db, p, modelo, [ValorCompetencia(competencia=c, valor=v[campo]) for c, v in lidos.items() if campo in v])
+    for c, v in lidos.items():
+        if not {"folha", "pro_labore"} & v.keys():
+            continue
+        f = db.scalar(select(FolhaMensal).where(FolhaMensal.planejamento_id == pid, FolhaMensal.competencia == c))
+        if f is None:
+            f = FolhaMensal(planejamento_id=pid, competencia=c)
+            db.add(f)
+        f.folha, f.pro_labore = v.get("folha", f.folha), v.get("pro_labore", f.pro_labore)
+    _alterou(db, p)
+    auditar("PLANILHA_MENSAL_IMPORTADA", usuario=u, planejamento=p, recurso_tipo="planejamento", recurso_id=pid,
+            detalhes={"arquivo": arquivo.filename, "competencias": sorted(lidos)})
+    return {"competencias": sorted(lidos), "valores": sum(len(v) for v in lidos.values())}
+
+
 @router.delete("/{pid}/composicao-compras", status_code=204)
 def apagar_composicao(pid: int, db: DB, _: UsuarioAtual):
     """Volta a origem das compras para o valor das notas (ou para pendente, sem notas de compra)."""
@@ -441,10 +489,13 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
                     nota.dest_contribuinte = n.dest_contribuinte  # notas de antes da leitura do indIEDest (DIFAL)
             log.append(f"NF {n.numero}: já importada" + (f"; base do ICMS-ST completada em {completados} item(ns)" if completados else ""))
             continue
-        if n.cnpj_emitente == p.empresa.cnpj and n.tipo_nf == 1:
-            tipo = "SAIDA"
+        if n.cnpj_emitente == p.empresa.cnpj:
+            # nota própria: venda (tpNF 1) ou entrada emitida pela empresa, como a devolução de venda (CFOP 1202)
+            tipo = "SAIDA" if n.tipo_nf == 1 else "ENTRADA"
         elif n.cnpj_destinatario == p.empresa.cnpj:
             tipo = "ENTRADA"
+            for i in n.itens:  # nota do fornecedor: o CFOP passa a ser o da entrada (5102 -> 1102)
+                i.cfop = relatorio_contabil.cfop_de_entrada(i.cfop)
         else:
             imp.ignorados += 1
             log.append(f"NF {n.numero}: empresa não é emitente nem destinatária")
@@ -456,6 +507,12 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
                            crt_emitente=n.crt_emitente, consumidor_final=n.consumidor_final,
                            dest_contribuinte=n.dest_contribuinte), n.itens))
         imp.importados += 1
+    # notas de fornecedor de importações antigas: o CFOP passa para o lado da entrada e o mês é recalculado
+    antigas = relatorio_contabil.entradas_com_cfop_do_fornecedor(db, pid)
+    comps_entrada = {nf["competencia"] for nf, _ in novas if nf["tipo"] == "ENTRADA"} | {c for _, c in antigas}
+    antes = relatorio_contabil.somar_entradas(db, pid, comps_entrada) if comps_entrada else {}
+    for item, _ in antigas:
+        item.cfop = relatorio_contabil.cfop_de_entrada(item.cfop)
     if novas:
         # INSERT em lote sem RETURNING (no SQLite o ORM inseriria nota a nota para saber cada id);
         # os ids vêm depois numa consulta pelas chaves
@@ -465,13 +522,17 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
         itens = [{"nota_fiscal_id": ids[nf["chave_acesso"]], **vars(i)} for nf, lidos in novas for i in lidos]
         for k in range(0, len(itens), LOTE_ITENS):
             db.execute(insert(NotaItem), itens[k:k + LOTE_ITENS])
+    avisos = []
+    if comps_entrada:
+        avisos = relatorio_contabil.preencher_pelas_entradas(db, p, antes, relatorio_contabil.somar_entradas(db, pid, comps_entrada))
     imp.status = "CONCLUIDA"
-    imp.log = "\n".join(log) or None
+    imp.log = "\n".join(log + avisos) or None
     _alterou(db, p)
     auditar("NFE_IMPORTADA", usuario=u, planejamento=p, recurso_tipo="importacao_nfe", recurso_id=imp.id,
             detalhes={"arquivo": nome, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados,
                       "erros": len(erros)})
-    return {"id": imp.id, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados, "log": log}
+    return {"id": imp.id, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados, "log": log,
+            "avisos": avisos}
 
 
 LOTE_ITENS = 1000  # itens por INSERT na importação de NF-e
@@ -570,7 +631,17 @@ def revisar_produto(pid: int, dados: RevisaoEntrada, db: DB, u: Contador):
     r.ncm_corrigido = dados.ncm_corrigido if dados.ncm_corrigido != dados.ncm_nota else None
     r.monofasico = dados.monofasico if condicional else None
     r.motivo, r.revisado_por, r.revisado_em = dados.motivo.strip(), u.id, datetime.now(UTC)
+    _revisao_da_empresa_mudou(db, p)
     _alterou(db, p)
+
+
+def _revisao_da_empresa_mudou(db: Session, p: Planejamento) -> None:
+    """A revisão vale para os outros planejamentos da empresa (os que não têm decisão própria sobre o produto)."""
+    db.flush()
+    for outro in db.scalars(select(Planejamento).where(Planejamento.empresa_id == p.empresa_id, Planejamento.id != p.id,
+                                                       Planejamento.status != "APROVADO")):
+        progresso.atualizar(db, outro)
+        marcar_desatualizada(db, outro.id)
 
 
 @router.delete("/{pid}/revisao/{revisao_id}", status_code=204)
@@ -580,6 +651,7 @@ def desfazer_revisao(pid: int, revisao_id: int, db: DB, _: Contador):
     if r is None or r.planejamento_id != pid:
         raise NaoEncontrado("Revisão")
     db.delete(r)
+    _revisao_da_empresa_mudou(db, p)
     _alterou(db, p)
 
 

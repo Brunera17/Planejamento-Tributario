@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
-import { api, lerSessao, mensagemErro } from "../api/cliente";
+import { api, baixarArquivo, lerSessao, mensagemErro } from "../api/cliente";
 import type { Bloco, Catalogo, Planejamento as TPlanejamento, SimulacaoResumo } from "../api/tipos";
 import { Badge, BarraProgresso, Botao, BotaoLink, Cabecalho, CampoMoeda, Card, EnvioArquivo, Erro, Ficha, Modal, Obrigatorio, Tabela, useConfirmacao } from "../components/ui";
 import { brl, competenciaExtenso, dataHora, editarMoeda, formatarCnpj, lerMoeda, REGIMES } from "../lib/formato";
@@ -121,7 +121,8 @@ function Coleta({ pid }: { pid: number }) {
     },
     onSuccess: (r) => {
       setRelatorios(null);
-      setLog(`${r.data.lidos} notas lidas: ${r.data.importados} importadas e ${r.data.ignorados} ignoradas.`);
+      const avisos: string[] = r.data.avisos ?? [];
+      setLog([`${r.data.lidos} notas lidas: ${r.data.importados} importadas e ${r.data.ignorados} ignoradas.`, ...avisos].join("\n"));
       atualizar();
     },
     onError: (e) => setErro(mensagemErro(e)),
@@ -149,13 +150,28 @@ function Coleta({ pid }: { pid: number }) {
     },
   });
 
+  const importarPlanilha = useMutation({
+    mutationFn: (f: File) => {
+      const fd = new FormData();
+      fd.append("arquivo", f);
+      return api.post<{ competencias: string[]; valores: number }>(`/planejamentos/${pid}/planilha-mensal`, fd);
+    },
+    onSuccess: (r) => {
+      setErro(null);
+      setRelatorios(null);
+      setLog(`Planilha importada: ${r.data.valores} valores em ${r.data.competencias.map(competenciaExtenso).join(", ")}.`);
+      atualizar();
+    },
+    onError: (e) => setErro(mensagemErro(e)),
+  });
+
   if (!data) return <p>Carregando…</p>;
   const mensal = (rota: string, c: string, v: number | null) => v != null && gravar.mutate({ rota, corpo: [{ competencia: c, valor: v }] });
 
   return (
     <div className="space-y-4">
       <Erro mensagem={erro} />
-      {log && <p className="text-sm">{log}</p>}
+      {log && <p className="whitespace-pre-line text-sm">{log}</p>}
       {relatorios && <ResumoImportacao resumos={relatorios} fechar={() => setRelatorios(null)} />}
       <Card
         titulo="Movimento mensal"
@@ -207,12 +223,14 @@ function Coleta({ pid }: { pid: number }) {
       <ImportarDocumentos
         aberto={importando}
         fechar={() => setImportando(false)}
-        enviando={importar.isPending || importarRelatorio.isPending}
+        enviando={importar.isPending || importarRelatorio.isPending || importarPlanilha.isPending}
         enviar={(tipo, arquivos) => {
           setImportando(false);
           if (tipo === "relatorio") importarRelatorio.mutate(arquivos);
+          else if (tipo === "planilha") importarPlanilha.mutate(arquivos[0]);
           else arquivos.forEach((f) => importar.mutate(f));
         }}
+        baixarModelo={() => baixarArquivo(`/planejamentos/${pid}/planilha-mensal`, "movimento-mensal.xlsx").catch((e) => setErro(mensagemErro(e)))}
       />
     </div>
   );
@@ -226,8 +244,14 @@ const TIPOS_IMPORTACAO = {
   },
   xml: {
     nome: "XML de NF-e",
-    detalhe: "Notas de saída avulsas ou num arquivo .zip. Preenchem o faturamento e a lista de produtos para revisão.",
+    detalhe:
+      "Notas de saída, de entrada ou de devolução, avulsas ou num arquivo .zip. As de saída preenchem o faturamento e a lista de produtos para revisão; as de entrada, as compras para revenda e as devoluções de venda do mês (sem apagar valor digitado).",
     formatos: [".xml", ".zip"],
+  },
+  planilha: {
+    nome: "Planilha padrão",
+    detalhe: "Compras, devoluções, folha e pró-labore por mês, no modelo do sistema. Célula vazia não altera o valor já informado.",
+    formatos: [".xlsx"],
   },
 };
 
@@ -236,11 +260,13 @@ function ImportarDocumentos({
   fechar,
   enviar,
   enviando,
+  baixarModelo,
 }: {
   aberto: boolean;
   fechar: () => void;
   enviar: (tipo: keyof typeof TIPOS_IMPORTACAO, arquivos: File[]) => void;
   enviando: boolean;
+  baixarModelo: () => void;
 }) {
   const [tipo, setTipo] = useState<keyof typeof TIPOS_IMPORTACAO>("relatorio");
   const [arquivos, setArquivos] = useState<File[]>([]);
@@ -248,7 +274,7 @@ function ImportarDocumentos({
   return (
     <Modal aberto={aberto} fechar={fechar} titulo="Importar documentos" descricao="Os valores lidos entram no movimento mensal; notas já importadas não são duplicadas.">
       <div className="space-y-4 text-sm">
-        <fieldset className="grid gap-2 sm:grid-cols-2">
+        <fieldset className="grid gap-2 sm:grid-cols-3">
           <legend className="mb-1 font-medium">Tipo de documento</legend>
           {(Object.keys(TIPOS_IMPORTACAO) as (keyof typeof TIPOS_IMPORTACAO)[]).map((k) => (
             <label key={k} className={`flex cursor-pointer gap-2 rounded border px-3 py-2 ${tipo === k ? "border-brand bg-highlight" : "border-border"}`}>
@@ -268,8 +294,18 @@ function ImportarDocumentos({
             </label>
           ))}
         </fieldset>
-        <p className="text-text-muted">{t.detalhe}</p>
-        <EnvioArquivo formatos={t.formatos} multiplo arquivos={arquivos} aoEscolher={setArquivos} />
+        <p className="text-text-muted">
+          {t.detalhe}
+          {tipo === "planilha" && (
+            <>
+              {" "}
+              <button type="button" className="font-medium text-brand underline underline-offset-2" onClick={baixarModelo}>
+                Baixar modelo
+              </button>
+            </>
+          )}
+        </p>
+        <EnvioArquivo formatos={t.formatos} multiplo={tipo !== "planilha"} arquivos={arquivos} aoEscolher={(fs) => setArquivos(tipo === "planilha" ? fs.slice(0, 1) : fs)} />
         <div className="flex justify-end gap-2 border-t border-surface pt-3">
           <Botao variante="secundario" onClick={fechar}>
             Cancelar
@@ -423,6 +459,7 @@ function Despesas({ pid }: { pid: number }) {
   };
 
   const gravarOutras = useMutation({
+    scope: { id: `despesas-${pid}` }, // na mesma fila do zerar: um não desfaz o outro
     mutationFn: (corpo: { outras: OutraDespesa[]; grupos_sem_outras: number[] }) => api.put(`/planejamentos/${pid}/levantamentos/${atual}`, corpo),
     onSuccess: () => {
       setErro(null);
@@ -431,6 +468,42 @@ function Despesas({ pid }: { pid: number }) {
     },
     onError: (e) => setErro(mensagemErro(e)),
   });
+
+  const [confirmar, janelaConfirmacao] = useConfirmacao();
+  // Mês sem despesas: todos os itens a 0,00 e "não" em todos os grupos, num PUT só. Fica na mesma fila das edições,
+  // e o `desejado` passa a 0: um lote que ainda estava esperando não traz o valor antigo de volta.
+  const zerar = useMutation({
+    scope: { id: `despesas-${pid}` },
+    mutationFn: (comp: string) =>
+      api.put(`/planejamentos/${pid}/levantamentos/${comp}`, {
+        // inativos também: um valor antigo de item inativo ainda entraria no cálculo
+        itens: catalogo.flatMap((g) => g.itens.map((i) => ({ item_despesa_id: i.id, valor: 0 }))),
+        outras: [],
+        grupos_sem_outras: catalogo.map((g) => g.id),
+      }),
+    onSuccess: (_r, comp) => {
+      setErro(null);
+      qc.invalidateQueries({ queryKey: ["levantamento", pid, comp] });
+      atualizar();
+    },
+    onError: (e, comp) => {
+      setErro(mensagemErro(e));
+      qc.invalidateQueries({ queryKey: ["levantamento", pid, comp] });
+    },
+  });
+  async function zerarMes() {
+    if (!atual) return;
+    const ok = await confirmar({
+      titulo: "Zerar despesas do mês",
+      mensagem: `Todos os itens de ${competenciaExtenso(atual)} ficam 0,00, as outras despesas lançadas são apagadas e "Possui outras despesas?" fica "Não" em todos os grupos.`,
+      confirmar: "Zerar despesas",
+      perigo: true,
+    });
+    if (!ok) return;
+    pendentes.current.delete(atual);
+    desejado.current.set(atual, new Map(catalogo.flatMap((g) => g.itens.map((i) => [i.id, 0] as const))));
+    zerar.mutate(atual);
+  }
 
   if (!atual || !lev) return <p>Carregando…</p>;
   const valor = (id: number) => lev.itens[String(id)];
@@ -448,8 +521,14 @@ function Despesas({ pid }: { pid: number }) {
             {competenciaExtenso(c)}
           </button>
         ))}
+        {editavel && (
+          <Botao variante="secundario" onClick={zerarMes} disabled={zerar.isPending}>
+            Zerar despesas do mês
+          </Botao>
+        )}
         <span className="ml-auto font-semibold">Total da competência: {brl(total)}</span>
       </div>
+      {janelaConfirmacao}
       <Erro mensagem={erro} />
       {!editavel && <p className="text-sm text-text-muted">Este mês foi enviado para conferência e está só para consulta. Para alterar, o contador devolve o planejamento para a coleta.</p>}
       {catalogo.map((g) => {

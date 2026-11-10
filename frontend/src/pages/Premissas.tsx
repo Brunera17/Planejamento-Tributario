@@ -17,7 +17,7 @@ type Coleta = {
   compras: Record<string, number>;
 };
 type Parametro = { chave: string; valor: number };
-type Marca = "notas" | "pgdas" | "pendente" | null;
+type Marca = "notas" | "pgdas" | "lei" | "pendente" | null;
 
 const MOEDAS = {
   rbt12_informado: { rotulo: "RBT12 (PGDAS-D)", ajuda: "Receita bruta dos últimos 12 meses. Com o extrato do PGDAS-D enviado em Documentos, vem preenchido; vazio, o sistema estima pela média do período × 12." },
@@ -71,15 +71,19 @@ function Info({ aberta, alternar, rotulo }: { aberta: boolean; alternar: () => v
 const MARCAS: Record<Exclude<Marca, null>, { texto: string; classe: string }> = {
   notas: { texto: "das notas", classe: "text-brand" },
   pgdas: { texto: "do PGDAS-D", classe: "text-brand" },
+  lei: { texto: "pela lei", classe: "text-brand" },
   pendente: { texto: "pendente", classe: "font-medium text-alert-ink" },
 };
 
 /** Bloco de um assunto: título e, dentro, os campos em ficha. */
-function Bloco({ titulo, colunas = 1, children }: { titulo: string; colunas?: 1 | 2 | 3; children: ReactNode }) {
+function Bloco({ titulo, colunas = 1, acao, children }: { titulo: string; colunas?: 1 | 2 | 3; acao?: ReactNode; children: ReactNode }) {
   const grade = { 1: "", 2: "sm:grid-cols-2", 3: "sm:grid-cols-3" }[colunas];
   return (
     <section>
-      <h3 className="mb-1.5 font-semibold">{titulo}</h3>
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <h3 className="font-semibold">{titulo}</h3>
+        {acao}
+      </div>
       <div className={`grid grid-cols-1 overflow-hidden rounded-md border-t border-l border-border bg-white ${grade}`}>{children}</div>
     </section>
   );
@@ -175,15 +179,17 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
   const comprasTotal = Object.values(coleta.compras).reduce((s, v) => s + Number(v), 0);
   const creditoSt = st?.taxa != null && lerMoeda(f.estoqueSt) != null ? lerMoeda(f.estoqueSt)! * st.taxa : null;
 
-  // o RBT12 automático vem do extrato do PGDAS-D enviado em Documentos; o resto, das notas importadas
-  const doPgdas = (k: string) => k === "rbt12_informado";
-  const marca = (k: string, vazio: boolean): Marca => (auto[k] && !informado(k) ? (doPgdas(k) ? "pgdas" : "notas") : vazio ? "pendente" : null);
+  // o RBT12 automático vem do extrato do PGDAS-D enviado em Documentos; o Tema 69, da decisão do STF; o resto, das notas
+  const origemAuto = (k: string): "pgdas" | "lei" | "notas" => (k === "rbt12_informado" ? "pgdas" : k === "excluir_icms_base_pis_cofins" ? "lei" : "notas");
+  const marca = (k: string, vazio: boolean): Marca => (auto[k] && !informado(k) ? origemAuto(k) : vazio ? "pendente" : null);
   const fonte = (k: string) =>
     auto[k] && !informado(k) ? (
       <span className="mt-1 block text-brand">
-        {doPgdas(k) ? "Do" : "Das notas:"} {auto[k].fonte}
+        {{ pgdas: "Do", lei: "Pela lei:", notas: "Das notas:" }[origemAuto(k)]} {auto[k].fonte}
       </span>
     ) : null;
+  const LR = ["adicoes_lr", "exclusoes_lr", "prejuizo_fiscal_compensar"] as const;
+  const lrVazios = LR.filter((k) => !f.moedas[k]);
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -317,7 +323,22 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
               </div>
             </Caixa>
           </Bloco>
-          <Bloco titulo="Lucro Real" colunas={3}>
+          <Bloco
+            titulo="Lucro Real"
+            colunas={3}
+            acao={
+              contador &&
+              lrVazios.length > 0 && (
+                <button
+                  type="button"
+                  className="text-xs text-brand underline underline-offset-2"
+                  onClick={() => mudar({ moedas: { ...f.moedas, ...Object.fromEntries(lrVazios.map((k) => [k, "0,00"])) } })}
+                >
+                  Não há (0,00 nos vazios)
+                </button>
+              )
+            }
+          >
             {moeda("adicoes_lr")}
             {moeda("exclusoes_lr")}
             {moeda("prejuizo_fiscal_compensar")}
@@ -440,7 +461,7 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
                     )}
                   </>
                 }
-                marca={informado(o.chave) ? null : auto[o.chave] ? "notas" : "pendente"}
+                marca={informado(o.chave) ? null : auto[o.chave] ? origemAuto(o.chave) : "pendente"}
                 checked={f.opcoes[o.chave]}
                 disabled={!contador}
                 onChange={(v) => mudar({ opcoes: { ...f.opcoes, [o.chave]: v } })}

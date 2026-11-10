@@ -119,6 +119,25 @@ def test_revisao_de_outra_empresa_nao_vaza(cliente, contador, pid):
     assert cliente.delete(f"/api/planejamentos/{outro}/revisao/{id_rev}", headers=contador).status_code == 404
 
 
+def test_revisao_vale_para_o_proximo_planejamento_da_empresa(cliente, contador, pid):
+    emp = cliente.get(f"/api/planejamentos/{pid}", headers=contador).json()["empresa_id"]
+    novo = cliente.post("/api/planejamentos", headers=contador, json={
+        "empresa_id": emp, "competencia_inicial": "2026-09", "competencia_final": "2026-09"}).json()["id"]
+    r = cliente.post(f"/api/planejamentos/{novo}/relatorio-contabil", headers=contador,
+                     files={"arquivo": ("SAIDAS.xls", gerar("Saídas", "09", ITENS), "application/vnd.ms-excel")})
+    assert r.status_code == 200, r.text
+
+    d1 = produto(revisao(cliente, contador, novo), "D1", "73181500")
+    assert (d1["revisado"], d1["ncm"], d1["id_revisao"]) == (True, "87083090", None)  # herdada: não se desfaz daqui
+    assert d1["revisao_herdada"]["planejamento_id"] == pid
+
+    # decisão própria no planejamento novo passa por cima da herdada e não mexe no anterior
+    assert put(cliente, contador, novo, cod_produto="D1", ncm_nota="73181500").status_code == 204
+    proprio = produto(revisao(cliente, contador, novo), "D1", "73181500")
+    assert (proprio["ncm"], proprio["revisao_herdada"]) == ("73181500", None) and proprio["id_revisao"]
+    assert produto(revisao(cliente, contador, pid), "D1", "73181500")["ncm"] == "87083090"
+
+
 def test_base_legal_consulta(cliente, analista):
     r = cliente.get("/api/tabelas/lei-monofasico?ncm=40169990", headers=analista).json()
     assert r["consulta"]["enquadramento"] == "CONDICIONAL" and len(r["itens"]) == 66

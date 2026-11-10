@@ -24,6 +24,8 @@ type Produto = {
   alertas: Alerta[];
   motivo: string | null;
   revisado_por: string | null;
+  revisado_em: string | null;
+  revisao_herdada: { planejamento_id: number; periodo: string | null } | null;
 };
 type TipoResumo = { rotulo: string; trava: boolean; produtos: number; receita: number };
 type Dados = {
@@ -166,6 +168,12 @@ export function Revisao({ pid }: { pid: number }) {
                   {p.revisado && (
                     <span className="block text-success-ink" title={p.motivo ?? ""}>
                       ✔ Revisado por {p.revisado_por}
+                      {p.revisao_herdada && (
+                        <span className="block text-xs text-text-muted">
+                          {p.revisado_em ? `em ${new Date(p.revisado_em).toLocaleDateString("pt-BR")}, ` : ""}no planejamento{" "}
+                          {p.revisao_herdada.periodo ?? `#${p.revisao_herdada.planejamento_id}`}
+                        </span>
+                      )}
                     </span>
                   )}
                 </td>

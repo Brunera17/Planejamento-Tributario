@@ -18,7 +18,8 @@ type Dados = {
   tipos: { id: number; nome: string }[];
   documentos: Documento[];
 };
-type Celula = { competencia: string; tipo: number; nome: string; editavel: boolean; doc?: Documento };
+type Celula = { competencia: string; tipo: number; nome: string; editavel: boolean; doc?: Documento; modo?: "arquivo" | "nao-se-aplica" };
+type Linha = { tipo: number; nome: string; competencias: string[] };
 
 const FORMATOS = [".pdf", ".xml", ".txt", ".xlsx", ".xls", ".csv", ".zip", ".jpg", ".jpeg", ".png"];
 
@@ -26,6 +27,7 @@ const FORMATOS = [".pdf", ".xml", ".txt", ".xlsx", ".xls", ".csv", ".zip", ".jpg
 export function Documentos({ pid }: { pid: number }) {
   const [erro, setErro] = useState<string | null>(null);
   const [aberta, setAberta] = useState<Celula | null>(null);
+  const [linha, setLinha] = useState<Linha | null>(null);
   const { data } = useQuery({
     queryKey: ["documentos", pid],
     queryFn: async () => (await api.get<Dados>(`/planejamentos/${pid}/documentos`)).data,
@@ -39,6 +41,7 @@ export function Documentos({ pid }: { pid: number }) {
   return (
     <div className="space-y-4">
       <Erro mensagem={erro} />
+      {linha && <NaoSeAplicaLinha pid={pid} linha={linha} fechar={() => setLinha(null)} />}
       {aberta && <EnvioDocumento pid={pid} celula={aberta} fechar={() => setAberta(null)} falhou={(e) => setErro(mensagemErro(e))} />}
       <Card titulo={faltam === 0 ? `Todos os ${esperados} documentos resolvidos` : `Faltam ${faltam} de ${esperados} documentos`} semPadding>
         <div className="overflow-x-auto">
@@ -55,10 +58,22 @@ export function Documentos({ pid }: { pid: number }) {
               </tr>
             </thead>
             <tbody>
-              {data.tipos.map((t) => (
+              {data.tipos.map((t) => {
+                // meses em que este documento ainda está pendente e dá para marcar
+                const abertos = data.competencias.filter((c) => c.editavel && !achar(c.competencia, t.id)).map((c) => c.competencia);
+                return (
                 <tr key={t.id} className="border-b border-surface last:border-0">
                   <th scope="row" className="max-w-64 px-4 py-2 text-left align-middle font-medium">
                     {t.nome}
+                    {abertos.length > 1 && (
+                      <button
+                        type="button"
+                        className="block text-xs font-normal text-brand underline-offset-2 hover:underline"
+                        onClick={() => setLinha({ tipo: t.id, nome: t.nome, competencias: abertos })}
+                      >
+                        Não se aplica nos {abertos.length} meses pendentes
+                      </button>
+                    )}
                   </th>
                   {data.competencias.map(({ competencia, editavel }) => {
                     const d = achar(competencia, t.id);
@@ -81,19 +96,32 @@ export function Documentos({ pid }: { pid: number }) {
                             )}
                             {!d && <span className="text-alert-ink">Pendente</span>}
                           </span>
-                          <Botao
-                            variante={!d && editavel ? "linha-destaque" : "linha"}
-                            aria-label={`${d ? "Abrir" : "Enviar"} ${t.nome} de ${competenciaExtenso(competencia)}`}
-                            onClick={() => setAberta(celula)}
-                          >
-                            {d ? "Abrir" : editavel ? "Enviar" : "Ver"}
-                          </Botao>
+                          <span className="flex shrink-0 gap-1">
+                            <Botao
+                              variante={!d && editavel ? "linha-destaque" : "linha"}
+                              aria-label={`${d ? "Abrir" : "Enviar"} ${t.nome} de ${competenciaExtenso(competencia)}`}
+                              onClick={() => setAberta(celula)}
+                            >
+                              {d ? "Abrir" : editavel ? "Enviar" : "Ver"}
+                            </Botao>
+                            {!d && editavel && (
+                              <Botao
+                                variante="linha"
+                                title="Não se aplica"
+                                aria-label={`Não se aplica: ${t.nome} de ${competenciaExtenso(competencia)}`}
+                                onClick={() => setAberta({ ...celula, modo: "nao-se-aplica" })}
+                              >
+                                N/A
+                              </Botao>
+                            )}
+                          </span>
                         </div>
                       </td>
                     );
                   })}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -105,7 +133,7 @@ export function Documentos({ pid }: { pid: number }) {
 function EnvioDocumento({ pid, celula, fechar, falhou }: { pid: number; celula: Celula; fechar: () => void; falhou: (e: unknown) => void }) {
   const qc = useQueryClient();
   const d = celula.doc;
-  const [modo, setModo] = useState<"arquivo" | "nao-se-aplica">(d?.nao_se_aplica ? "nao-se-aplica" : "arquivo");
+  const [modo, setModo] = useState<"arquivo" | "nao-se-aplica">(celula.modo ?? (d?.nao_se_aplica ? "nao-se-aplica" : "arquivo"));
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [justificativa, setJustificativa] = useState(d?.justificativa ?? "");
   const [removendo, setRemovendo] = useState(false);
@@ -214,6 +242,54 @@ function EnvioDocumento({ pid, celula, fechar, falhou }: { pid: number; celula: 
         ) : (
           <p className="text-text-muted">Este mês foi enviado para conferência e está só para consulta.</p>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+/** Mesma justificativa para todos os meses pendentes de um documento (ex.: tarifas de marketplace numa lanchonete). */
+function NaoSeAplicaLinha({ pid, linha, fechar }: { pid: number; linha: Linha; fechar: () => void }) {
+  const qc = useQueryClient();
+  const [justificativa, setJustificativa] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const marcar = useMutation({
+    mutationFn: async () => {
+      for (const c of linha.competencias)
+        await api.put(`/planejamentos/${pid}/documentos/${c}/${linha.tipo}/nao-se-aplica`, { justificativa: justificativa.trim(), somente_pendente: true });
+    },
+    onError: (e) => setErro(mensagemErro(e)),
+    onSettled: (_r, e) => {
+      // mesmo com erro no meio, os meses já marcados aparecem
+      qc.invalidateQueries({ queryKey: ["documentos", pid] });
+      qc.invalidateQueries({ queryKey: ["planejamento", String(pid)] });
+      qc.invalidateQueries({ queryKey: ["progresso", pid] });
+      if (!e) fechar();
+    },
+  });
+  return (
+    <Modal aberto fechar={fechar} titulo={linha.nome} descricao={`Não se aplica em ${linha.competencias.map(competenciaExtenso).join(", ")}`}>
+      <div className="space-y-4 text-sm">
+        <label className="block">
+          Por que este documento não se aplica?<Obrigatorio />
+          <textarea
+            autoFocus
+            rows={3}
+            maxLength={500}
+            placeholder="Ex.: a empresa não vende por marketplace"
+            className="mt-1 w-full rounded border border-border bg-white px-2 py-1.5"
+            value={justificativa}
+            onChange={(e) => setJustificativa(e.target.value)}
+          />
+        </label>
+        <Erro mensagem={erro} />
+        <div className="flex justify-end gap-2 border-t border-surface pt-3">
+          <Botao variante="secundario" onClick={fechar}>
+            Cancelar
+          </Botao>
+          <Botao disabled={justificativa.trim().length < 5 || marcar.isPending} onClick={() => marcar.mutate()}>
+            Marcar {linha.competencias.length} meses
+          </Botao>
+        </div>
       </div>
     </Modal>
   );

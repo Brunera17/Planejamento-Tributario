@@ -37,6 +37,7 @@ ROTULOS = {
     "vendas_b2c": "Vendas para consumidor final",
 }
 
+TEMA_69 = "Tema 69 do STF (RE 574.706): o ICMS destacado não compõe a base do PIS/COFINS, com efeitos desde 15/03/2017"
 SUL_SUDESTE = {"PR", "SC", "RS", "SP", "RJ", "MG"}  # o ES fica de fora (Resolução do Senado 22/1989)
 ORIGEM_IMPORTADA = {"1", "2", "3", "8"}  # Resolução do Senado 13/2012: 4% na operação interestadual
 CST_ST = {"10", "30", "60", "70"}
@@ -118,6 +119,10 @@ def derivar(db: Session, p: Planejamento) -> Automaticas:
     uf = p.empresa.uf
     out = Automaticas()
     comps = p.competencias()
+
+    # ---- Tema 69 do STF: decidido (RE 574.706, efeitos desde 15/03/2017), então vem ligado; o contador pode desligar
+    if min(comps) >= "2017-03":  # período anterior aos efeitos da modulação fica pendente
+        out.premissas["excluir_icms_base_pis_cofins"] = Derivada(True, TEMA_69)
 
     # ---- extrato do PGDAS-D enviado em Documentos: RBT12 declarado
     extrato = pgdas.do_planejamento(db, p)
