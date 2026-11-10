@@ -160,8 +160,11 @@ importações (`importacao_nfe`), as compras, as devoluções, a folha, as despe
   notas, como estavam na aprovação;
 - importar notas num planejamento aprovado é recusado (409). A aprovação trava a linha do planejamento (Postgres),
   então uma importação ou outra aprovação simultânea espera a primeira terminar;
-- a tela de coleta não mostra mais as premissas tiradas das notas nem o detalhe do crédito do estoque da ST. Os valores
-  usados ficam na simulação aprovada;
+- antes de apagar, o que a tela mostra a partir das notas é gravado como retrato na simulação aprovada
+  (`entrada_json.das_notas`): premissas automáticas, composição das compras, indício de ST, resumo das saídas por
+  competência e crédito do estoque que saiu da ST. Enquanto o planejamento estiver aprovado, a coleta e o estoque da ST
+  são lidos desse retrato (`services/retencao.py`). Planejamentos aprovados antes da retenção não têm retrato e
+  continuam calculando a partir das notas, que ainda existem;
 - a simulação de crescimento para outros RBT12 fica indisponível (422); os valores calculados continuam na tela;
 - a simulação aprovada não pode ser recalculada a partir das notas. Ela continua reproduzível pela memória de cálculo
   gravada;

@@ -5,15 +5,13 @@ import json
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.erros import ErroNegocio
 from app.models import (
     HistoricoStatus,
     MemoriaCalculo,
-    NotaFiscal,
-    NotaItem,
     OportunidadeRegistro,
     Planejamento,
     Simulacao,
@@ -21,7 +19,7 @@ from app.models import (
 )
 from app.motor import simular
 from app.motor.tipos import Memoria
-from app.services import memoria_calculo, progresso
+from app.services import memoria_calculo, progresso, retencao
 from app.services.entrada import montar_entrada
 from app.services.serializacao import hash_entrada, para_json
 
@@ -99,21 +97,12 @@ def aprovar(db: Session, sim: Simulacao, usuario_id: int) -> Simulacao:
         raise ErroNegocio("Envie os dados para conferência, confirme a conferência e simule de novo antes de aprovar")
     sim.aprovada_por = usuario_id
     sim.aprovada_em = datetime.now(UTC)
-    notas, itens = apagar_notas(db, p.id)
+    notas, itens = retencao.apagar_notas(db, sim)
     db.add(HistoricoStatus(planejamento_id=p.id, status_de=p.status, status_para="APROVADO", usuario_id=usuario_id,
                            motivo=f"Simulação v{sim.versao} aprovada; {notas} notas e {itens} itens apagados"))
     p.status = "APROVADO"
     db.commit()
     return sim
-
-
-def apagar_notas(db: Session, planejamento_id: int) -> tuple[int, int]:
-    """Retenção: aprovada a simulação, as notas e os itens deixam de ser guardados (são o grosso do banco).
-    O resultado, a memória de cálculo e o relatório ficam; reabrir o planejamento exige importar as notas de novo."""
-    ids = select(NotaFiscal.id).where(NotaFiscal.planejamento_id == planejamento_id).scalar_subquery()
-    itens = db.execute(delete(NotaItem).where(NotaItem.nota_fiscal_id.in_(ids))).rowcount
-    notas = db.execute(delete(NotaFiscal).where(NotaFiscal.planejamento_id == planejamento_id)).rowcount
-    return notas, itens
 
 
 def marcar_desatualizada(db: Session, planejamento_id: int) -> None:

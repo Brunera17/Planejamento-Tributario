@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import Response
 from pydantic import Field
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual, obter_planejamento
@@ -41,7 +41,7 @@ from app.schemas.planejamento import (
     StatusEntrada,
     ValorCompetencia,
 )
-from app.services import estoque_st, premissas_auto, progresso, relatorio_contabil, revisao_produtos
+from app.services import estoque_st, progresso, relatorio_contabil, retencao, revisao_produtos
 from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
@@ -194,7 +194,6 @@ def ver_coleta(pid: int, db: DB, _: UsuarioAtual):
     def mensal(modelo):
         return {m.competencia: m.valor for m in db.scalars(select(modelo).where(modelo.planejamento_id == pid))}
 
-    auto = premissas_auto.derivar(db, p)
     return {
         "competencias": p.competencias(),
         "compras": mensal(CompraMensal),
@@ -205,19 +204,8 @@ def ver_coleta(pid: int, db: DB, _: UsuarioAtual):
                                for o in db.scalars(select(CompraOrigem).where(CompraOrigem.planejamento_id == pid))],
         "premissas": {pr.chave: json.loads(pr.valor) for pr in
                       db.scalars(select(PremissaPlanejamento).where(PremissaPlanejamento.planejamento_id == pid))},
-        # valores tirados das notas: valem enquanto o contador não informar outro
-        "premissas_auto": {k: {"valor": d.valor, "fonte": d.fonte} for k, d in auto.premissas.items()},
-        "composicao_auto": auto.composicao and {
-            "linhas": [{"aliquota": a, "percentual": v} for a, v in sorted(auto.composicao.items(), reverse=True)],
-            "fonte": auto.fonte_composicao,
-        },
-        "indicio_st": auto.indicio_st,
-        "saidas": [{"competencia": c, "notas": n, "itens": i, "valor": v} for c, n, i, v in db.execute(
-            select(NotaFiscal.competencia, func.count(func.distinct(NotaFiscal.id)), func.count(NotaItem.id),
-                   func.sum(NotaItem.vl_total))
-            .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
-            .where(NotaFiscal.planejamento_id == pid, NotaFiscal.tipo == "SAIDA")
-            .group_by(NotaFiscal.competencia).order_by(NotaFiscal.competencia))],
+        # premissas_auto, composicao_auto, indicio_st e saidas: das notas, ou do retrato gravado na aprovação
+        **retencao.ler(db, p, "coleta"),
     }
 
 
@@ -603,16 +591,7 @@ class EstoqueStEntrada(Esquema):
 
 
 def _estoque_st(db: Session, p: Planejamento) -> dict | None:
-    e = estoque_st.calcular(db, p)
-    if e is None:
-        return None
-    return {
-        "corte": e.corte, "norma": e.norma, "segmentos": e.segmentos, "ncms": e.ncms, "regime_rpa": e.regime_rpa,
-        "estoque": e.estoque, "taxa": e.taxa, "credito": e.credito, "inicio_uso": e.inicio_uso, "sem_base": e.sem_base,
-        "parcelas": [{"competencia": c, "valor": v} for c, v in e.parcelas()],
-        "entradas": [vars(x) for x in sorted(e.entradas, key=lambda x: x.data, reverse=True)],
-        "fundamento": estoque_st.FUNDAMENTO,
-    }
+    return retencao.ler(db, p, "estoque_st")
 
 
 @router.get("/{pid}/estoque-st")
