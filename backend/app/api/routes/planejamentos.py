@@ -85,7 +85,7 @@ def _saida(p: Planejamento) -> PlanejamentoSaida:
 def _recusar_se_aprovado(db: Session, p: Planejamento) -> None:
     """Importar notas num planejamento aprovado desfaria a retenção. A linha fica travada (Postgres) até o fim da
     importação, então uma aprovação simultânea espera e não apaga notas que ainda estão entrando."""
-    db.refresh(p, with_for_update=True)
+    db.refresh(p, with_for_update={"of": Planejamento})  # só a linha do planejamento: a empresa vem por outer join
     if p.status == "APROVADO":
         raise ErroNegocio("Planejamento aprovado: reabra-o (volta para Em coleta) antes de importar notas", 409)
 
