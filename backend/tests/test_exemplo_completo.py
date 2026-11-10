@@ -1,13 +1,16 @@
 """O exemplo da carga precisa chegar a 100%, sem pendências, aprovado e com PDF final."""
 import io
+import json
+from fastapi.encoders import jsonable_encoder
 from pypdf import PdfReader
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from decimal import Decimal
 
-from app.models import FolhaMensal, ItemDespesa, Levantamento, LevantamentoItem, RelatorioPdf, Simulacao
+from app.models import (FolhaMensal, HistoricoStatus, ItemDespesa, Levantamento, LevantamentoItem, NotaFiscal, NotaItem,
+                        Planejamento, RelatorioPdf, Simulacao, Usuario)
 from app.seeds.exemplo import carregar_exemplo, concluir_exemplo
-from app.services import progresso, relatorio_pdf
+from app.services import progresso, relatorio_pdf, retencao
 from app.services.entrada import ITEM_FOLHA, montar_entrada
 
 
@@ -18,6 +21,12 @@ def test_exemplo_completo(fabrica_sessao):
         pct, blocos = progresso.calcular(db, p)
         assert pct == 100, [(b.codigo, b.pendencias[:3]) for b in blocos if b.pendencias]
         assert all(b.preenchidos == b.esperados for b in blocos)
+        ids_notas = select(NotaFiscal.id).where(NotaFiscal.planejamento_id == p.id)
+        n_notas = db.scalar(select(func.count()).select_from(ids_notas.subquery()))
+        n_itens = db.scalar(select(func.count()).select_from(NotaItem).where(NotaItem.nota_fiscal_id.in_(ids_notas)))
+        assert n_notas and n_itens
+        antes = {parte: jsonable_encoder(retencao.ler(db, p, parte)) for parte in retencao.PARTES}  # como a API devolve
+        assert antes["coleta"]["saidas"] and antes["coleta"]["premissas_auto"] and antes["estoque_st"]
 
         concluir_exemplo(db, p)
         sim = db.scalar(select(Simulacao).where(Simulacao.planejamento_id == p.id))
@@ -34,6 +43,50 @@ def test_exemplo_completo(fabrica_sessao):
 
         concluir_exemplo(db, carregar_exemplo(db))  # repetir a carga não duplica
         assert len(db.scalars(select(Simulacao).where(Simulacao.planejamento_id == p.id)).all()) == 1
+
+        # retenção: aprovada a simulação, as notas e os itens são apagados; o PDF final continua sem pendências
+        assert db.scalar(select(func.count()).select_from(NotaFiscal).where(NotaFiscal.planejamento_id == p.id)) == 0
+        assert db.scalar(select(func.count()).select_from(NotaItem)
+                         .where(NotaItem.nota_fiscal_id.not_in(select(NotaFiscal.id)))) == 0
+        motivo = db.scalar(select(HistoricoStatus.motivo).where(HistoricoStatus.planejamento_id == p.id,
+                                                                 HistoricoStatus.status_para == "APROVADO"))
+        assert motivo == f"Simulação v{sim.versao} aprovada; {n_notas} notas e {n_itens} itens apagados"
+        assert progresso.calcular(db, p)[0] == 100  # sem as notas, o aprovado não volta a acusar saídas pendentes
+        # a tela continua mostrando o que vinha das notas, pelo retrato gravado na simulação aprovada
+        assert {parte: retencao.ler(db, p, parte) for parte in retencao.PARTES} == antes
+        contador = db.scalar(select(Usuario).where(Usuario.usuario == "contador"))
+        dados = relatorio_pdf.coletar(db, sim, contador, None)
+        assert (dados.progresso, dados.pendencias, dados.preliminar) == (100, [], False)
+
+
+def test_reabrir_aprovado_exige_notas_de_novo(cliente, contador, fabrica_sessao):
+    with fabrica_sessao() as db:
+        p = carregar_exemplo(db)
+        concluir_exemplo(db, p)
+        db.commit()
+        pid = p.id
+        sim = db.scalar(select(Simulacao).where(Simulacao.planejamento_id == pid))
+        sid, gravado = sim.id, json.loads(sim.resultado_json)["crescimento"]
+    r = cliente.get(f"/api/simulacoes/{sid}/crescimento", headers=contador, params={"rbt12": ["3000000"]})
+    assert r.status_code == 422 and "apagadas" in r.json()["erro"]
+    r = cliente.get(f"/api/simulacoes/{sid}/crescimento", headers=contador)
+    assert r.status_code == 200 and r.json() == gravado and gravado  # os valores gravados continuam
+    assert cliente.get(f"/api/planejamentos/{pid}/progresso", headers=contador).json()["progresso"] == 100
+    assert len(cliente.get(f"/api/planejamentos/{pid}/coleta", headers=contador).json()["saidas"]) == 3  # do retrato
+    assert cliente.get(f"/api/planejamentos/{pid}/estoque-st", headers=contador).json()["corte"] == "2026-09-30"
+
+    xml = b"<nfeProc/>"  # o conteúdo nem é lido: a recusa vem antes
+    r = cliente.post(f"/api/planejamentos/{pid}/nfe", headers=contador, files={"arquivo": ("n.xml", xml)})
+    assert r.status_code == 409 and "aprovado" in r.json()["erro"]
+
+    r = cliente.post(f"/api/planejamentos/{pid}/status", headers=contador, json={"status": "EM_COLETA", "motivo": "Refazer"})
+    assert r.status_code == 200 and r.json()["progresso"] < 100  # reaberto, as notas apagadas voltam a faltar
+    assert cliente.get(f"/api/planejamentos/{pid}/coleta", headers=contador).json()["saidas"] == []  # volta ao cálculo
+    r = cliente.post(f"/api/planejamentos/{pid}/simulacoes", headers=contador)
+    assert r.status_code == 422 and "Importe as notas" in r.json()["erro"]  # nunca simula com receita zero
+    with fabrica_sessao() as db:  # o exemplo é compartilhado pela suíte: volta a ficar aprovado
+        db.get(Planejamento, pid).status = "APROVADO"
+        db.commit()
 
 
 def test_folha_nao_e_deduzida_duas_vezes(fabrica_sessao):

@@ -19,7 +19,7 @@ from app.models import (
 )
 from app.motor import simular
 from app.motor.tipos import Memoria
-from app.services import memoria_calculo, progresso
+from app.services import memoria_calculo, progresso, retencao
 from app.services.entrada import montar_entrada
 from app.services.serializacao import hash_entrada, para_json
 
@@ -91,13 +91,15 @@ def aprovar(db: Session, sim: Simulacao, usuario_id: int) -> Simulacao:
         raise ErroNegocio("Simulação desatualizada: execute uma nova simulação antes de aprovar")
     if sim.tipo != "FINAL":
         raise ErroNegocio("Somente simulações sem pendências podem ser aprovadas", campos={"pendencias": sim.pendencias or ""})
-    p = db.get(Planejamento, sim.planejamento_id)
+    # trava a linha (Postgres): duas aprovações ou uma importação ao mesmo tempo esperam esta terminar
+    p = db.get(Planejamento, sim.planejamento_id, with_for_update={"of": Planejamento}, populate_existing=True)
     if p.status != "SIMULADO":
         raise ErroNegocio("Envie os dados para conferência, confirme a conferência e simule de novo antes de aprovar")
     sim.aprovada_por = usuario_id
     sim.aprovada_em = datetime.now(UTC)
+    notas, itens = retencao.apagar_notas(db, sim)
     db.add(HistoricoStatus(planejamento_id=p.id, status_de=p.status, status_para="APROVADO", usuario_id=usuario_id,
-                           motivo=f"Simulação v{sim.versao} aprovada"))
+                           motivo=f"Simulação v{sim.versao} aprovada; {notas} notas e {itens} itens apagados"))
     p.status = "APROVADO"
     db.commit()
     return sim

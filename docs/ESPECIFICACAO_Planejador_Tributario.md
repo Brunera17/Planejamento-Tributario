@@ -151,6 +151,26 @@ Em coleta ──► Em conferência ──► Pronto para simular ──► Simu
 
 Cada transição é gravada em `historico_status` (usuário, data, motivo).
 
+**Retenção das notas fiscais:** na aprovação, as notas e os itens de NF-e do planejamento (importados por XML ou pelo
+relatório contábil) são apagados, porque são a maior parte do banco. O motivo da aprovação no histórico registra quantos
+foram apagados. Ficam a simulação aprovada (resultado e memória de cálculo), o relatório PDF com o hash, as
+importações (`importacao_nfe`), as compras, as devoluções, a folha, as despesas e a revisão de produtos. Consequências:
+
+- no planejamento aprovado, o progresso (tela e PDF) conta como completos o bloco de saídas e as premissas tiradas das
+  notas, como estavam na aprovação;
+- importar notas num planejamento aprovado é recusado (409). A aprovação trava a linha do planejamento (Postgres),
+  então uma importação ou outra aprovação simultânea espera a primeira terminar;
+- antes de apagar, o que a tela mostra a partir das notas é gravado como retrato na simulação aprovada
+  (`entrada_json.das_notas`): premissas automáticas, composição das compras, indício de ST, resumo das saídas por
+  competência e crédito do estoque que saiu da ST. Enquanto o planejamento estiver aprovado, a coleta e o estoque da ST
+  são lidos desse retrato (`services/retencao.py`). Planejamentos aprovados antes da retenção não têm retrato e
+  continuam calculando a partir das notas, que ainda existem;
+- a simulação de crescimento para outros RBT12 fica indisponível (422); os valores calculados continuam na tela;
+- a simulação aprovada não pode ser recalculada a partir das notas. Ela continua reproduzível pela memória de cálculo
+  gravada;
+- reabrir um planejamento aprovado (volta a "Em coleta") exige importar as notas de novo: sem notas de saída, a
+  simulação é recusada e o progresso é recalculado na hora, com o bloco de saídas pendente.
+
 ### 3.4 Módulo de coleta (entradas do motor)
 
 #### a) Levantamento de despesas — mantido do documento original
