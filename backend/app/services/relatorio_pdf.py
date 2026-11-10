@@ -299,8 +299,7 @@ def coletar(db: Session, sim: Simulacao, usuario: Usuario, recomendacao: list[st
     r = json.loads(sim.resultado_json)
     r["memoria"] = {"passos": memoria_calculo.passos(db, sim)}  # a memória fica na tabela, não no JSON
     comps = p.competencias()
-    # aprovada = simulação FINAL, sem pendências; as notas já foram apagadas e o cálculo ao vivo acusaria falta delas
-    pct_prog, blocos = (100, []) if sim.aprovada_em else progresso.calcular(db, p)
+    pct_prog, blocos = progresso.calcular(db, p)
 
     motivos = []
     if sim.tipo != "FINAL":

@@ -1,5 +1,6 @@
 """O exemplo da carga precisa chegar a 100%, sem pendências, aprovado e com PDF final."""
 import io
+import json
 from pypdf import PdfReader
 from sqlalchemy import func, select
 
@@ -19,6 +20,10 @@ def test_exemplo_completo(fabrica_sessao):
         pct, blocos = progresso.calcular(db, p)
         assert pct == 100, [(b.codigo, b.pendencias[:3]) for b in blocos if b.pendencias]
         assert all(b.preenchidos == b.esperados for b in blocos)
+        ids_notas = select(NotaFiscal.id).where(NotaFiscal.planejamento_id == p.id)
+        n_notas = db.scalar(select(func.count()).select_from(ids_notas.subquery()))
+        n_itens = db.scalar(select(func.count()).select_from(NotaItem).where(NotaItem.nota_fiscal_id.in_(ids_notas)))
+        assert n_notas and n_itens
 
         concluir_exemplo(db, p)
         sim = db.scalar(select(Simulacao).where(Simulacao.planejamento_id == p.id))
@@ -42,7 +47,8 @@ def test_exemplo_completo(fabrica_sessao):
                          .where(NotaItem.nota_fiscal_id.not_in(select(NotaFiscal.id)))) == 0
         motivo = db.scalar(select(HistoricoStatus.motivo).where(HistoricoStatus.planejamento_id == p.id,
                                                                  HistoricoStatus.status_para == "APROVADO"))
-        assert "notas e" in motivo and "itens apagados" in motivo
+        assert motivo == f"Simulação v{sim.versao} aprovada; {n_notas} notas e {n_itens} itens apagados"
+        assert progresso.calcular(db, p)[0] == 100  # sem as notas, o aprovado não volta a acusar saídas pendentes
         contador = db.scalar(select(Usuario).where(Usuario.usuario == "contador"))
         dados = relatorio_pdf.coletar(db, sim, contador, None)
         assert (dados.progresso, dados.pendencias, dados.preliminar) == (100, [], False)
@@ -54,13 +60,20 @@ def test_reabrir_aprovado_exige_notas_de_novo(cliente, contador, fabrica_sessao)
         concluir_exemplo(db, p)
         db.commit()
         pid = p.id
-        sid = db.scalar(select(Simulacao.id).where(Simulacao.planejamento_id == pid))
+        sim = db.scalar(select(Simulacao).where(Simulacao.planejamento_id == pid))
+        sid, gravado = sim.id, json.loads(sim.resultado_json)["crescimento"]
     r = cliente.get(f"/api/simulacoes/{sid}/crescimento", headers=contador, params={"rbt12": ["3000000"]})
     assert r.status_code == 422 and "apagadas" in r.json()["erro"]
-    assert cliente.get(f"/api/simulacoes/{sid}/crescimento", headers=contador).status_code == 200  # valores gravados
+    r = cliente.get(f"/api/simulacoes/{sid}/crescimento", headers=contador)
+    assert r.status_code == 200 and r.json() == gravado and gravado  # os valores gravados continuam
+    assert cliente.get(f"/api/planejamentos/{pid}/progresso", headers=contador).json()["progresso"] == 100
+
+    xml = b"<nfeProc/>"  # o conteúdo nem é lido: a recusa vem antes
+    r = cliente.post(f"/api/planejamentos/{pid}/nfe", headers=contador, files={"arquivo": ("n.xml", xml)})
+    assert r.status_code == 409 and "aprovado" in r.json()["erro"]
 
     r = cliente.post(f"/api/planejamentos/{pid}/status", headers=contador, json={"status": "EM_COLETA", "motivo": "Refazer"})
-    assert r.status_code == 200
+    assert r.status_code == 200 and r.json()["progresso"] < 100  # reaberto, as notas apagadas voltam a faltar
     r = cliente.post(f"/api/planejamentos/{pid}/simulacoes", headers=contador)
     assert r.status_code == 422 and "Importe as notas" in r.json()["erro"]  # nunca simula com receita zero
     with fabrica_sessao() as db:  # o exemplo é compartilhado pela suíte: volta a ficar aprovado

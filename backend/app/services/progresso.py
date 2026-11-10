@@ -74,8 +74,9 @@ def calcular(db: Session, p: Planejamento) -> tuple[int, list[Bloco]]:
 
     comps_saida = set(db.scalars(select(NotaFiscal.competencia).where(
         NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA").distinct()))
+    aprovado = p.status == "APROVADO"  # as notas foram apagadas na aprovação, mas estavam completas
     for c in comps:
-        b["SAIDAS"].ok() if c in comps_saida else b["SAIDAS"].falta(c, "Notas fiscais de saída")
+        b["SAIDAS"].ok() if aprovado or c in comps_saida else b["SAIDAS"].falta(c, "Notas fiscais de saída")
 
     levs = {lv.competencia: lv for lv in db.scalars(select(Levantamento).where(Levantamento.planejamento_id == p.id))}
     itens = db.scalars(select(ItemDespesa).where(ItemDespesa.ativo).order_by(ItemDespesa.grupo_id, ItemDespesa.ordem)).all()
@@ -128,7 +129,7 @@ def calcular(db: Session, p: Planejamento) -> tuple[int, list[Bloco]]:
 
     faltam = premissas_auto.faltantes(db, p)
     for chave, rotulo in premissas_auto.ROTULOS.items():
-        b["PREMISSAS"].falta(None, rotulo) if chave in faltam else b["PREMISSAS"].ok()
+        b["PREMISSAS"].falta(None, rotulo) if chave in faltam and not aprovado else b["PREMISSAS"].ok()
 
     valor = sum(x.peso * x.fracao for x in b.values())
     tudo_ok = all(x.preenchidos == x.esperados for x in b.values())

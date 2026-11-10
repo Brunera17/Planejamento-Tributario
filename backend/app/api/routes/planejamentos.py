@@ -82,6 +82,14 @@ def _saida(p: Planejamento) -> PlanejamentoSaida:
         criado_em=p.criado_em, documentos_faltando=faltam, documentos_recebidos_em=recebidos_em)
 
 
+def _recusar_se_aprovado(db: Session, p: Planejamento) -> None:
+    """Importar notas num planejamento aprovado desfaria a retenção. A linha fica travada (Postgres) até o fim da
+    importação, então uma aprovação simultânea espera e não apaga notas que ainda estão entrando."""
+    db.refresh(p, with_for_update=True)
+    if p.status == "APROVADO":
+        raise ErroNegocio("Planejamento aprovado: reabra-o (volta para Em coleta) antes de importar notas", 409)
+
+
 def _alterou(db: Session, p: Planejamento) -> None:
     """Toda gravação de dado de entrada recalcula o progresso e desatualiza as simulações."""
     db.flush()
@@ -152,6 +160,7 @@ def alterar_status(pid: int, dados: StatusEntrada, db: DB, u: UsuarioAtual):
     if dados.status == "EM_CONFERENCIA":
         valores["enviado_em"] = datetime.now(UTC)
     db.execute(update(Levantamento).where(Levantamento.planejamento_id == pid).values(**valores))
+    progresso.atualizar(db, p)  # reaberto depois da aprovação, as notas apagadas voltam a faltar
     db.commit()
     return _saida(p)
 
@@ -401,6 +410,7 @@ def gravar_levantamento(pid: int, competencia: str, dados: LevantamentoEntrada, 
 def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     """XML de NF-e avulso ou .zip com vários XML. Notas já importadas (mesma chave) são ignoradas."""
     p = obter_planejamento(db, pid)
+    _recusar_se_aprovado(db, p)
     nome = arquivo.filename or "arquivo"
     if not nome.lower().endswith((".xml", ".zip")):
         raise ErroNegocio("Envie um XML de NF-e ou um .zip com XMLs", 415)
@@ -505,6 +515,7 @@ def _itens_sem_st(db: Session, notas: list[NotaFiscal]) -> dict[int, list[NotaIt
 def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     """Relatório "Movimentação de Produtos – ICMS – PIS – COFINS" do Domínio (.xls ou .xlsx), de saídas ou de entradas."""
     p = obter_planejamento(db, pid)
+    _recusar_se_aprovado(db, p)
     nome = arquivo.filename or "relatorio.xls"
     if not nome.lower().endswith((".xls", ".xlsx")):
         raise ErroNegocio("Envie o relatório em .xls ou .xlsx", 415)

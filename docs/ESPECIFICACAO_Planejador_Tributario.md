@@ -156,13 +156,17 @@ relatório contábil) são apagados, porque são a maior parte do banco. O motiv
 foram apagados. Ficam a simulação aprovada (resultado e memória de cálculo), o relatório PDF com o hash, as
 importações (`importacao_nfe`), as compras, as devoluções, a folha, as despesas e a revisão de produtos. Consequências:
 
-- o PDF da simulação aprovada mostra progresso de 100% e nenhuma pendência, como na aprovação, sem recalcular a partir
-  das notas;
+- no planejamento aprovado, o progresso (tela e PDF) conta como completos o bloco de saídas e as premissas tiradas das
+  notas, como estavam na aprovação;
+- importar notas num planejamento aprovado é recusado (409). A aprovação trava a linha do planejamento (Postgres),
+  então uma importação ou outra aprovação simultânea espera a primeira terminar;
+- a tela de coleta não mostra mais as premissas tiradas das notas nem o detalhe do crédito do estoque da ST. Os valores
+  usados ficam na simulação aprovada;
 - a simulação de crescimento para outros RBT12 fica indisponível (422); os valores calculados continuam na tela;
 - a simulação aprovada não pode ser recalculada a partir das notas. Ela continua reproduzível pela memória de cálculo
   gravada;
 - reabrir um planejamento aprovado (volta a "Em coleta") exige importar as notas de novo: sem notas de saída, a
-  simulação é recusada e o bloco de saídas fica pendente.
+  simulação é recusada e o progresso é recalculado na hora, com o bloco de saídas pendente.
 
 ### 3.4 Módulo de coleta (entradas do motor)
 

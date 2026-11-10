@@ -93,7 +93,8 @@ def aprovar(db: Session, sim: Simulacao, usuario_id: int) -> Simulacao:
         raise ErroNegocio("Simulação desatualizada: execute uma nova simulação antes de aprovar")
     if sim.tipo != "FINAL":
         raise ErroNegocio("Somente simulações sem pendências podem ser aprovadas", campos={"pendencias": sim.pendencias or ""})
-    p = db.get(Planejamento, sim.planejamento_id)
+    # trava a linha (Postgres): duas aprovações ou uma importação ao mesmo tempo esperam esta terminar
+    p = db.get(Planejamento, sim.planejamento_id, with_for_update=True, populate_existing=True)
     if p.status != "SIMULADO":
         raise ErroNegocio("Envie os dados para conferência, confirme a conferência e simule de novo antes de aprovar")
     sim.aprovada_por = usuario_id
