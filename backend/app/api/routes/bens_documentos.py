@@ -51,6 +51,7 @@ class BemSaida(Esquema):
 
 class NaoSeAplica(Esquema):
     justificativa: str = Field(min_length=5, max_length=500)
+    somente_pendente: bool = False  # marcação em lote: não substitui documento enviado enquanto a tela estava aberta
 
 
 def _progresso(db: Session, p: Planejamento) -> None:
@@ -181,6 +182,8 @@ def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFi
 def marcar_nao_se_aplica(pid: int, competencia: str, tipo_id: int, dados: NaoSeAplica, db: DB, u: UsuarioAtual):
     p = obter_planejamento(db, pid)
     doc = _documento(db, _levantamento(db, p, competencia, u.id), tipo_id)
+    if dados.somente_pendente and (doc.arquivo or doc.nao_se_aplica):
+        raise ErroNegocio("Este documento já foi resolvido por outra pessoa; recarregue a tela", 409)
     anterior = doc.arquivo
     doc.arquivo, doc.arquivo_nome, doc.pgdas_extrato = None, None, None
     doc.nao_se_aplica, doc.justificativa, doc.enviado_em = True, dados.justificativa.strip(), datetime.now(UTC)

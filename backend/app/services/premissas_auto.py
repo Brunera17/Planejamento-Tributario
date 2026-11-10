@@ -121,7 +121,8 @@ def derivar(db: Session, p: Planejamento) -> Automaticas:
     comps = p.competencias()
 
     # ---- Tema 69 do STF: decidido (RE 574.706, efeitos desde 15/03/2017), então vem ligado; o contador pode desligar
-    out.premissas["excluir_icms_base_pis_cofins"] = Derivada(True, TEMA_69)
+    if min(comps) >= "2017-03":  # período anterior aos efeitos da modulação fica pendente
+        out.premissas["excluir_icms_base_pis_cofins"] = Derivada(True, TEMA_69)
 
     # ---- extrato do PGDAS-D enviado em Documentos: RBT12 declarado
     extrato = pgdas.do_planejamento(db, p)

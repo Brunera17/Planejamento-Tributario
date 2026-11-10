@@ -459,6 +459,7 @@ function Despesas({ pid }: { pid: number }) {
   };
 
   const gravarOutras = useMutation({
+    scope: { id: `despesas-${pid}` }, // na mesma fila do zerar: um não desfaz o outro
     mutationFn: (corpo: { outras: OutraDespesa[]; grupos_sem_outras: number[] }) => api.put(`/planejamentos/${pid}/levantamentos/${atual}`, corpo),
     onSuccess: () => {
       setErro(null);
@@ -475,7 +476,8 @@ function Despesas({ pid }: { pid: number }) {
     scope: { id: `despesas-${pid}` },
     mutationFn: (comp: string) =>
       api.put(`/planejamentos/${pid}/levantamentos/${comp}`, {
-        itens: catalogo.flatMap((g) => g.itens.filter((i) => i.ativo).map((i) => ({ item_despesa_id: i.id, valor: 0 }))),
+        // inativos também: um valor antigo de item inativo ainda entraria no cálculo
+        itens: catalogo.flatMap((g) => g.itens.map((i) => ({ item_despesa_id: i.id, valor: 0 }))),
         outras: [],
         grupos_sem_outras: catalogo.map((g) => g.id),
       }),

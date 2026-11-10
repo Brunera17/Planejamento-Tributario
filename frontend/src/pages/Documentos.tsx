@@ -255,7 +255,7 @@ function NaoSeAplicaLinha({ pid, linha, fechar }: { pid: number; linha: Linha; f
   const marcar = useMutation({
     mutationFn: async () => {
       for (const c of linha.competencias)
-        await api.put(`/planejamentos/${pid}/documentos/${c}/${linha.tipo}/nao-se-aplica`, { justificativa: justificativa.trim() });
+        await api.put(`/planejamentos/${pid}/documentos/${c}/${linha.tipo}/nao-se-aplica`, { justificativa: justificativa.trim(), somente_pendente: true });
     },
     onError: (e) => setErro(mensagemErro(e)),
     onSettled: (_r, e) => {

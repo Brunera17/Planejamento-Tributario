@@ -71,6 +71,8 @@ def test_valor_digitado_nao_e_sobrescrito(cliente, contador, pid):
 
 
 def test_planilha_padrao_ida_e_volta(cliente, contador, pid):
+    assert cliente.put(f"/api/planejamentos/{pid}/compras", headers=contador,
+                       json=[{"competencia": "2026-09", "valor": 777}]).status_code == 204
     r = cliente.get(f"/api/planejamentos/{pid}/planilha-mensal", headers=contador)
     assert r.status_code == 200
     ws = load_workbook(io.BytesIO(r.content)).active
@@ -104,3 +106,31 @@ def test_planilha_fora_do_modelo_e_recusada(cliente, contador, pid):
     r = cliente.post(f"/api/planejamentos/{pid}/planilha-mensal", headers=contador,
                      files={"arquivo": ("x.xlsx", buf.getvalue())})
     assert r.status_code == 422 and "modelo" in r.text
+
+
+def test_nota_antiga_com_cfop_do_fornecedor_e_corrigida_na_reimportacao(cliente, contador, pid, fabrica_sessao):
+    from sqlalchemy import select, update
+
+    from app.models import NotaFiscal, NotaItem
+
+    _xml(cliente, contador, pid, _nfe(30, FORNECEDOR, CNPJ, 5102, "400.00", mes="10"))
+    with fabrica_sessao() as db:  # simula a importação de antes da correção: CFOP do fornecedor gravado
+        ids = select(NotaFiscal.id).where(NotaFiscal.planejamento_id == pid, NotaFiscal.numero == "30")
+        db.execute(update(NotaItem).where(NotaItem.nota_fiscal_id.in_(ids)).values(cfop=5102))
+        db.commit()
+    _xml(cliente, contador, pid, _nfe(30, FORNECEDOR, CNPJ, 5102, "400.00", mes="10"))
+    with fabrica_sessao() as db:
+        assert db.scalar(select(NotaItem.cfop).join(NotaFiscal).where(NotaFiscal.planejamento_id == pid,
+                                                                      NotaFiscal.numero == "30")) == 1102
+
+
+def test_planilha_com_competencia_repetida_ou_vazia_e_recusada(cliente, contador, pid):
+    for linhas in ([["10/2026", 1, None, None, None], ["10/2026", 2, None, None, None]], [["10/2026", None, None, None, None]]):
+        wb = Workbook()
+        wb.active.append(["Competência", "Compras", "Devoluções", "Folha", "Pró-labore"])
+        for l in linhas:
+            wb.active.append(l)
+        buf = io.BytesIO()
+        wb.save(buf)
+        r = cliente.post(f"/api/planejamentos/{pid}/planilha-mensal", headers=contador, files={"arquivo": ("x.xlsx", buf.getvalue())})
+        assert r.status_code == 422, r.text

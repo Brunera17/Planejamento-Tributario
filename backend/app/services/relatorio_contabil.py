@@ -25,7 +25,8 @@ from app.models import CompraMensal, DevolucaoMensal, ImportacaoNfe, NotaFiscal,
 from app.utils.validacao import sem_acentos
 
 ZERO = Decimal("0")
-CFOP_DEVOLUCAO_VENDA = {1201, 1202, 2201, 2202, 1410, 1411, 2410, 2411}
+# 1410/1411/2410/2411: devolução de venda com ST; 3201/3202: devolução de exportação
+CFOP_DEVOLUCAO_VENDA = {1201, 1202, 2201, 2202, 1410, 1411, 2410, 2411, 3201, 3202}
 CFOP_COMPRA_REVENDA = {1102, 1403, 2102, 2403, 1101, 2101, 3102}
 CENTAVO = Decimal("0.01")
 
@@ -292,6 +293,13 @@ def cfop_de_entrada(cfop: int) -> int:
     if cfop // 1000 in (5, 6, 7):
         cfop -= 4000
     return {1405: 1403, 2404: 2403, 2405: 2403}.get(cfop, cfop)
+
+
+def entradas_com_cfop_do_fornecedor(db: Session, pid: int) -> list[tuple[NotaItem, str]]:
+    """Itens de notas de fornecedor importadas antes de o CFOP ser gravado do lado da entrada (5xxx/6xxx/7xxx)."""
+    return [(i, c) for i, c in db.execute(
+        select(NotaItem, NotaFiscal.competencia).join(NotaFiscal, NotaFiscal.id == NotaItem.nota_fiscal_id)
+        .where(NotaFiscal.planejamento_id == pid, NotaFiscal.tipo == "ENTRADA", NotaItem.cfop.between(5000, 7999)))]
 
 
 def somar_entradas(db: Session, pid: int, comps) -> dict[str, tuple[Decimal, Decimal]]:

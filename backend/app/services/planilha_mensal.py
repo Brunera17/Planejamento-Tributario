@@ -15,6 +15,7 @@ from openpyxl.styles import Font
 COLUNAS = ["Competência", "Compras", "Devoluções", "Folha", "Pró-labore"]
 CAMPOS = ["compras", "devolucoes", "folha", "pro_labore"]
 FORMATO_MOEDA = '#,##0.00'
+MAX_LINHAS = 200  # um planejamento tem poucos meses; limita planilha forjada com milhões de linhas
 
 
 class PlanilhaInvalida(ValueError):
@@ -72,16 +73,22 @@ def ler(conteudo: bytes) -> dict[str, dict[str, Decimal | None]]:
         ws = load_workbook(io.BytesIO(conteudo), read_only=True, data_only=True).worksheets[0]
     except Exception as e:  # openpyxl levanta vários tipos para arquivo que não é .xlsx
         raise PlanilhaInvalida("Não foi possível ler a planilha: envie o modelo em .xlsx") from e
-    linhas = [list(r) for r in ws.iter_rows(values_only=True)]
-    if not linhas or [str(c or "").strip() for c in linhas[0][:5]] != COLUNAS:
+    linhas = ws.iter_rows(values_only=True, max_col=5)
+    cab = next(linhas, None)
+    if cab is None or [str(c or "").strip() for c in cab] != COLUNAS:
         raise PlanilhaInvalida("A planilha não segue o modelo: baixe o modelo e mantenha as colunas " + ", ".join(COLUNAS))
     out: dict[str, dict[str, Decimal | None]] = {}
-    for n, r in enumerate(linhas[1:], start=2):
-        r = (r + [None] * 5)[:5]
+    for n, r in enumerate(linhas, start=2):
+        if n > MAX_LINHAS + 1:
+            raise PlanilhaInvalida(f"A planilha tem mais de {MAX_LINHAS} linhas: use o modelo, uma linha por mês")
+        r = (list(r) + [None] * 5)[:5]
         if all(c is None or str(c).strip() == "" for c in r):
             continue
         comp = _competencia(r[0])
+        if comp in out:
+            raise PlanilhaInvalida(f"Linha {n}: a competência {r[0]} aparece mais de uma vez")
         out[comp] = {k: v for k, c in zip(CAMPOS, r[1:]) if (v := _valor(c, f"Linha {n}, {COLUNAS[CAMPOS.index(k) + 1]}")) is not None}
+    out = {c: v for c, v in out.items() if v}
     if not out:
-        raise PlanilhaInvalida("A planilha não tem nenhuma competência preenchida")
+        raise PlanilhaInvalida("A planilha não tem nenhum valor preenchido")
     return out

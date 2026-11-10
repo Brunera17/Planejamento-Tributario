@@ -507,8 +507,12 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
                            crt_emitente=n.crt_emitente, consumidor_final=n.consumidor_final,
                            dest_contribuinte=n.dest_contribuinte), n.itens))
         imp.importados += 1
-    comps_entrada = {nf["competencia"] for nf, _ in novas if nf["tipo"] == "ENTRADA"}
+    # notas de fornecedor de importações antigas: o CFOP passa para o lado da entrada e o mês é recalculado
+    antigas = relatorio_contabil.entradas_com_cfop_do_fornecedor(db, pid)
+    comps_entrada = {nf["competencia"] for nf, _ in novas if nf["tipo"] == "ENTRADA"} | {c for _, c in antigas}
     antes = relatorio_contabil.somar_entradas(db, pid, comps_entrada) if comps_entrada else {}
+    for item, _ in antigas:
+        item.cfop = relatorio_contabil.cfop_de_entrada(item.cfop)
     if novas:
         # INSERT em lote sem RETURNING (no SQLite o ORM inseriria nota a nota para saber cada id);
         # os ids vêm depois numa consulta pelas chaves

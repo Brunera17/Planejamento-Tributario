@@ -58,6 +58,8 @@ def _faltam(cliente, contador, pid) -> list[str]:
 def test_sem_notas_tudo_fica_pendente(cliente, contador, pid):
     faltam = _faltam(cliente, contador, pid)
     assert len(faltam) == 11 and faltam[0] == "Origem das compras"  # o Tema 69 já vem ligado
+    auto = cliente.get(f"/api/planejamentos/{pid}/coleta", headers=contador).json()["premissas_auto"]
+    assert auto["excluir_icms_base_pis_cofins"]["valor"] is True
 
 
 def test_notas_preenchem_as_premissas(cliente, contador, pid):
