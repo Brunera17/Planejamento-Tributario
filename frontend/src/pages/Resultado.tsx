@@ -87,7 +87,7 @@ export function Resultado() {
                 (await confirmar({
                   titulo: "Aprovar simulação",
                   mensagem:
-                    "Ao aprovar, as notas fiscais importadas deste planejamento são apagadas. O resultado, a memória de cálculo e o relatório continuam guardados. Para reabrir o planejamento depois, será preciso importar as notas de novo.",
+                    "Ao aprovar, as notas fiscais importadas deste planejamento são apagadas. O resultado e a memória de cálculo continuam guardados, assim como os relatórios já gerados. Para reabrir o planejamento depois, será preciso importar as notas de novo.",
                   confirmar: "Aprovar e apagar as notas",
                   perigo: true,
                 })) && aprovar.mutate()
