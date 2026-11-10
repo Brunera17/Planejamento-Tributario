@@ -5,7 +5,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 
 import { api, baixarArquivo, lerSessao, mensagemErro } from "../api/cliente";
 import type { LinhaNcm, PassoMemoria, Planejamento, Resultado as TResultado, ResultadoRegime, SimulacaoResumo } from "../api/tipos";
-import { Badge, Botao, BotaoLink, Card, Erro, Tabela } from "../components/ui";
+import { Badge, Botao, BotaoLink, Card, Erro, Tabela, useConfirmacao } from "../components/ui";
 import { brl, competenciaExtenso, dataHora, percentual, REGIMES } from "../lib/formato";
 
 const CORES: Record<string, string> = {
@@ -35,6 +35,7 @@ export function Resultado() {
     onError: (e) => setErro(mensagemErro(e)),
   });
 
+  const [confirmar, janelaConfirmacao] = useConfirmacao();
   const [gerando, setGerando] = useState(false);
 
   async function baixar(rota: "excel" | "apresentacao", padrao: string) {
@@ -81,13 +82,24 @@ export function Resultado() {
             <Botao variante="secundario" onClick={() => setRelatorio(!relatorio)} aria-expanded={relatorio}>
               Relatório PDF
             </Botao>
-            <Botao onClick={() => aprovar.mutate()} disabled={!!s.aprovada_em || s.desatualizada || s.tipo !== "FINAL"}>
+            <Botao
+              onClick={async () =>
+                (await confirmar({
+                  titulo: "Aprovar simulação",
+                  mensagem:
+                    "Ao aprovar, as notas fiscais importadas deste planejamento são apagadas. O resultado e a memória de cálculo continuam guardados, assim como os relatórios já gerados. Para reabrir o planejamento depois, será preciso importar as notas de novo.",
+                  confirmar: "Aprovar e apagar as notas",
+                  perigo: true,
+                })) && aprovar.mutate()
+              }
+              disabled={!!s.aprovada_em || s.desatualizada || s.tipo !== "FINAL"}>
               {s.aprovada_em ? "Aprovada" : "Aprovar simulação"}
             </Botao>
           </div>
         )}
       </div>
       <Erro mensagem={erro} />
+      {janelaConfirmacao}
       {contador && relatorio && <PainelRelatorio sid={s.id} pid={s.planejamento_id} preliminar={s.tipo !== "FINAL" || s.desatualizada || !s.aprovada_em} />}
       {(s.pendencias || s.desatualizada) && (
         <div className="rounded border border-warning bg-warning-soft px-3 py-2 text-sm text-warning-ink">
