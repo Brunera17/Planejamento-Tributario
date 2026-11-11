@@ -6,6 +6,7 @@ services:
     name: planejador-api
     runtime: docker
     rootDir: backend
+    region: virginia  # ao lado do banco no Neon (aws-us-east-1): cada consulta ao banco fica a ~1 ms
     plan: free  # sem disco persistente: os arquivos vão para o Drive (ARMAZENAMENTO=drive)
     healthCheckPath: /openapi.json
     autoDeployTrigger: checksPass  # só publica depois que o CI do GitHub passar no commit
