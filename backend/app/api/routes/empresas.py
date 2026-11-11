@@ -25,7 +25,7 @@ def listar(db: DB, _: UsuarioAtual, resposta: Response, busca: str | None = None
         q = q.where(Empresa.ativo)
     if busca:
         cnpj = somente_digitos(busca)  # o CNPJ é gravado só com dígitos; a busca pode vir com máscara
-        q = q.where(or_(Empresa.razao_social.ilike(f"%{busca}%"), *([Empresa.cnpj.contains(cnpj)] if cnpj else [])))
+        q = q.where(or_(Empresa.razao_social.icontains(busca, autoescape=True), *([Empresa.cnpj.contains(cnpj)] if cnpj else [])))
     return pagina(db, q, limite, deslocamento, resposta)
 
 
