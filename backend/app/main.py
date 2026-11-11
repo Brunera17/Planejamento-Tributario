@@ -17,7 +17,7 @@ def criar_app() -> FastAPI:
     )
     app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_lista, allow_credentials=True,
                        allow_methods=["*"], allow_headers=["*"],
-                       expose_headers=["Content-Disposition"])  # nome do arquivo nos downloads (Excel, apresentação)
+                       expose_headers=["Content-Disposition", "X-Proximo"])  # nome dos downloads; próxima página das listas
     app.add_middleware(MiddlewareAuditoria)
     registrar_handlers(app)
     for r in (auth, auditoria, empresas, tabelas, planejamentos, bens_documentos, simulacoes, dashboard):

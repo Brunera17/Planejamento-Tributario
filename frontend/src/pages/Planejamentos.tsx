@@ -3,8 +3,9 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
+import { useLista } from "../api/lista";
 import type { Empresa, Planejamento } from "../api/tipos";
-import { Badge, BarraProgresso, Botao, Cabecalho, Card, Erro, LegendaObrigatorio, Modal, Obrigatorio, Tabela } from "../components/ui";
+import { Badge, BarraProgresso, Botao, Cabecalho, CarregarMais, Card, Erro, LegendaObrigatorio, Modal, Obrigatorio, Tabela } from "../components/ui";
 import { competenciaExtenso, dataHora, formatarCnpj, REGIMES, STATUS } from "../lib/formato";
 
 export function Planejamentos() {
@@ -13,10 +14,8 @@ export function Planejamentos() {
   const [novo, setNovo] = useState(false);
   const [status, setStatus] = useState("");
   const [busca, setBusca] = useState("");
-  const { data = [] } = useQuery({
-    queryKey: ["planejamentos", status, busca],
-    queryFn: async () => (await api.get<Planejamento[]>("/planejamentos", { params: { status: status || undefined, busca: busca || undefined } })).data,
-  });
+  const lista = useLista<Planejamento>(["planejamentos", status, busca], "/planejamentos", { status: status || undefined, busca: busca || undefined });
+  const data = lista.itens;
 
   return (
     <>
@@ -47,7 +46,7 @@ export function Planejamentos() {
             </select>
           </div>
         }
-        titulo={`${data.length} ${data.length === 1 ? "planejamento" : "planejamentos"}`}
+        titulo={`${data.length}${lista.temMais ? "+" : ""} ${data.length === 1 ? "planejamento" : "planejamentos"}`}
       >
         <Tabela cabecalho={["Empresa", "CNPJ", "Regime atual", "Período", "Documentos recebidos", "Progresso", "Status"]}>
           {data.map((p) => (
@@ -82,6 +81,7 @@ export function Planejamentos() {
             </tr>
           ))}
         </Tabela>
+        <CarregarMais lista={lista} />
       </Card>
     </>
   );
@@ -89,7 +89,11 @@ export function Planejamentos() {
 
 function NovoPlanejamento({ fechar }: { fechar: () => void }) {
   const qc = useQueryClient();
-  const { data: empresas = [] } = useQuery({ queryKey: ["empresas"], queryFn: async () => (await api.get<Empresa[]>("/empresas")).data });
+  const [buscaEmpresa, setBuscaEmpresa] = useState("");
+  const { data: empresas = [] } = useQuery({
+    queryKey: ["empresas", "escolha", buscaEmpresa],
+    queryFn: async () => (await api.get<Empresa[]>("/empresas", { params: { busca: buscaEmpresa || undefined } })).data,
+  });
   const [form, setForm] = useState({ empresa_id: "", competencia_inicial: "", competencia_final: "" });
   const [erro, setErro] = useState<string | null>(null);
   const criar = useMutation({
@@ -113,7 +117,18 @@ function NovoPlanejamento({ fechar }: { fechar: () => void }) {
       >
         <label className="sm:col-span-2">
           Empresa<Obrigatorio />
-          <select autoFocus className={campo} value={form.empresa_id} onChange={(e) => setForm({ ...form, empresa_id: e.target.value })}>
+          <input
+            autoFocus
+            aria-label="Buscar empresa por razão social ou CNPJ"
+            placeholder="Buscar por razão social ou CNPJ"
+            className={campo}
+            value={buscaEmpresa}
+            onChange={(e) => {
+              setBuscaEmpresa(e.target.value);
+              setForm({ ...form, empresa_id: "" }); // a escolhida pode sumir do filtro
+            }}
+          />
+          <select aria-label="Empresa" className={campo} value={form.empresa_id} onChange={(e) => setForm({ ...form, empresa_id: e.target.value })}>
             <option value="">Selecione</option>
             {empresas.map((e) => (
               <option key={e.id} value={e.id}>

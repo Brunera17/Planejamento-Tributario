@@ -159,3 +159,18 @@ def test_aceite_conta_no_progresso_e_nao_desatualiza_simulacao(cliente, contador
     assert next(b for b in blocos if b["codigo"] == "OBSERVACOES")["preenchidos"] == 1
     lista = cliente.get(f"/api/planejamentos/{pid}/simulacoes", headers=contador).json()
     assert next(s for s in lista if s["id"] == sim["id"])["desatualizada"] is False
+
+
+def test_listagens_paginadas(cliente, contador):
+    for rota in ("/api/empresas?ativas=false", "/api/planejamentos?"):
+        todos = cliente.get(f"{rota}&limite=200", headers=contador)
+        assert "x-proximo" not in todos.headers
+        ids = [x["id"] for x in todos.json()]
+        assert len(ids) >= 2
+        r1 = cliente.get(f"{rota}&limite=1", headers=contador)
+        assert r1.headers["x-proximo"] == "1"
+        r2 = cliente.get(f"{rota}&limite=200&deslocamento={r1.headers['x-proximo']}", headers=contador)
+        assert [x["id"] for x in r1.json() + r2.json()] == ids
+        assert cliente.get(f"{rota}&limite=201", headers=contador).status_code == 422
+    abertos = cliente.get("/api/planejamentos?abertos=true&limite=200", headers=contador).json()
+    assert abertos and all(p["status"] != "APROVADO" for p in abertos)

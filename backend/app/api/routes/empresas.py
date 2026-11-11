@@ -1,6 +1,6 @@
 import dataclasses
 
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, Response, UploadFile
 from sqlalchemy import delete, or_, select
 
 from app.api.deps import DB, Contador, UsuarioAtual
@@ -10,19 +10,21 @@ from app.schemas.cadastro import EmpresaEntrada, EmpresaSaida
 from app.services import importacao_empresas
 from app.services.auditoria import auditar
 from app.services.simulacao import marcar_desatualizada
+from app.utils.paginacao import Deslocamento, Limite, pagina
 from app.utils.upload import ler_limitado
 
 router = APIRouter(prefix="/empresas", tags=["Empresas"])
 
 
 @router.get("", response_model=list[EmpresaSaida])
-def listar(db: DB, _: UsuarioAtual, busca: str | None = None, ativas: bool = True):
-    q = select(Empresa).order_by(Empresa.razao_social)
+def listar(db: DB, _: UsuarioAtual, resposta: Response, busca: str | None = None, ativas: bool = True,
+           limite: Limite = 50, deslocamento: Deslocamento = 0):
+    q = select(Empresa).order_by(Empresa.razao_social, Empresa.id)
     if ativas:
         q = q.where(Empresa.ativo)
     if busca:
         q = q.where(or_(Empresa.razao_social.ilike(f"%{busca}%"), Empresa.cnpj.contains(busca)))
-    return db.scalars(q).all()
+    return pagina(db, q, limite, deslocamento, resposta)
 
 
 @router.post("", response_model=EmpresaSaida, status_code=201)
