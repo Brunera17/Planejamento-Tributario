@@ -178,7 +178,7 @@ def baixar_relatorio(rid: int, db: DB, u: Contador):
     rel = db.get(RelatorioPdf, rid)
     if rel is None:
         raise NaoEncontrado("Relatório")
-    if not relatorio_pdf.caminho(rel).exists():
+    if not relatorio_pdf.existe(rel):
         raise ErroNegocio("Arquivo do relatório não encontrado no armazenamento", 410)
     try:
         conteudo = relatorio_pdf.ler(rel)

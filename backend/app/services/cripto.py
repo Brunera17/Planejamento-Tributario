@@ -16,11 +16,9 @@ from __future__ import annotations
 
 import argparse
 import base64
-import os
 import secrets
 import struct
 from dataclasses import dataclass
-from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -152,52 +150,39 @@ def decifrar_campo(valor: str, contexto: str) -> str:
     return decifrar(base64.b64decode(valor), contexto.encode()).decode()
 
 
-# ------------------------------------------------------------------ arquivos no disco
+# ------------------------------------------------------------------ arquivos guardados (disco ou Drive)
 
-def _pastas() -> list[Path]:
-    base = Path(get_settings().upload_dir)
-    return [base / "documentos", base / "relatorios"]
-
-
-def _gravar_atomico(arq: Path, dados: bytes) -> None:
-    tmp = arq.with_name(f".{arq.name}.{os.getpid()}.tmp")
-    tmp.write_bytes(dados)
-    os.replace(tmp, arq)  # troca atômica: nunca fica meio arquivo cifrado
+def _arquivos():
+    from app.services import armazenamento  # aqui: armazenamento -> erros, sem ciclo com este módulo
+    a = armazenamento.atual()
+    for pasta in armazenamento.PASTAS:
+        for nome in a.nomes(pasta):
+            yield a, pasta, nome
 
 
 def cifrar_existentes() -> tuple[int, int]:
     """Cifra o que ainda está em texto puro. Idempotente. Devolve (cifrados, já cifrados)."""
     novos = ja = 0
-    for pasta in _pastas():
-        if not pasta.exists():
+    for a, pasta, nome in _arquivos():
+        dados = a.ler(pasta, nome)
+        if eh_cifrado(dados):
+            ja += 1
             continue
-        for arq in pasta.iterdir():
-            if not arq.is_file() or arq.name.startswith("."):
-                continue
-            dados = arq.read_bytes()
-            if eh_cifrado(dados):
-                ja += 1
-                continue
-            _gravar_atomico(arq, cifrar(dados, arq.name.encode()))
-            novos += 1
+        a.gravar(pasta, nome, cifrar(dados, nome.encode()))  # no disco, troca atômica
+        novos += 1
     return novos, ja
 
 
 def recifrar_existentes() -> int:
     n = 0
-    for pasta in _pastas():
-        if not pasta.exists():
+    for a, pasta, nome in _arquivos():
+        dados = a.ler(pasta, nome)
+        if not eh_cifrado(dados):
             continue
-        for arq in pasta.iterdir():
-            if not arq.is_file() or arq.name.startswith("."):
-                continue
-            dados = arq.read_bytes()
-            if not eh_cifrado(dados):
-                continue
-            novo = recifrar_cabecalho(dados, arq.name.encode())
-            if novo is not dados:
-                _gravar_atomico(arq, novo)
-                n += 1
+        novo = recifrar_cabecalho(dados, nome.encode())
+        if novo is not dados:
+            a.gravar(pasta, nome, novo)
+            n += 1
     return n
 
 
