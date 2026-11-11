@@ -150,6 +150,15 @@ def test_dashboard(cliente, analista):
     d = cliente.get("/api/dashboard", headers=analista).json()
     assert d["empresas_ativas"] >= 2
     assert d["economia_anual_estimada"] > 0
+    total = sum(d["planejamentos_por_status"].values())
+    assert sum(d["planejamentos_por_progresso"].values()) == total
+    assert cliente.get("/api/dashboard", headers=analista).json() == d  # segunda leitura, pelo cache, igual
+
+
+def test_meses_do_periodo():
+    from app.api.routes.dashboard import _meses
+    assert _meses("2025-01", "2025-12") == 12
+    assert _meses("2025-11", "2026-02") == 4
 
 
 def test_aceite_conta_no_progresso_e_nao_desatualiza_simulacao(cliente, contador, pid):
