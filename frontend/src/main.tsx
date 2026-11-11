@@ -21,10 +21,20 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, ref
 /** O access vive só em memória: ao abrir ou recarregar, recupera a sessão pelo cookie de refresh. */
 function Protegida({ children }: { children: React.ReactNode }) {
   const [estado, setEstado] = useState<"carregando" | "ok" | "anonimo">(temAccess() ? "ok" : "carregando");
+  const [demorando, setDemorando] = useState(false);
   useEffect(() => {
-    if (estado === "carregando") renovarSessao().then((ok) => setEstado(ok ? "ok" : "anonimo"));
+    if (estado !== "carregando") return;
+    renovarSessao().then((ok) => setEstado(ok ? "ok" : "anonimo"));
+    // plano grátis do Render: a API dorme após 15 min sem acesso e leva até ~1 min para acordar
+    const t = setTimeout(() => setDemorando(true), 4000);
+    return () => clearTimeout(t);
   }, [estado]);
-  if (estado === "carregando") return <div className="p-8 text-sm text-black/60">Carregando…</div>;
+  if (estado === "carregando")
+    return (
+      <div className="p-8 text-sm text-black/60" role="status">
+        {demorando ? "Acordando o servidor… o primeiro acesso depois de um tempo parado pode levar até 1 minuto." : "Carregando…"}
+      </div>
+    );
   return estado === "ok" ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
