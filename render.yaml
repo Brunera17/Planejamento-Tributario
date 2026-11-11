@@ -6,6 +6,7 @@ services:
     name: planejador-api
     runtime: docker
     rootDir: backend
+    region: virginia  # ao lado do banco no Neon (aws-us-east-1): cada consulta ao banco fica a ~1 ms
     plan: free  # sem disco persistente: os arquivos vão para o Drive (ARMAZENAMENTO=drive)
     healthCheckPath: /openapi.json
     autoDeployTrigger: checksPass  # só publica depois que o CI do GitHub passar no commit
@@ -58,6 +59,7 @@ services:
   # Redis (Key Value) das sessões. Gratuito e sem persistência: um reinício desloga todos (decisão D3).
   - type: keyvalue
     name: planejador-redis
+    region: virginia  # a mesma da API: a rede interna do Render só liga serviços da mesma região
     plan: free
     ipAllowList: []  # só a rede interna do Render
     maxmemoryPolicy: noeviction  # nunca apagar sessões sozinho

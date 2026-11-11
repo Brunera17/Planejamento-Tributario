@@ -20,7 +20,7 @@ Decidido em 11/11/2026. Custo previsto: **US$ 0 por mês**.
 
 ## Fase 0: preparação (usuário)
 
-1. **Neon:** criar a conta e o projeto (região São Paulo, se houver; senão, a mais próxima). Copiar a URL de conexão **direta**, a que não tem `-pooler` no endereço e termina em `sslmode=require`.
+1. **Neon:** criar a conta e o projeto na região **AWS US East 1 (Virgínia)**, a mesma do Render (`region: virginia`). São Paulo deixaria a API, que fica nos EUA, a ~120 ms do banco em cada consulta. Copiar a URL de conexão **direta**, a que não tem `-pooler` no endereço e termina em `sslmode=require`.
 2. **Google Cloud**, na conta do Google que vai guardar os arquivos:
    1. Criar um projeto e ativar a **Google Drive API**.
    2. Na **tela de consentimento OAuth**, escolher o tipo "Externo" e adicionar o escopo `.../auth/drive.file`. Depois, **publicar o app como "Em produção"**. No modo "Teste", a autorização expira a cada 7 dias e os uploads param.
