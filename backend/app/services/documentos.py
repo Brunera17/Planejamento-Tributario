@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from app.core.config import get_settings
 from app.core.erros import ErroNegocio
-from app.services import cripto
+from app.services import armazenamento, cripto
 
 # extensão -> assinatura inicial do arquivo (None = texto, sem assinatura)
 ASSINATURAS: dict[str, bytes | None] = {
@@ -21,12 +21,6 @@ ASSINATURAS: dict[str, bytes | None] = {
     ".txt": None,  # SPED e arquivos de texto do sistema contábil
     ".xml": None,
 }
-
-
-def pasta() -> Path:
-    destino = Path(get_settings().upload_dir) / "documentos"
-    destino.mkdir(parents=True, exist_ok=True)
-    return destino
 
 
 def validar(nome: str, conteudo: bytes) -> str:
@@ -49,24 +43,24 @@ def gravar(conteudo: bytes, ext: str) -> str:
     """Grava cifrado, com nome gerado pelo sistema; o nome original fica só no banco.
     O nome gerado entra como dado associado: o arquivo não pode ser trocado pelo de outro documento."""
     nome = f"{uuid4().hex}{ext}"
-    (pasta() / nome).write_bytes(cripto.cifrar(conteudo, nome.encode()))
+    armazenamento.atual().gravar("documentos", nome, cripto.cifrar(conteudo, nome.encode()))
     return nome
 
 
 def existe(arquivo: str | None) -> bool:
-    return bool(arquivo) and caminho(arquivo).exists()
+    return bool(arquivo) and armazenamento.atual().existe("documentos", Path(arquivo).name)
 
 
 def ler(arquivo: str) -> bytes:
     """Conteúdo original do documento (decifrado). Arquivo de antes da criptografia ainda é aceito em texto puro
     enquanto ACEITAR_ARQUIVO_SEM_CIFRA estiver ligada (desligar depois de `cripto --cifrar-existentes`)."""
-    return ler_arquivo(caminho(arquivo))
+    nome = Path(arquivo).name
+    return abrir(nome, armazenamento.atual().ler("documentos", nome))
 
 
-def ler_arquivo(arq: Path) -> bytes:
-    dados = arq.read_bytes()
+def abrir(nome: str, dados: bytes) -> bytes:
     if cripto.eh_cifrado(dados):
-        return cripto.decifrar(dados, arq.name.encode())
+        return cripto.decifrar(dados, nome.encode())
     if get_settings().aceitar_arquivo_sem_cifra:
         return dados
     raise cripto.ErroCripto("arquivo sem criptografia recusado (ACEITAR_ARQUIVO_SEM_CIFRA=false)")
@@ -74,7 +68,14 @@ def ler_arquivo(arq: Path) -> bytes:
 
 def apagar(arquivo: str | None) -> None:
     if arquivo:
-        (pasta() / Path(arquivo).name).unlink(missing_ok=True)
+        armazenamento.atual().apagar("documentos", Path(arquivo).name)
+
+
+# só no armazenamento em disco (testes e desenvolvimento)
+def pasta() -> Path:
+    destino = Path(get_settings().upload_dir) / "documentos"
+    destino.mkdir(parents=True, exist_ok=True)
+    return destino
 
 
 def caminho(arquivo: str) -> Path:

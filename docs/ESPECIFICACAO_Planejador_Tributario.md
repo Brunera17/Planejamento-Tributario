@@ -118,6 +118,16 @@ relatório continua sendo o do PDF original. **Perder a chave mestra é perder o
 fora do servidor. Comandos: `python -m app.services.cripto --gerar-chave`, `--cifrar-existentes` (arquivos de antes
 da criptografia; idempotente) e `--recifrar-chaves` (rotação da chave mestra).
 
+**Onde ficam os arquivos.** `services/armazenamento.py` guarda os arquivos já cifrados numa pasta local
+(`ARMAZENAMENTO=disco`, padrão, para desenvolvimento e testes) ou no Google Drive da conta do escritório
+(`ARMAZENAMENTO=drive`, produção). O Drive entra por OAuth com token de atualização e escopo `drive.file`: o app só
+enxerga a pasta `Planejador` que ele mesmo criou, com as subpastas `documentos` e `relatorios`. Quem abrir a pasta no
+Drive vê só arquivos cifrados, com nomes opacos (o nome real, que no relatório tem CNPJ e período, fica no banco e em `appProperties`). Drive fora do ar ou acesso revogado responde 503. Comandos:
+`python -m app.services.armazenamento --autorizar` (uma vez: autoriza a conta, cria as pastas e imprime
+`DRIVE_REFRESH_TOKEN` e `DRIVE_PASTA_ID`) e `--importar-pasta <pasta>` (migração de um disco de uploads; idempotente).
+A contingência da auditoria continua no disco local, que no plano grátis do Render se perde num reinício: nesse caso
+o evento fica só no log (risco aceito).
+
 ### 3.2 Empresas
 
 Mantém a importação de empresas do documento original (xlsx/csv, prévia linha a linha, CNPJ validado e gravado com
@@ -765,7 +775,8 @@ Mantém a stack sugerida no documento original, com acréscimos:
 | Validação | Pydantic | Schemas de entrada e saída |
 | Autenticação | JWT (PyJWT) + bcrypt + refresh opaco em cookie | Login, perfis, sessões revogáveis (3.1.1) |
 | Sessões e limites | Redis (cliente síncrono, timeout curto e disjuntor) | Sessões, limite de tentativas de login, deduplicação da auditoria |
-| Criptografia | `cryptography` (AES-256-GCM, envelope) | Documentos e relatórios cifrados no disco |
+| Criptografia | `cryptography` (AES-256-GCM, envelope) | Documentos e relatórios cifrados em repouso |
+| Arquivos | Google Drive (API v3, OAuth) ou disco local | Documentos e relatórios, já cifrados (3.1.1) |
 | Banco | PostgreSQL 16 | `NUMERIC` para valores monetários e alíquotas |
 | Motor de cálculo | Python puro + `decimal.Decimal` | Funções puras, sem dependência de banco |
 | Leitura de NF-e | `lxml` (XML NF-e 4.00) + openpyxl (relatório) | Importação de saídas e entradas |
@@ -849,6 +860,11 @@ Iguais ao documento original (pré-requisitos, instalação, `.env.example` com 
 - em produção a API não sobe sem `JWT_SECRET` forte, `REDIS_URL` e `CHAVE_ARQUIVOS`; os usuários de demonstração
   não existem em produção (o primeiro contador vem de `ADMIN_USUARIO` e `ADMIN_SENHA`);
 - `CHAVE_ARQUIVOS` (gerada com `python -m app.services.cripto --gerar-chave`) tem cópia guardada fora do servidor;
+- produção (`render.yaml`): API no plano grátis do Render (um processo; dorme após 15 minutos sem acesso), banco no
+  Neon (URL direta, sem pooler), sessões no Key Value grátis do Render e arquivos no Google Drive
+  (`ARMAZENAMENTO=drive` e as variáveis `DRIVE_*`, também com cópia fora do servidor). O cliente OAuth do Google
+  precisa estar publicado como "Em produção": no modo Teste o token expira em 7 dias. Passo a passo em
+  `docs/PLANO_Deploy_Render_Neon_Drive.md`;
 
 - carga das tabelas legais vigentes e do planejamento de demonstração (caso de referência da seção 9) com um comando;
 - pasta `exemplos/` com XML de NF-e anonimizados e um relatório de movimentação de exemplo para teste da importação.

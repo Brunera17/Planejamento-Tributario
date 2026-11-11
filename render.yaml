@@ -1,22 +1,20 @@
-# Blueprint do Render: API (Docker) com disco para os arquivos enviados e Postgres.
-# No Render: New > Blueprint > este repositório. Preencha CORS_ORIGINS, ADMIN_USUARIO e ADMIN_SENHA no painel.
+# Blueprint do Render: API (Docker) no plano grátis. Banco no Neon, arquivos no Google Drive (cifrados).
+# Plano: docs/PLANO_Deploy_Render_Neon_Drive.md. No Render: New > Blueprint > este repositório.
+# Preencha no painel as variáveis com sync: false. O plano grátis dorme após 15 min sem acesso (o primeiro volta em ~1 min).
 services:
   - type: web
     name: planejador-api
     runtime: docker
     rootDir: backend
-    plan: starter  # o disco persistente exige plano pago
+    plan: free  # sem disco persistente: os arquivos vão para o Drive (ARMAZENAMENTO=drive)
     healthCheckPath: /openapi.json
     autoDeployTrigger: checksPass  # só publica depois que o CI do GitHub passar no commit
-    disk:
-      name: uploads
-      mountPath: /data/uploads
-      sizeGB: 5
     envVars:
+      # Neon: a URL direta (sem "-pooler" no host), com sslmode=require. 1 processo x pool 5+5 cabe no plano grátis.
       - key: DATABASE_URL
-        fromDatabase:
-          name: planejador-db
-          property: connectionString
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: "1"  # 512 MB de memória no plano grátis: um processo só
       - key: REDIS_URL
         fromService:
           type: keyvalue
@@ -30,8 +28,18 @@ services:
         sync: false
       - key: ACEITAR_ARQUIVO_SEM_CIFRA
         value: "false"  # instalação nova: nenhum arquivo antigo em texto puro
-      - key: UPLOAD_DIR
-        value: /data/uploads
+      # Google Drive: rode `python -m app.services.armazenamento --autorizar` no computador (com DRIVE_CLIENT_ID e
+      # DRIVE_CLIENT_SECRET no .env); ele imprime o DRIVE_REFRESH_TOKEN e o DRIVE_PASTA_ID. Guarde cópia fora do Render.
+      - key: ARMAZENAMENTO
+        value: drive
+      - key: DRIVE_CLIENT_ID
+        sync: false
+      - key: DRIVE_CLIENT_SECRET
+        sync: false
+      - key: DRIVE_REFRESH_TOKEN
+        sync: false
+      - key: DRIVE_PASTA_ID
+        sync: false
       - key: CORS_ORIGINS
         sync: false  # vazio com o proxy da Vercel (mesma origem); só se a tela chamar a API direto
       - key: ORIGEM_PUBLICA
@@ -54,8 +62,3 @@ services:
     ipAllowList: []  # só a rede interna do Render
     maxmemoryPolicy: noeviction  # nunca apagar sessões sozinho
 
-databases:
-  - name: planejador-db
-    plan: basic-256mb
-    databaseName: planejador
-    user: planejador

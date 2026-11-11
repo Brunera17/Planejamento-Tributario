@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +30,13 @@ class Settings(BaseSettings):
     proxies_confiaveis: str = ""  # CIDRs separados por vírgula (ex.: faixas do proxy da Vercel)
     origem_publica: str = ""  # ex.: https://planejamento-tributario.domingosassessoria.com.br
     upload_dir: str = str(RAIZ_BACKEND / "uploads")
+    # onde ficam os arquivos cifrados (app/services/armazenamento.py): "disco" (UPLOAD_DIR) ou "drive" (Google Drive).
+    # O Drive é preparado por `python -m app.services.armazenamento --autorizar`, que imprime o token e a pasta.
+    armazenamento: Literal["disco", "drive"] = "disco"
+    drive_client_id: str = ""
+    drive_client_secret: str = ""
+    drive_refresh_token: str = ""
+    drive_pasta_id: str = ""
     # criptografia dos arquivos (envelope AES-256-GCM, app/services/cripto.py). Perder a chave = perder os arquivos:
     # guarde uma cópia fora do Render. Gere com `python -m app.services.cripto --gerar-chave`.
     chave_arquivos: str = ""  # base64 de 32 bytes; obrigatória em produção
@@ -72,6 +80,9 @@ class Settings(BaseSettings):
             raise ValueError("Em produção, defina REDIS_URL")
         if not self.database_url.startswith("sqlite") and not self.chave_arquivos:
             raise ValueError("Em produção, defina CHAVE_ARQUIVOS (python -m app.services.cripto --gerar-chave)")
+        if self.armazenamento == "drive" and not all(
+                (self.drive_client_id, self.drive_client_secret, self.drive_refresh_token, self.drive_pasta_id)):
+            raise ValueError("ARMAZENAMENTO=drive exige DRIVE_CLIENT_ID, DRIVE_CLIENT_SECRET, DRIVE_REFRESH_TOKEN e DRIVE_PASTA_ID")
         return self
 
     @property
