@@ -59,6 +59,7 @@ services:
   # Redis (Key Value) das sessões. Gratuito e sem persistência: um reinício desloga todos (decisão D3).
   - type: keyvalue
     name: planejador-redis
+    region: virginia  # a mesma da API: a rede interna do Render só liga serviços da mesma região
     plan: free
     ipAllowList: []  # só a rede interna do Render
     maxmemoryPolicy: noeviction  # nunca apagar sessões sozinho
