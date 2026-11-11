@@ -235,3 +235,11 @@ def test_listagens_paginadas(cliente, contador, fabrica_sessao):
     # busca com a máscara do CNPJ acha a empresa gravada só com dígitos
     assert [e["id"] for e in cliente.get("/api/empresas?busca=12.345.679/0001-30", headers=contador).json()] == [emp["id"]]
     assert {p["empresa_id"] for p in cliente.get("/api/planejamentos?busca=12.345.679", headers=contador).json()} == {emp["id"]}
+
+
+def test_busca_trata_curingas_como_texto(cliente, contador):
+    # % e _ digitados na busca não viram curinga do LIKE: "%" não pode devolver a carteira inteira
+    for rota in ("/api/empresas", "/api/planejamentos"):
+        assert cliente.get(f"{rota}?busca=%25", headers=contador).json() == []
+        assert cliente.get(f"{rota}?busca=_", headers=contador).json() == []
+    assert cliente.get("/api/empresas?busca=autope", headers=contador).json()  # a busca comum continua sem diferenciar caixa
