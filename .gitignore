@@ -16,3 +16,5 @@ frontend/dist/
 *.p12
 **/clientes/
 *.tsbuildinfo
+.neon
+.env.local
