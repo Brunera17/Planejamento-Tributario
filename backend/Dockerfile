@@ -12,4 +12,4 @@ EXPOSE 8000
 # app.services.pgdas: grava a leitura dos extratos do PGDAS-D enviados antes da leitura no upload (idempotente;
 # precisa rodar antes da criptografia dos arquivos). Se falhar, só avisa: não impede a API de subir.
 # produção: sem dados de demonstração; o primeiro usuário vem de ADMIN_USUARIO e ADMIN_SENHA (veja app/seeds/carga.py)
-CMD ["sh", "-c", "alembic upgrade head && python -m app.seeds.carga && (python -m app.services.pgdas || echo \"aviso: leitura dos extratos do PGDAS-D antigos falhou; a API sobe assim mesmo\") && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-*}\""]
+CMD ["sh", "-c", "alembic upgrade head && python -m app.seeds.carga && (python -m app.services.pgdas || echo \"aviso: leitura dos extratos do PGDAS-D antigos falhou; a API sobe assim mesmo\") && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]
