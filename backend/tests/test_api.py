@@ -146,10 +146,51 @@ def test_importa_xml_nfe(cliente, contador):
     assert coleta["saidas"][0]["valor"] == pytest.approx(195.00)
 
 
-def test_dashboard(cliente, analista):
+def test_dashboard(cliente, analista, fabrica_sessao, monkeypatch):
+    from sqlalchemy import select
+
+    from app.api.routes import dashboard
+    from app.models import Planejamento
+
+    dashboard._TOTAIS.clear()
     d = cliente.get("/api/dashboard", headers=analista).json()
     assert d["empresas_ativas"] >= 2
     assert d["economia_anual_estimada"] > 0
+    with fabrica_sessao() as s:
+        progressos = s.scalars(select(Planejamento.progresso)).all()
+    esperado = {"0%": 0, "1–49%": 0, "50–99%": 0, "100%": 0}
+    for p in progressos:
+        esperado["0%" if p == 0 else "100%" if p == 100 else "1–49%" if p < 50 else "50–99%"] += 1
+    assert d["planejamentos_por_progresso"] == esperado
+    # segunda leitura sai do cache: sem decodificar JSON de novo, mesmo resultado
+    assert dashboard._TOTAIS
+    class SemJson:
+        @staticmethod
+        def loads(*_):
+            raise AssertionError("decodificou de novo: cache não usado")
+    monkeypatch.setattr(dashboard, "json", SemJson)
+    assert cliente.get("/api/dashboard", headers=analista).json() == d
+
+
+def test_totais_com_cache_cheio_devolve_todos(fabrica_sessao, monkeypatch):
+    from sqlalchemy import select
+
+    from app.api.routes import dashboard
+    from app.models import Simulacao
+
+    with fabrica_sessao() as s:
+        ids = s.scalars(select(Simulacao.id).limit(2)).all()
+        dashboard._TOTAIS.clear()
+        dashboard._totais(s, ids[:1])
+        monkeypatch.setattr(dashboard, "_CACHE_MAX", 1)  # o segundo id estoura o limite e zera o cache
+        assert set(dashboard._totais(s, ids)) == set(ids)
+        assert len(dashboard._TOTAIS) <= 1
+
+
+def test_meses_do_periodo():
+    from app.api.routes.dashboard import _meses
+    assert _meses("2025-01", "2025-12") == 12
+    assert _meses("2025-11", "2026-02") == 4
 
 
 def test_aceite_conta_no_progresso_e_nao_desatualiza_simulacao(cliente, contador, pid):
