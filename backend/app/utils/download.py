@@ -18,4 +18,4 @@ def celula_csv(v):
     caractere de controle (tab, CR, LF) ou com = + - @, mesmo depois de espaços."""
     if not isinstance(v, str) or not v:
         return v
-    return "'" + v if v[0] in "\t\r\n" or v.lstrip(" ")[:1] in ("=", "+", "-", "@") else v
+    return "'" + v if v[0] in "\t\r\n" or v.lstrip()[:1] in ("=", "+", "-", "@") else v

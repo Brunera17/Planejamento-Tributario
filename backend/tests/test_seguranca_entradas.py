@@ -33,6 +33,7 @@ def test_celula_csv_neutraliza_formulas():
     assert celula_csv("-2+3") == "'-2+3"
     assert celula_csv("\n=1+1") == "'\n=1+1"
     assert celula_csv("  =1+1") == "'  =1+1"
+    assert celula_csv(" \t=1+1") == "' \t=1+1"
     assert celula_csv("Parafuso") == "Parafuso" and celula_csv("") == ""
     assert celula_csv(42) == 42 and celula_csv(None) is None
 
