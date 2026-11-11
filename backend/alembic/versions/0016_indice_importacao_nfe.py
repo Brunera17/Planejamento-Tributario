@@ -19,9 +19,13 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+# CONCURRENTLY no Postgres: não trava gravações em nota_fiscal durante o deploy (precisa rodar fora de transação);
+# o SQLite ignora a opção
 def upgrade() -> None:
-    op.create_index("ix_nota_fiscal_importacao", "nota_fiscal", ["importacao_id"])
+    with op.get_context().autocommit_block():
+        op.create_index("ix_nota_fiscal_importacao", "nota_fiscal", ["importacao_id"], postgresql_concurrently=True)
 
 
 def downgrade() -> None:
-    op.drop_index("ix_nota_fiscal_importacao", table_name="nota_fiscal")
+    with op.get_context().autocommit_block():
+        op.drop_index("ix_nota_fiscal_importacao", table_name="nota_fiscal", postgresql_concurrently=True)
