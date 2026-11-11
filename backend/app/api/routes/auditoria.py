@@ -13,6 +13,7 @@ from app.core.erros import ErroNegocio
 from app.db import session as db_session
 from app.models import EventoAuditoria
 from app.services import auditoria
+from app.utils.download import celula_csv
 
 router = APIRouter(prefix="/auditoria", tags=["Auditoria"])
 
@@ -96,7 +97,7 @@ def exportar(u: Contador, desde: date, ate: date, usuario_id: int | None = None,
         # sessão própria: a da requisição já foi fechada quando o corpo começa a ser enviado
         with db_session.SessionLocal() as s:
             for ev in s.scalars(q.order_by(EventoAuditoria.id).execution_options(yield_per=500)):
-                w.writerow([_saida(ev)[c] for c in COLUNAS])
+                w.writerow([celula_csv(_saida(ev)[c]) for c in COLUNAS])
                 yield saida()
 
     nome = f"AUDITORIA_{desde.isoformat()}_{ate.isoformat()}.csv"

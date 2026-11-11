@@ -13,8 +13,15 @@ RegimeStr = Literal["SIMPLES_NACIONAL", "LUCRO_PRESUMIDO", "LUCRO_REAL"]
 
 
 class LoginEntrada(Esquema):
-    usuario: str
-    senha: str
+    usuario: str = Field(max_length=120)
+    senha: str = Field(max_length=256)  # acima de 72 bytes o bcrypt recusa; conferir_senha devolve False
+
+
+def _senha_cabe_no_bcrypt(v: str | None) -> str | None:
+    # o bcrypt usa no máximo 72 bytes, e letra acentuada ocupa 2 em UTF-8
+    if v is not None and len(v.encode()) > 72:
+        raise ValueError("Senha longa demais (máximo 72 bytes; acentos contam 2)")
+    return v
 
 
 class UsuarioSaida(Esquema):
@@ -38,12 +45,16 @@ class UsuarioEntrada(Esquema):
     senha: str = Field(min_length=8, max_length=72)
     perfil: Perfil
 
+    _senha = field_validator("senha")(_senha_cabe_no_bcrypt)
+
 
 class UsuarioEdicao(Esquema):
     nome: str = Field(min_length=2, max_length=120)
     perfil: Perfil
     ativo: bool
     senha: str | None = Field(default=None, min_length=8, max_length=72)  # vazio mantém a senha atual
+
+    _senha = field_validator("senha")(_senha_cabe_no_bcrypt)
 
 
 class EmpresaEntrada(Esquema):
