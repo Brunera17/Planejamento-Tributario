@@ -8,7 +8,7 @@ services:
     rootDir: backend
     region: virginia  # ao lado do banco no Neon (aws-us-east-1): cada consulta ao banco fica a ~1 ms
     plan: free  # sem disco persistente: os arquivos vão para o Drive (ARMAZENAMENTO=drive)
-    healthCheckPath: /openapi.json
+    healthCheckPath: /api/saude  # sempre 200; o /openapi.json fica desligado em produção
     autoDeployTrigger: checksPass  # só publica depois que o CI do GitHub passar no commit
     envVars:
       # Neon: a URL direta (sem "-pooler" no host), com sslmode=require. 1 processo x pool 5+5 cabe no plano grátis.

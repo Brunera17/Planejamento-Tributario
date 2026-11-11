@@ -32,6 +32,7 @@ services:
       CHAVE_ARQUIVOS: ${CHAVE_ARQUIVOS:-ZGVzZW52b2x2aW1lbnRvLXNvbWVudGUtbmFvLXVzYXI=}
       UPLOAD_DIR: /data/uploads
       CORS_ORIGINS: http://localhost:5173
+      DOCUMENTACAO_API: "true"  # /docs local; em produção fica desligado
     # local: com os usuários e planejamentos de demonstração
     command: ["sh", "-c", "alembic upgrade head && python -m app.seeds.carga --demo && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     ports: ["8000:8000"]

@@ -10,10 +10,13 @@ from app.services import auditoria as auditoria_servico
 
 
 def criar_app() -> FastAPI:
+    docs = get_settings().documentacao_ligada
     app = FastAPI(
         title="Planejador Tributário",
         version="0.1.0",
         description="Compara Simples Nacional, Lucro Presumido e Lucro Real, inclusive na transição da Reforma.",
+        docs_url="/docs" if docs else None, redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
     )
     app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_lista, allow_credentials=True,
                        allow_methods=["*"], allow_headers=["*"],

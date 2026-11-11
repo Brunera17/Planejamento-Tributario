@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     auditoria_retencao_anos: int = 5
     auditoria_dedup_horas: int = 12  # PLANEJAMENTO_ABERTO: uma vez por sessão (duração absoluta da sessão)
     cors_origins: str = "http://localhost:5173"
+    # /docs, /redoc e /openapi.json: vazio = só em desenvolvimento (SQLite); em produção expõem o mapa da API
+    documentacao_api: bool | None = None
 
     @field_validator("database_url")
     @classmethod
@@ -89,6 +91,10 @@ class Settings(BaseSettings):
     def chave_arquivos_efetiva(self) -> str:
         """Sem CHAVE_ARQUIVOS (só desenvolvimento e testes, em SQLite): uma chave fixa e pública — nunca em produção."""
         return self.chave_arquivos or CHAVE_ARQUIVOS_DESENVOLVIMENTO
+
+    @property
+    def documentacao_ligada(self) -> bool:
+        return self.database_url.startswith("sqlite") if self.documentacao_api is None else self.documentacao_api
 
     @property
     def cors_lista(self) -> list[str]:
