@@ -1,0 +1,44 @@
+"""Entradas hostis: senha acima do limite do bcrypt e texto que o Excel leria como fórmula."""
+from datetime import UTC, datetime
+
+from app.core.seguranca import conferir_senha, gerar_hash
+from app.utils.download import celula_csv
+
+
+def test_senha_acima_de_72_bytes_e_senha_errada_nao_erro_500(cliente):
+    r = cliente.post("/api/auth/login", json={"usuario": "ninguem-longo", "senha": "ç" * 40})  # 80 bytes
+    assert r.status_code == 401
+
+
+def test_conferir_senha_longa_devolve_false():
+    h = gerar_hash("a" * 72)
+    assert conferir_senha("a" * 72, h)
+    assert not conferir_senha("a" * 73, h)
+
+
+def test_login_com_campos_gigantes_e_recusado(cliente):
+    r = cliente.post("/api/auth/login", json={"usuario": "x" * 5000, "senha": "y"})
+    assert r.status_code == 422
+
+
+def test_cadastro_recusa_senha_com_acentos_acima_de_72_bytes(cliente, contador):
+    r = cliente.post("/api/usuarios", headers=contador, json={
+        "nome": "Teste Acento", "usuario": "teste.acento", "senha": "ã" * 40, "perfil": "ANALISTA"})
+    assert r.status_code == 422 and "senha" in r.json()["campos"]
+
+
+def test_celula_csv_neutraliza_formulas():
+    assert celula_csv("=HYPERLINK(1)") == "'=HYPERLINK(1)"
+    assert celula_csv("@SUM(A1)") == "'@SUM(A1)"
+    assert celula_csv("-2+3") == "'-2+3"
+    assert celula_csv("Parafuso") == "Parafuso"
+    assert celula_csv(42) == 42 and celula_csv(None) is None
+
+
+def test_exportacao_da_auditoria_neutraliza_login_hostil(cliente, contador):
+    cliente.post("/api/auth/login", json={"usuario": '=HYPERLINK("http://x";"y")', "senha": "qualquer"})
+    hoje = datetime.now(UTC).date()
+    r = cliente.get(f"/api/auditoria/exportar?desde={hoje}&ate={hoje}&acao=LOGIN_FALHA", headers=contador)
+    assert r.status_code == 200
+    assert "'=HYPERLINK" in r.text
+    assert ';=HYPERLINK' not in r.text and ';"=HYPERLINK' not in r.text

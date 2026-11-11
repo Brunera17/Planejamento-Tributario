@@ -11,3 +11,8 @@ def anexo(conteudo: bytes, nome: str, media_type: str = "application/octet-strea
                   else f'attachment; filename="{nome}"')
     return Response(conteudo, media_type=media_type,
                     headers={"Content-Disposition": disposicao, "Cache-Control": "no-store"})
+
+
+def celula_csv(v):
+    """Texto que o Excel leria como fórmula (=, +, -, @, tab, CR) ganha um apóstrofo na frente: CSV injection."""
+    return "'" + v if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r") else v

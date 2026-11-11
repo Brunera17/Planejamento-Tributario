@@ -20,6 +20,7 @@ from app.models import CfopRegra, NotaFiscal, NotaItem, Planejamento, RevisaoPro
 from app.motor.lei_monofasico import Avaliacao, Enquadramento, avaliar
 from app.seeds import tabelas
 from app.services.memo import por_planejamento
+from app.utils.download import celula_csv
 from app.utils.validacao import sem_acentos
 
 ZERO = Decimal("0")
@@ -175,7 +176,7 @@ def exportar_csv(produtos: list[Produto]) -> str:
     for pr in produtos:
         if not pr.alertas and not (pr.revisao and pr.revisao.ncm_corrigido):
             continue
-        w.writerow([pr.cod_produto, pr.descricao, pr.ncm_nota, pr.ncm, "/".join(sorted(pr.csts)), "Monofásico" if pr.monofasico else "Tributado",
+        w.writerow([celula_csv(pr.cod_produto), celula_csv(pr.descricao), pr.ncm_nota, pr.ncm, "/".join(sorted(pr.csts)), "Monofásico" if pr.monofasico else "Tributado",
                     f"{pr.receita:.2f}".replace(".", ","), "Revisado" if pr.revisado else ("Pendente" if pr.pendente else "Aviso"),
-                    "; ".join(TIPOS[a][0] for a in pr.alertas) + (f". {pr.revisao.motivo}" if pr.revisao else "")])
+                    celula_csv("; ".join(TIPOS[a][0] for a in pr.alertas) + (f". {pr.revisao.motivo}" if pr.revisao else ""))])
     return buf.getvalue()

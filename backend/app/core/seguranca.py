@@ -19,7 +19,11 @@ def gerar_hash(senha: str) -> str:
 
 
 def conferir_senha(senha: str, senha_hash: str) -> bool:
-    return bcrypt.checkpw(senha.encode(), senha_hash.encode())
+    b = senha.encode()
+    if len(b) > 72:  # o bcrypt 5 lança ValueError: vira senha errada (e conta no limite de tentativas)
+        bcrypt.checkpw(b[:72], senha_hash.encode())  # mesmo tempo de resposta
+        return False
+    return bcrypt.checkpw(b, senha_hash.encode())
 
 
 @lru_cache
