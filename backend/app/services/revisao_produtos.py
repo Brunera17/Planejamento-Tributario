@@ -176,7 +176,8 @@ def exportar_csv(produtos: list[Produto]) -> str:
     for pr in produtos:
         if not pr.alertas and not (pr.revisao and pr.revisao.ncm_corrigido):
             continue
-        w.writerow([celula_csv(pr.cod_produto), celula_csv(pr.descricao), pr.ncm_nota, pr.ncm, "/".join(sorted(pr.csts)), "Monofásico" if pr.monofasico else "Tributado",
+        w.writerow([celula_csv(pr.cod_produto), celula_csv(pr.descricao), celula_csv(pr.ncm_nota), celula_csv(pr.ncm),
+                    celula_csv("/".join(sorted(pr.csts))), "Monofásico" if pr.monofasico else "Tributado",
                     f"{pr.receita:.2f}".replace(".", ","), "Revisado" if pr.revisado else ("Pendente" if pr.pendente else "Aviso"),
                     celula_csv("; ".join(TIPOS[a][0] for a in pr.alertas) + (f". {pr.revisao.motivo}" if pr.revisao else ""))])
     return buf.getvalue()
