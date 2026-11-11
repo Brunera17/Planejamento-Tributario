@@ -74,3 +74,17 @@ def test_producao_exige_redis_url(monkeypatch):
     from app.core.config import Settings
     with pytest.raises(ValueError, match="REDIS_URL"):
         Settings(database_url="postgresql://u:s@h/db", jwt_secret="x" * 40, redis_url="")
+
+
+def test_saude_continua_200_com_erro_do_redis_ou_do_disco(cliente, monkeypatch):
+    class RedisCarregando:
+        def ping(self):
+            raise redis.exceptions.BusyLoadingError("LOADING")
+
+    def disco_cheio():
+        raise OSError("disco cheio")
+
+    redis_cliente.definir_cliente(RedisCarregando())
+    monkeypatch.setattr("app.services.auditoria.pendentes_na_contingencia", disco_cheio)
+    r = cliente.get("/api/saude")
+    assert r.status_code == 200 and r.json()["redis"] == "indisponivel" and r.json()["auditoria_pendente"] is None

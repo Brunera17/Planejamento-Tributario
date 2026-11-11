@@ -29,8 +29,11 @@ def criar_app() -> FastAPI:
     @app.get("/api/saude", tags=["Infra"])
     def saude():
         # sempre 200: se virar health check do Render, uma queda do Redis não pode reiniciar a API em loop
-        return {"status": "ok", "redis": redis_cliente.estado(),
-                "auditoria_pendente": auditoria_servico.pendentes_na_contingencia()}
+        try:
+            pendente = auditoria_servico.pendentes_na_contingencia()
+        except OSError:  # disco cheio ou sem permissão: informa sem derrubar o health check
+            pendente = None
+        return {"status": "ok", "redis": redis_cliente.estado(), "auditoria_pendente": pendente}
 
     return app
 

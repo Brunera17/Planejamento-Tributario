@@ -62,3 +62,9 @@ def test_documentacao_da_api_some_em_producao(monkeypatch):
     for rota in ("/docs", "/redoc", "/openapi.json"):
         assert c.get(rota).status_code == 404
     assert get_settings().documentacao_ligada  # testes rodam em SQLite: docs continuam no desenvolvimento
+
+
+def test_documentacao_api_vazia_vale_automatico(monkeypatch):
+    from app.core.config import Settings
+    monkeypatch.setenv("DOCUMENTACAO_API", "")
+    assert Settings().documentacao_api is None

@@ -62,8 +62,14 @@ class Settings(BaseSettings):
     auditoria_retencao_anos: int = 5
     auditoria_dedup_horas: int = 12  # PLANEJAMENTO_ABERTO: uma vez por sessão (duração absoluta da sessão)
     cors_origins: str = "http://localhost:5173"
-    # /docs, /redoc e /openapi.json: vazio = só em desenvolvimento (SQLite); em produção expõem o mapa da API
+    # /docs, /redoc e /openapi.json (o mapa da API): sem valor, só ligam em SQLite (desenvolvimento);
+    # fora dele ficam desligados, a menos que DOCUMENTACAO_API=true
     documentacao_api: bool | None = None
+
+    @field_validator("documentacao_api", mode="before")
+    @classmethod
+    def _vazio_e_automatico(cls, v):
+        return None if isinstance(v, str) and not v.strip() else v  # DOCUMENTACAO_API= no painel não derruba a API
 
     @field_validator("database_url")
     @classmethod
