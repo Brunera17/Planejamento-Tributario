@@ -68,7 +68,11 @@ export function Empresas() {
       {importando && <Importacao fechar={() => setImportando(false)} />}
       {janelaConfirmacao}
       <Card
-        titulo={`${ativas}${lista.temMais ? "+" : ""} ${ativas === 1 ? "empresa ativa" : "empresas ativas"}`}
+        titulo={
+          inativas // com inativas na lista, as páginas seguintes misturam as duas: conta só o que está na tela
+            ? `${data.length}${lista.temMais ? "+" : ""} ${data.length === 1 ? "empresa" : "empresas"}`
+            : `${ativas}${lista.temMais ? "+" : ""} ${ativas === 1 ? "empresa ativa" : "empresas ativas"}`
+        }
         semPadding
         acoes={
           <div className="flex flex-wrap items-center gap-3 text-sm">

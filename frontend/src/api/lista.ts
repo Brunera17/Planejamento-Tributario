@@ -15,9 +15,11 @@ export function useLista<T>(chave: unknown[], rota: string, params: Record<strin
     getNextPageParam: (ultima) => ultima.proximo,
   });
   return {
-    itens: q.data?.pages.flatMap((p) => p.itens) ?? [],
+    // a paginação é por deslocamento: um cadastro novo entre páginas empurra uma linha para a página seguinte
+    itens: [...new Map((q.data?.pages.flatMap((p) => p.itens) ?? []).map((x) => [(x as { id: number }).id, x])).values()],
     temMais: q.hasNextPage,
     carregarMais: () => q.fetchNextPage(),
     carregando: q.isFetchingNextPage,
+    falhou: q.isFetchNextPageError,
   };
 }

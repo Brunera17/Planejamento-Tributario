@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import Response
 from pydantic import Field
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, insert, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual, obter_planejamento
@@ -51,6 +51,7 @@ from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
 from app.utils.paginacao import Deslocamento, Limite, pagina
 from app.utils.upload import ler_limitado
+from app.utils.validacao import somente_digitos
 
 router = APIRouter(prefix="/planejamentos", tags=["Planejamentos e coleta"])
 
@@ -115,7 +116,8 @@ def listar(db: DB, _: UsuarioAtual, resposta: Response, status: str | None = Non
     if empresa_id:
         q = q.where(Planejamento.empresa_id == empresa_id)
     if busca:
-        q = q.where(Empresa.razao_social.ilike(f"%{busca}%") | Empresa.cnpj.contains(busca))
+        cnpj = somente_digitos(busca)  # o CNPJ é gravado só com dígitos; a busca pode vir com máscara
+        q = q.where(or_(Empresa.razao_social.ilike(f"%{busca}%"), *([Empresa.cnpj.contains(cnpj)] if cnpj else [])))
     return [_saida(p) for p in pagina(db, q, limite, deslocamento, resposta)]
 
 

@@ -12,6 +12,7 @@ from app.services.auditoria import auditar
 from app.services.simulacao import marcar_desatualizada
 from app.utils.paginacao import Deslocamento, Limite, pagina
 from app.utils.upload import ler_limitado
+from app.utils.validacao import somente_digitos
 
 router = APIRouter(prefix="/empresas", tags=["Empresas"])
 
@@ -23,7 +24,8 @@ def listar(db: DB, _: UsuarioAtual, resposta: Response, busca: str | None = None
     if ativas:
         q = q.where(Empresa.ativo)
     if busca:
-        q = q.where(or_(Empresa.razao_social.ilike(f"%{busca}%"), Empresa.cnpj.contains(busca)))
+        cnpj = somente_digitos(busca)  # o CNPJ é gravado só com dígitos; a busca pode vir com máscara
+        q = q.where(or_(Empresa.razao_social.ilike(f"%{busca}%"), *([Empresa.cnpj.contains(cnpj)] if cnpj else [])))
     return pagina(db, q, limite, deslocamento, resposta)
 
 

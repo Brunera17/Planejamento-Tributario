@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import Query, Response
 
 Limite = Annotated[int, Query(ge=1, le=200)]
-Deslocamento = Annotated[int, Query(ge=0)]
+Deslocamento = Annotated[int, Query(ge=0, le=10_000)]  # teto: OFFSET grande faz o banco varrer e descartar linhas
 
 
 def pagina(db, q, limite: int, deslocamento: int, resposta: Response) -> list:

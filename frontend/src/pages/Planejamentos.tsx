@@ -100,6 +100,7 @@ function NovoPlanejamento({ fechar }: { fechar: () => void }) {
     mutationFn: () => api.post("/planejamentos", { ...form, empresa_id: Number(form.empresa_id) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["planejamentos"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] }); // as contagens da visão geral vêm do indicador
       fechar();
     },
     onError: (e) => setErro(mensagemErro(e)),
