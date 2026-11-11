@@ -122,7 +122,7 @@ da criptografia; idempotente) e `--recifrar-chaves` (rotação da chave mestra).
 (`ARMAZENAMENTO=disco`, padrão, para desenvolvimento e testes) ou no Google Drive da conta do escritório
 (`ARMAZENAMENTO=drive`, produção). O Drive entra por OAuth com token de atualização e escopo `drive.file`: o app só
 enxerga a pasta `Planejador` que ele mesmo criou, com as subpastas `documentos` e `relatorios`. Quem abrir a pasta no
-Drive vê só arquivos cifrados. Drive fora do ar ou acesso revogado responde 503. Comandos:
+Drive vê só arquivos cifrados, com nomes opacos (o nome real, que no relatório tem CNPJ e período, fica no banco e em `appProperties`). Drive fora do ar ou acesso revogado responde 503. Comandos:
 `python -m app.services.armazenamento --autorizar` (uma vez: autoriza a conta, cria as pastas e imprime
 `DRIVE_REFRESH_TOKEN` e `DRIVE_PASTA_ID`) e `--importar-pasta <pasta>` (migração de um disco de uploads; idempotente).
 A contingência da auditoria continua no disco local, que no plano grátis do Render se perde num reinício: nesse caso

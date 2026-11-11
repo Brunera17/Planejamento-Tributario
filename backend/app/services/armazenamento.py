@@ -10,6 +10,7 @@ ele mesmo criou). Conta de serviço não serve: ela não tem espaço próprio no
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import secrets
@@ -77,6 +78,11 @@ def _literal(texto: str) -> str:
     return "'" + texto.replace("\\", "\\\\").replace("'", "\\'") + "'"
 
 
+def _opaco(nome: str) -> str:
+    """Nome no Drive: o real (o do relatório tem CNPJ e período) fica só no banco e em appProperties, que só o app vê."""
+    return hashlib.sha256(nome.encode()).hexdigest()
+
+
 class Drive:
     def __init__(self, client_id: str, client_secret: str, refresh_token: str, raiz: str):
         self.client_id, self.client_secret, self.refresh_token, self.raiz = client_id, client_secret, refresh_token, raiz
@@ -95,6 +101,8 @@ class Drive:
             raise ErroArmazenamento(f"Google Drive respondeu {e.code}") from e
         except urllib.error.URLError as e:
             raise ErroArmazenamento("Google Drive fora do ar") from e
+        except OSError as e:  # inclui o tempo esgotado no meio da leitura da resposta
+            raise ErroArmazenamento("Google Drive não respondeu") from e
 
     def _api(self, metodo: str, url: str, corpo: bytes | None = None, cabecalhos: dict | None = None) -> tuple[bytes, dict]:
         with self._trava:
@@ -111,14 +119,16 @@ class Drive:
         q = [f"{_literal(pai)} in parents", "trashed = false"]
         if nome is not None:
             q.append(f"name = {_literal(nome)}")
-        if pasta:
-            q.append(f"mimeType = '{PASTA_MIME}'")
+        q.append(f"mimeType {'=' if pasta else '!='} '{PASTA_MIME}'")  # arquivo nunca é pasta, como no disco
         achados, pagina = [], None
         while True:
-            params = {"q": " and ".join(q), "fields": "nextPageToken,files(id,name)", "pageSize": 1000}
+            params = {"q": " and ".join(q), "fields": "nextPageToken,files(id,name,appProperties)", "pageSize": 1000}
             if pagina:
                 params["pageToken"] = pagina
-            r = json.loads(self._api("GET", f"{API}?{urlencode(params)}")[0])
+            try:
+                r = json.loads(self._api("GET", f"{API}?{urlencode(params)}")[0])
+            except FileNotFoundError as e:  # a pasta-mãe sumiu: problema de configuração, não de um arquivo
+                raise ErroArmazenamento("pasta do Drive não encontrada; confira DRIVE_PASTA_ID") from e
             achados += r.get("files", [])
             pagina = r.get("nextPageToken")
             if not pagina:
@@ -134,7 +144,7 @@ class Drive:
         return self._pastas[pasta]
 
     def _id(self, pasta: str, nome: str) -> str | None:
-        achados = self._buscar(self._pasta(pasta), nome)
+        achados = self._buscar(self._pasta(pasta), _opaco(nome))
         return achados[0]["id"] if achados else None
 
     def gravar(self, pasta: str, nome: str, dados: bytes) -> None:
@@ -143,7 +153,7 @@ class Drive:
         if fid:  # recifrar: o arquivo continua o mesmo, só o conteúdo muda
             inicio = self._api("PATCH", f"{UPLOAD}/{fid}?uploadType=resumable", b"{}", JSON)
         else:
-            meta = {"name": nome, "parents": [self._pasta(pasta)]}
+            meta = {"name": _opaco(nome), "parents": [self._pasta(pasta)], "appProperties": {"nome": nome}}
             inicio = self._api("POST", f"{UPLOAD}?uploadType=resumable", json.dumps(meta).encode(), JSON)
         sessao = {k.lower(): v for k, v in inicio[1].items()}["location"]
         self._api("PUT", sessao, dados, {"Content-Type": "application/octet-stream"})
@@ -163,7 +173,7 @@ class Drive:
             self._api("DELETE", f"{API}/{fid}")
 
     def nomes(self, pasta: str) -> list[str]:
-        return sorted(f["name"] for f in self._buscar(self._pasta(pasta)))
+        return sorted((f.get("appProperties") or {}).get("nome", f["name"]) for f in self._buscar(self._pasta(pasta)))
 
     def criar_pasta(self, nome: str, pai: str | None = None) -> str:
         meta = {"name": nome, "mimeType": PASTA_MIME, **({"parents": [pai]} if pai else {})}
@@ -201,6 +211,7 @@ def _autorizar() -> None:
             pass
 
     servidor = HTTPServer(("127.0.0.1", 0), Resposta)
+    servidor.timeout = 300  # sem retorno do navegador em 5 minutos: desiste
     retorno = f"http://127.0.0.1:{servidor.server_port}"
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
         "client_id": s.drive_client_id, "redirect_uri": retorno, "response_type": "code", "scope": ESCOPO,
@@ -208,6 +219,8 @@ def _autorizar() -> None:
     print(f"Abrindo o navegador. Se não abrir, acesse:\n{url}\n")
     webbrowser.open(url)
     servidor.handle_request()
+    if not recebido:
+        raise SystemExit("Tempo esgotado: o navegador não voltou com a autorização em 5 minutos; rode de novo")
     if recebido.get("state") != estado or "code" not in recebido:
         raise SystemExit(f"Autorização recusada ou inválida: {recebido.get('error', 'sem código')}")
     drive = Drive(s.drive_client_id, s.drive_client_secret, "", "")
@@ -228,13 +241,19 @@ def _autorizar() -> None:
 
 
 def _importar_pasta(origem: str) -> None:
-    """Migração: sobe os arquivos de uma pasta de uploads (como o disco do Render) para o armazenamento atual."""
+    """Migração: sobe os arquivos de uma pasta de uploads (como o disco do Render) para o Drive.
+    Arquivo de antes da criptografia é cifrado antes de subir: o Drive nunca recebe texto puro."""
+    from app.services import cripto  # aqui: cripto importa este módulo
+
     disco, destino = Disco(origem), atual()
+    if not isinstance(destino, Drive):
+        raise SystemExit("Defina ARMAZENAMENTO=drive (e as DRIVE_*): o destino da migração é o Drive")
     for pasta in PASTAS:
         ja = set(destino.nomes(pasta))
         novos = [n for n in disco.nomes(pasta) if n not in ja]
         for nome in novos:
-            destino.gravar(pasta, nome, disco.ler(pasta, nome))
+            dados = disco.ler(pasta, nome)
+            destino.gravar(pasta, nome, dados if cripto.eh_cifrado(dados) else cripto.cifrar(dados, nome.encode()))
         print(f"{pasta}: {len(novos)} enviado(s), {len(ja)} já estava(m) lá")
 
 

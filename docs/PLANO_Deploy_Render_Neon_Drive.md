@@ -71,7 +71,7 @@ Banco: o código não muda. Com a URL direta do Neon, a trava de linha da aprova
 ## Fase 3: migração (só se já houver dados num Render pago)
 
 1. `pg_dump` do banco antigo e `pg_restore` no Neon.
-2. `python -m app.services.armazenamento --importar-pasta /data/uploads`, no shell do serviço antigo e com as variáveis `DRIVE_*`. Os arquivos sobem como estão, já cifrados. Repetir o comando não duplica nada.
+2. `python -m app.services.armazenamento --importar-pasta /data/uploads`, no shell do serviço antigo, com `ARMAZENAMENTO=drive` e as variáveis `DRIVE_*` (sem elas o comando recusa). Arquivo de antes da criptografia é cifrado antes de subir. Repetir o comando não duplica nada.
 3. Conferir se o número de documentos no banco bate com o número de arquivos no Drive, e só então desligar o serviço antigo.
 
 ## Riscos que ficam

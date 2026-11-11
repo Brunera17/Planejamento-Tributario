@@ -24,7 +24,8 @@ class DriveFalso(Drive):
     def _novo(self, meta, pasta=False):
         self._seq += 1
         fid = f"f{self._seq}"
-        self.itens[fid] = {"name": meta["name"], "pai": (meta.get("parents") or [None])[0], "pasta": pasta}
+        self.itens[fid] = {"name": meta["name"], "pai": (meta.get("parents") or [None])[0], "pasta": pasta,
+                           "appProperties": meta.get("appProperties")}
         return fid
 
     def _http(self, metodo, url, corpo=None, cabecalhos=None):
@@ -44,9 +45,9 @@ class DriveFalso(Drive):
             pai = re.search(r"'([^']*)' in parents", consulta).group(1)
             nome = re.search(r"name = '((?:[^'\\]|\\.)*)'", consulta)
             nome = nome and re.sub(r"\\(.)", r"\1", nome.group(1))
-            so_pasta = "mimeType" in consulta
-            achados = [{"id": i, "name": x["name"]} for i, x in self.itens.items()
-                       if x["pai"] == pai and (nome is None or x["name"] == nome) and (not so_pasta or x["pasta"])]
+            so_pasta = "mimeType = " in consulta
+            achados = [{"id": i, "name": x["name"], "appProperties": x.get("appProperties")} for i, x in self.itens.items()
+                       if x["pai"] == pai and (nome is None or x["name"] == nome) and x["pasta"] == so_pasta]
             return json.dumps({"files": achados}).encode(), {}
         if base == API and metodo == "POST":
             meta = json.loads(corpo)
@@ -84,6 +85,29 @@ def test_drive_tem_a_mesma_interface_do_disco():
     assert d.tokens == 1  # o token de acesso é reaproveitado até perto de vencer
 
 
+def test_nome_real_nao_aparece_no_drive_e_subpasta_nao_e_arquivo():
+    d = DriveFalso()
+    nome = "PLANEJAMENTO_81520477000108_202601-202612_20261111-120000.pdf"
+    d.gravar("relatorios", nome, PDF)
+    d.criar_pasta("perdida", "id-relatorios")
+    assert nome not in [x["name"] for x in d.itens.values()]  # sem CNPJ nem período à vista
+    assert d.nomes("relatorios") == [nome] and d.ler("relatorios", nome) == PDF
+
+
+def test_pasta_apagada_no_drive_responde_503():
+    d = DriveFalso()
+    d._pastas["documentos"] = "sumiu"
+    real = d._http
+
+    def http(metodo, url, corpo=None, cabecalhos=None):
+        if "sumiu" in url:
+            raise FileNotFoundError(url)
+        return real(metodo, url, corpo, cabecalhos)
+    d._http = http
+    with pytest.raises(ErroArmazenamento):
+        d.existe("documentos", "a.pdf")
+
+
 def test_token_renovado_ao_vencer():
     d = DriveFalso()
     d.existe("documentos", "a.pdf")
@@ -113,8 +137,10 @@ def drive(monkeypatch):
 
 
 def test_documento_vai_cifrado_para_o_drive(cliente, contador, drive):
-    emp = cliente.post("/api/empresas", headers=contador, json={
-        "razao_social": "DRIVE LTDA", "cnpj": "81520477009903", "regime_tributario": "LUCRO_REAL"}).json()
+    r = cliente.post("/api/empresas", headers=contador, json={
+        "razao_social": "DRIVE LTDA", "cnpj": "81520477009903", "regime_tributario": "LUCRO_REAL"})
+    assert r.status_code == 201, r.text
+    emp = r.json()
     pid = cliente.post("/api/planejamentos", headers=contador, json={
         "empresa_id": emp["id"], "competencia_inicial": "2026-01", "competencia_final": "2026-01"}).json()["id"]
     r = cliente.post(f"/api/planejamentos/{pid}/documentos/2026-01/1", headers=contador, files={"arquivo": ("e.pdf", PDF)})
@@ -134,9 +160,15 @@ def test_cifrar_existentes_no_drive(drive):
 
 def test_importar_pasta_sobe_so_o_que_falta(drive, tmp_path, capsys):
     origem = armazenamento.Disco(tmp_path)
-    origem.gravar("documentos", "a.pdf", b"A")
-    origem.gravar("relatorios", "r.pdf", b"R")
+    origem.gravar("documentos", "a.pdf", b"A")  # de antes da criptografia: sobe cifrado
+    origem.gravar("relatorios", "r.pdf", cripto.cifrar(b"R", b"r.pdf"))
     armazenamento._importar_pasta(str(tmp_path))
     armazenamento._importar_pasta(str(tmp_path))  # repetir não duplica
-    assert drive.nomes("documentos") == ["a.pdf"] and drive.ler("relatorios", "r.pdf") == b"R"
+    assert drive.nomes("documentos") == ["a.pdf"] and cripto.eh_cifrado(drive.ler("documentos", "a.pdf"))
+    assert documentos.ler("a.pdf") == b"A" and drive.ler("relatorios", "r.pdf") == origem.ler("relatorios", "r.pdf")
     assert "0 enviado(s), 1 já estava(m) lá" in capsys.readouterr().out
+
+
+def test_importar_pasta_exige_o_drive(tmp_path):
+    with pytest.raises(SystemExit, match="ARMAZENAMENTO=drive"):
+        armazenamento._importar_pasta(str(tmp_path))  # padrão é o disco: copiaria para ele mesmo
