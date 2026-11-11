@@ -105,6 +105,6 @@ def estado() -> str:
         return "disjuntor_aberto"
     try:
         executar(lambda r: r.ping())
-    except RedisIndisponivel:
+    except (RedisIndisponivel, redis.RedisError):  # ex.: LOADING logo após reiniciar
         return "indisponivel"
     return "ok"
