@@ -23,13 +23,19 @@ def _meses(inicio: str, fim: str) -> int:
 
 
 def _totais(db, ids: list[int]) -> dict[int, dict[str, Decimal]]:
-    faltam = [i for i in ids if i not in _TOTAIS]
+    # monta a resposta em dicionário próprio: outra requisição pode zerar o cache no meio desta
+    saida = {i: t for i in ids if (t := _TOTAIS.get(i)) is not None}
+    faltam = [i for i in ids if i not in saida]
     if faltam:
-        if len(_TOTAIS) + len(faltam) > _CACHE_MAX:
+        novos = {sid: {c["regime"]: Decimal(str(c["total"])) for c in json.loads(resultado)["comparativo"]}
+                 for sid, resultado in db.execute(
+                     select(Simulacao.id, Simulacao.resultado_json).where(Simulacao.id.in_(faltam)))}
+        saida.update(novos)
+        if len(_TOTAIS) + len(novos) > _CACHE_MAX:
             _TOTAIS.clear()
-        for sid, resultado in db.execute(select(Simulacao.id, Simulacao.resultado_json).where(Simulacao.id.in_(faltam))):
-            _TOTAIS[sid] = {c["regime"]: Decimal(str(c["total"])) for c in json.loads(resultado)["comparativo"]}
-    return {i: _TOTAIS[i] for i in ids}
+        if len(novos) <= _CACHE_MAX:
+            _TOTAIS.update(novos)
+    return saida
 
 
 @router.get("")
