@@ -52,7 +52,11 @@ let renovando: Promise<boolean> | null = null;
 
 export function renovarSessao(): Promise<boolean> {
   renovando ??= api
-    .post<RespostaSessao>("/auth/refresh", null, { _semRenovar: true } as unknown as InternalAxiosRequestConfig)
+    // 90 s: cobre a API acordando no Render (~1 min) sem deixar a tela em "Carregando…" para sempre
+    .post<RespostaSessao>("/auth/refresh", null, {
+      _semRenovar: true,
+      timeout: 90_000,
+    } as unknown as InternalAxiosRequestConfig)
     .then((r) => {
       gravarSessao(r.data);
       return true;
