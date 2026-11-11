@@ -31,6 +31,7 @@ class NotaFiscal(Base):
     __table_args__ = (
         UniqueConstraint("planejamento_id", "chave_acesso", name="uq_nota_chave"),
         Index("ix_nota_fiscal_planejamento_tipo_competencia", "planejamento_id", "tipo", "competencia"),
+        Index("ix_nota_fiscal_importacao", "importacao_id"),  # o ON DELETE SET NULL da importação e o join do relatório contábil
     )
 
     id: Mapped[PK]
