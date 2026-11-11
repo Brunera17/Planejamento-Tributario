@@ -100,7 +100,7 @@ Configuração: `maxmemory-policy noeviction`. No plano gratuito do Render o lim
 ### 1.5 Proteção do login
 - **5 falhas por login / 20 por IP em 15 min** → `429` com `Retry-After`.
 - Mensagem genérica; **tempo constante** (bcrypt contra hash fictício quando o login não existe).
-- IP real: com o proxy, a requisição passa por **navegador → Vercel → Render**, e o `X-Forwarded-For` chega com mais de um endereço. O IP do cliente é o primeiro que não pertence a um proxy confiável, contando da direita (`PROXIES_CONFIAVEIS` = saltos do Render e da Vercel). Hoje o [Dockerfile](../backend/Dockerfile) sobe o Uvicorn com `--forwarded-allow-ips='*'`, o que faz o Uvicorn aceitar `X-Forwarded-For` de **qualquer origem** — quem chamar `planejador-api.onrender.com` direto forja o IP e escapa do limite por IP. Trocar por resolução própria do IP (ignorando `request.client.host` reescrito) com a lista de proxies confiáveis. **Conferir no primeiro deploy** registrando os cabeçalhos recebidos — o limite de tentativas e a auditoria dependem disso; se errar, todo mundo aparece com o IP da Vercel e o limite por IP bloqueia o escritório inteiro.
+- IP real: com o proxy, a requisição passa por **navegador → Vercel → Render**, e o `X-Forwarded-For` chega com mais de um endereço. O IP do cliente é o primeiro que não pertence a um proxy confiável, contando da direita (`PROXIES_CONFIAVEIS` = saltos do Render e da Vercel). Hoje o [Dockerfile](../backend/Dockerfile) sobe o Uvicorn com `--forwarded-allow-ips='*'`, o que faz o Uvicorn aceitar `X-Forwarded-For` de **qualquer origem** — quem chamar `planejador-api-79jj.onrender.com` direto forja o IP e escapa do limite por IP. Trocar por resolução própria do IP (ignorando `request.client.host` reescrito) com a lista de proxies confiáveis. **Conferir no primeiro deploy** registrando os cabeçalhos recebidos — o limite de tentativas e a auditoria dependem disso; se errar, todo mundo aparece com o IP da Vercel e o limite por IP bloqueia o escritório inteiro.
 
 ### 1.6 CSRF e CORS
 - Rotas de dados usam `Authorization: Bearer` → imunes a CSRF.
@@ -115,13 +115,13 @@ Cliente **síncrono** com `ConnectionPool`, `socket_timeout=0.5`, `socket_connec
 
 **Endereço**: `https://planejamento-tributario.domingosassessoria.com.br` — sempre **HTTPS** (o `http://` só redireciona). Cookie `Secure` e HSTS não funcionam em HTTP.
 
-**DNS** (no provedor do `domingosassessoria.com.br`): `CNAME planejamento-tributario → cname.vercel-dns.com`; adicionar o domínio no projeto da Vercel (certificado automático). O Render não precisa de domínio próprio — a Vercel fala com `planejador-api.onrender.com` por trás.
+**DNS** (no provedor do `domingosassessoria.com.br`): `CNAME planejamento-tributario → cname.vercel-dns.com`; adicionar o domínio no projeto da Vercel (certificado automático). O Render não precisa de domínio próprio — a Vercel fala com `planejador-api-79jj.onrender.com` por trás.
 
 **Proxy** em [vercel.json](../frontend/vercel.json) — a regra de `/api` precisa vir **antes** da regra que manda tudo para `index.html`:
 ```json
 {
   "rewrites": [
-    { "source": "/api/:caminho*", "destination": "https://planejador-api.onrender.com/api/:caminho*" },
+    { "source": "/api/:caminho*", "destination": "https://planejador-api-79jj.onrender.com/api/:caminho*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
@@ -138,7 +138,7 @@ Cliente **síncrono** com `ConnectionPool`, `socket_timeout=0.5`, `socket_connec
 | Tempo de resposta | Tempo máximo do proxy: 30 s numa página da Vercel, 120 s num anúncio mais recente; geração de PDF/apresentação e importação de ZIP de NF-e grandes | Gerar o maior relatório e importar o maior ZIP | Mesma rota direta, ou geração em segundo plano com aviso quando pronta |
 | IP do cliente | Ver 1.5 | Conferir IP gravado na auditoria | Ajustar `PROXIES_CONFIAVEIS` |
 
-**Endereço direto do Render**: `planejador-api.onrender.com` continua acessível. Sem CORS e com cookie preso ao domínio da tela, um navegador não consegue usar a sessão por ali; um token roubado funcionaria lá como em qualquer lugar — a defesa é a mesma (15 min, sessão revogável). Desligar o `*.vercel.app` do projeto (ou redirecionar para o domínio próprio).
+**Endereço direto do Render**: `planejador-api-79jj.onrender.com` continua acessível. Sem CORS e com cookie preso ao domínio da tela, um navegador não consegue usar a sessão por ali; um token roubado funcionaria lá como em qualquer lugar — a defesa é a mesma (15 min, sessão revogável). Desligar o `*.vercel.app` do projeto (ou redirecionar para o domínio próprio).
 
 ---
 

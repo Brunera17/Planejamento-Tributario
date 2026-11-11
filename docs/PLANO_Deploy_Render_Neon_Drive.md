@@ -57,7 +57,7 @@ Banco: o código não muda. Com a URL direta do Neon, a trava de linha da aprova
    - `PROXIES_CONFIAVEIS`;
    - `CORS_ORIGINS`: vazio.
 2. A API sobe e roda sozinha `alembic upgrade head` e a carga (tabelas legais e o primeiro usuário).
-3. **Vercel:** conferir se o `frontend/vercel.json` aponta `/api` para a URL do Render. Hoje aponta para `https://planejador-api.onrender.com`; se o Render der outro nome, ajustar.
+3. **Vercel:** o `frontend/vercel.json` aponta `/api` para `https://planejador-api-79jj.onrender.com`. O nome `planejador-api.onrender.com` é de outro dono no Render: nunca usar.
 4. **Teste de aceite no endereço público:**
    1. Login.
    2. Cadastrar uma empresa.
