@@ -200,3 +200,38 @@ def test_aceite_conta_no_progresso_e_nao_desatualiza_simulacao(cliente, contador
     assert next(b for b in blocos if b["codigo"] == "OBSERVACOES")["preenchidos"] == 1
     lista = cliente.get(f"/api/planejamentos/{pid}/simulacoes", headers=contador).json()
     assert next(s for s in lista if s["id"] == sim["id"])["desatualizada"] is False
+
+
+
+def test_listagens_paginadas(cliente, contador, fabrica_sessao):
+    from app.models import Planejamento
+
+    # dados próprios: não depende da ordem dos testes; um planejamento aprovado para o filtro de abertos excluir
+    emp = cliente.post("/api/empresas", headers=contador, json={
+        "razao_social": "Paginação Teste", "cnpj": "12.345.679/0001-30", "regime_tributario": "LUCRO_REAL"}).json()
+    aprovado = cliente.post("/api/planejamentos", headers=contador, json={
+        "empresa_id": emp["id"], "competencia_inicial": "2026-01", "competencia_final": "2026-03"}).json()
+    cliente.post("/api/planejamentos", headers=contador, json={
+        "empresa_id": emp["id"], "competencia_inicial": "2026-04", "competencia_final": "2026-06"})
+    with fabrica_sessao() as s:
+        s.get(Planejamento, aprovado["id"]).status = "APROVADO"
+        s.commit()
+
+    for rota in ("/api/empresas?ativas=false", "/api/planejamentos?"):
+        todos = cliente.get(f"{rota}&limite=200", headers=contador)
+        assert "x-proximo" not in todos.headers
+        ids = [x["id"] for x in todos.json()]
+        assert len(ids) >= 2
+        r1 = cliente.get(f"{rota}&limite=1", headers=contador)
+        assert r1.headers["x-proximo"] == "1"
+        r2 = cliente.get(f"{rota}&limite=200&deslocamento={r1.headers['x-proximo']}", headers=contador)
+        assert "x-proximo" not in r2.headers
+        assert [x["id"] for x in r1.json() + r2.json()] == ids
+        assert cliente.get(f"{rota}&limite=201", headers=contador).status_code == 422
+        assert cliente.get(f"{rota}&deslocamento=10001", headers=contador).status_code == 422
+    abertos = {p["id"]: p for p in cliente.get("/api/planejamentos?abertos=true&limite=200", headers=contador).json()}
+    assert aprovado["id"] not in abertos and all(p["status"] != "APROVADO" for p in abertos.values())
+    assert any(p["empresa_id"] == emp["id"] for p in abertos.values())
+    # busca com a máscara do CNPJ acha a empresa gravada só com dígitos
+    assert [e["id"] for e in cliente.get("/api/empresas?busca=12.345.679/0001-30", headers=contador).json()] == [emp["id"]]
+    assert {p["empresa_id"] for p in cliente.get("/api/planejamentos?busca=12.345.679", headers=contador).json()} == {emp["id"]}

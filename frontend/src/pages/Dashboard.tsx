@@ -49,24 +49,25 @@ export function Dashboard() {
   const navegar = useNavigate();
   const [etapa, setEtapa] = useState<string | null>(null);
   const { data } = useQuery({ queryKey: ["dashboard"], queryFn: async () => (await api.get<Indicadores>("/dashboard")).data });
+  // shortcut: só os 200 mais recentes da etapa (ou em aberto) entram na ordenação; ordenar no SQL se a carteira passar disso
   const { data: planejamentos = [] } = useQuery({
-    queryKey: ["planejamentos", "", ""],
-    queryFn: async () => (await api.get<Planejamento[]>("/planejamentos")).data,
+    queryKey: ["planejamentos", "painel", etapa],
+    queryFn: async () => (await api.get<Planejamento[]>("/planejamentos", { params: etapa ? { status: etapa, limite: 200 } : { abertos: true, limite: 200 } })).data,
   });
   if (!data) return <p>Carregando…</p>;
 
-  const contagem = (s: string) => planejamentos.filter((p) => p.status === s).length;
-  const abertos = planejamentos.filter((p) => p.status !== "APROVADO");
+  const contagem = (s: string) => data.planejamentos_por_status[s] ?? 0;
+  const emAndamento = Object.entries(data.planejamentos_por_status).reduce((t, [s, n]) => (s === "APROVADO" ? t : t + n), 0);
   // quem está mais adiantado no fluxo vem primeiro: aprovar fecha o trabalho; coleta parada vem por menor progresso
   const ordem = (p: Planejamento) => ETAPAS.findIndex((e) => e.status === p.status);
-  const lista = (etapa ? planejamentos.filter((p) => p.status === etapa) : abertos).sort((a, b) => ordem(b) - ordem(a) || a.progresso - b.progresso);
+  const lista = [...planejamentos].sort((a, b) => ordem(b) - ordem(a) || a.progresso - b.progresso);
   const nomeEtapa = ETAPAS.find((e) => e.status === etapa)?.nome;
 
   return (
     <>
       <Cabecalho
         titulo="Visão geral"
-        descricao={`${abertos.length} ${abertos.length === 1 ? "planejamento em andamento" : "planejamentos em andamento"} em ${data.empresas_ativas} ${data.empresas_ativas === 1 ? "empresa ativa" : "empresas ativas"}.`}
+        descricao={`${emAndamento} ${emAndamento === 1 ? "planejamento em andamento" : "planejamentos em andamento"} em ${data.empresas_ativas} ${data.empresas_ativas === 1 ? "empresa ativa" : "empresas ativas"}.`}
       />
 
       <dl className="grid grid-cols-1 overflow-hidden rounded-md border-l border-t border-border bg-white sm:grid-cols-2 lg:grid-cols-4">
@@ -101,7 +102,7 @@ export function Dashboard() {
       </Card>
 
       <Card
-        titulo={nomeEtapa ? `${nomeEtapa} (${lista.length})` : "Próximas ações"}
+        titulo={nomeEtapa ? `${nomeEtapa} (${contagem(etapa!)})` : "Próximas ações"}
         semPadding
         acoes={etapa && <Botao variante="linha" onClick={() => setEtapa(null)}>Mostrar todos em aberto</Botao>}
       >

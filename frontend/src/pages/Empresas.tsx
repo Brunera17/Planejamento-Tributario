@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, lerSessao, mensagemErro } from "../api/cliente";
+import { useLista } from "../api/lista";
 import type { Empresa } from "../api/tipos";
 import { FormEmpresa } from "../components/FormEmpresa";
-import { Botao, Cabecalho, Card, EnvioArquivo, Erro, Modal, Tabela, useConfirmacao } from "../components/ui";
+import { Botao, Cabecalho, CarregarMais, Card, EnvioArquivo, Erro, Modal, Tabela, useConfirmacao } from "../components/ui";
 import { dataHora, formatarCnpj, formatarTelefone, REGIMES } from "../lib/formato";
 
 type LinhaPrevia = { linha: number; dados: Record<string, string>; situacao: string; erros: string[]; avisos: string[] };
@@ -14,13 +15,12 @@ export function Empresas() {
   const qc = useQueryClient();
   const [confirmar, janelaConfirmacao] = useConfirmacao();
   const [inativas, setInativas] = useState(false);
+  const [busca, setBusca] = useState("");
   const [importando, setImportando] = useState(false);
   const [editando, setEditando] = useState<Empresa | "nova" | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const { data = [] } = useQuery({
-    queryKey: ["empresas", inativas],
-    queryFn: async () => (await api.get<Empresa[]>("/empresas", { params: { ativas: !inativas } })).data,
-  });
+  const lista = useLista<Empresa>(["empresas", inativas, busca], "/empresas", { ativas: !inativas, busca: busca || undefined });
+  const data = lista.itens;
   const atualizar = {
     onSuccess: () => {
       setErro(null);
@@ -68,13 +68,26 @@ export function Empresas() {
       {importando && <Importacao fechar={() => setImportando(false)} />}
       {janelaConfirmacao}
       <Card
-        titulo={`${ativas} ${ativas === 1 ? "empresa ativa" : "empresas ativas"}`}
+        titulo={
+          inativas // com inativas na lista, as páginas seguintes misturam as duas: conta só o que está na tela
+            ? `${data.length}${lista.temMais ? "+" : ""} ${data.length === 1 ? "empresa" : "empresas"}`
+            : `${ativas}${lista.temMais ? "+" : ""} ${ativas === 1 ? "empresa ativa" : "empresas ativas"}`
+        }
         semPadding
         acoes={
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={inativas} onChange={(e) => setInativas(e.target.checked)} />
-            Mostrar inativas
-          </label>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <input
+              aria-label="Buscar por razão social ou CNPJ"
+              placeholder="Razão social ou CNPJ"
+              className="rounded border border-border px-2 py-1"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={inativas} onChange={(e) => setInativas(e.target.checked)} />
+              Mostrar inativas
+            </label>
+          </div>
         }
       >
         <Tabela cabecalho={["Razão social", "CNPJ", "Regime", "UF", "Representante", "Telefone", "Cadastro", ""]}>
@@ -112,6 +125,7 @@ export function Empresas() {
             </tr>
           ))}
         </Tabela>
+        <CarregarMais lista={lista} />
       </Card>
     </>
   );

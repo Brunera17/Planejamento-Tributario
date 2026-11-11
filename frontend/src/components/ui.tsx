@@ -376,3 +376,16 @@ export function Tabela({ cabecalho, children, numericas = [] }: { cabecalho: Rea
     </div>
   );
 }
+
+/** Rodapé das listas paginadas: some quando a API não anuncia próxima página. */
+export function CarregarMais({ lista }: { lista: { temMais: boolean; carregarMais: () => void; carregando: boolean; falhou: boolean } }) {
+  if (!lista.temMais) return null;
+  return (
+    <div className="border-t border-border p-3 text-center">
+      {lista.falhou && !lista.carregando && <p role="alert" className="mb-2 text-sm text-alert-ink">Não foi possível carregar a próxima página.</p>}
+      <Botao variante="secundario" disabled={lista.carregando} onClick={lista.carregarMais}>
+        {lista.carregando ? "Carregando…" : lista.falhou ? "Tentar de novo" : "Carregar mais"}
+      </Botao>
+    </div>
+  );
+}

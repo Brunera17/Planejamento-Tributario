@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import Response
 from pydantic import Field
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, insert, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual, obter_planejamento
@@ -49,7 +49,9 @@ from app.services.entrada import PREMISSAS
 from app.services.auditoria import auditar, auditar_uma_vez
 from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
+from app.utils.paginacao import Deslocamento, Limite, pagina
 from app.utils.upload import ler_limitado
+from app.utils.validacao import somente_digitos
 
 router = APIRouter(prefix="/planejamentos", tags=["Planejamentos e coleta"])
 
@@ -104,15 +106,19 @@ def _competencia_valida(p: Planejamento, c: str) -> None:
 
 
 @router.get("", response_model=list[PlanejamentoSaida])
-def listar(db: DB, _: UsuarioAtual, status: str | None = None, empresa_id: int | None = None, busca: str | None = None):
-    q = select(Planejamento).join(Empresa).order_by(Planejamento.criado_em.desc())
+def listar(db: DB, _: UsuarioAtual, resposta: Response, status: str | None = None, empresa_id: int | None = None,
+           busca: str | None = None, abertos: bool = False, limite: Limite = 50, deslocamento: Deslocamento = 0):
+    q = select(Planejamento).join(Empresa).order_by(Planejamento.criado_em.desc(), Planejamento.id.desc())
     if status:
         q = q.where(Planejamento.status == status)
+    if abertos:
+        q = q.where(Planejamento.status != "APROVADO")
     if empresa_id:
         q = q.where(Planejamento.empresa_id == empresa_id)
     if busca:
-        q = q.where(Empresa.razao_social.ilike(f"%{busca}%") | Empresa.cnpj.contains(busca))
-    return [_saida(p) for p in db.scalars(q).unique()]
+        cnpj = somente_digitos(busca)  # o CNPJ é gravado só com dígitos; a busca pode vir com máscara
+        q = q.where(or_(Empresa.razao_social.ilike(f"%{busca}%"), *([Empresa.cnpj.contains(cnpj)] if cnpj else [])))
+    return [_saida(p) for p in pagina(db, q, limite, deslocamento, resposta)]
 
 
 @router.post("", response_model=PlanejamentoSaida, status_code=201)
