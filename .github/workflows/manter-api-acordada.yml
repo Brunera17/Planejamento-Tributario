@@ -1,0 +1,20 @@
+# Mantém a API acordada: o Render grátis a põe para dormir após 15 min sem acesso, e acordar leva ~30 s.
+# O agendamento do GitHub pode atrasar alguns minutos; a cada 10 min sobra folga até os 15.
+# O GitHub desliga agendamentos de repositório público sem atividade por 60 dias: um commit religa.
+name: Manter API acordada
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  acordar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: GET /api/saude
+        # falhar aqui avisa por e-mail que a API está fora (o /api/saude sempre responde 200 quando ela está no ar)
+        run: curl -fsS --retry 2 --retry-delay 10 -m 120 -o /dev/null -w "%{http_code} em %{time_total}s\n" https://planejador-api-79jj.onrender.com/api/saude
