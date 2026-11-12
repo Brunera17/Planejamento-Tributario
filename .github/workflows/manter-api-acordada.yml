@@ -4,8 +4,12 @@
 name: Manter API acordada
 
 on:
+  # só no expediente, das 8h às 18h de Brasília (UTC-3, sem horário de verão); o cron do GitHub é em UTC.
+  # Começa 7h45 para a API já estar acordada às 8h; o último acesso (17h55) a mantém até ~18h10.
+  # Fora desse horário ela dorme e o primeiro acesso leva ~30 s (a tela avisa que está acordando).
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "45,50,55 10 * * *"
+    - cron: "*/5 11-20 * * *"
   workflow_dispatch:
 
 permissions: {}
