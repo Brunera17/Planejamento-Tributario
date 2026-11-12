@@ -12,4 +12,6 @@ EXPOSE 8000
 # app.services.pgdas: grava a leitura dos extratos do PGDAS-D enviados antes da leitura no upload (idempotente;
 # precisa rodar antes da criptografia dos arquivos). Se falhar, só avisa: não impede a API de subir.
 # produção: sem dados de demonstração; o primeiro usuário vem de ADMIN_USUARIO e ADMIN_SENHA (veja app/seeds/carga.py)
-CMD ["sh", "-c", "alembic upgrade head && python -m app.seeds.carga && (python -m app.services.pgdas || echo \"aviso: leitura dos extratos do PGDAS-D antigos falhou; a API sobe assim mesmo\") && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]
+# app.implantacao: no Render grátis a API acorda num contêiner novo; se esta versão já foi preparada no banco,
+# pula migrações e cargas (sobe mais rápido). Fora do Render (sem RENDER_GIT_COMMIT) o preparo roda sempre.
+CMD ["sh", "-c", "{ python -m app.implantacao pronta || { alembic upgrade head && python -m app.seeds.carga && { if python -m app.services.pgdas; then python -m app.implantacao marcar || echo \"aviso: marca de implantação não gravada; o próximo boot prepara de novo\"; else echo \"aviso: leitura dos extratos do PGDAS-D antigos falhou; a API sobe assim mesmo e tenta de novo no próximo boot\"; fi; }; }; } && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --proxy-headers --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]

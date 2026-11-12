@@ -178,3 +178,11 @@ class RegraReforma(Base, Vigencia):
     norma_id: Mapped[int | None] = mapped_column(ForeignKey("norma.id"))
     alterado_por: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     alterado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MarcaImplantacao(Base):
+    """Versão do código já preparada no banco (migrações e cargas): a API pula o preparo ao acordar (app/implantacao.py)."""
+    __tablename__ = "marca_implantacao"
+
+    chave: Mapped[str] = mapped_column(String(40), primary_key=True)
+    valor: Mapped[str] = mapped_column(String(80))
