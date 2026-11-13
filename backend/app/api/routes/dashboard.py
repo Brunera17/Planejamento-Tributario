@@ -60,7 +60,8 @@ def indicadores(db: DB, _: UsuarioAtual):
             economia += (t[u.regime_tributario] - t[u.regime_recomendado]) * 12 / _meses(u.competencia_inicial, u.competencia_final)
 
     def oportunidades(*codigos):
-        return OportunidadeRegistro.codigo.in_(codigos), OportunidadeRegistro.simulacao_id.in_(ids)
+        return (OportunidadeRegistro.codigo.in_(codigos), OportunidadeRegistro.simulacao_id.in_(ids),
+                OportunidadeRegistro.situacao != "DESCARTADA")  # o contador já disse que não se aplica
 
     recuperacao = db.scalar(select(func.coalesce(func.sum(OportunidadeRegistro.impacto), 0)).where(
         *oportunidades(*RECUPERACOES))) or 0

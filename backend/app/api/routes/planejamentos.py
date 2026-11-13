@@ -227,21 +227,21 @@ def _gravar_mensal(db: Session, p: Planejamento, modelo, valores: list[ValorComp
 
 @router.put("/{pid}/compras", status_code=204)
 def gravar_compras(pid: int, valores: list[ValorCompetencia], db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     _gravar_mensal(db, p, CompraMensal, valores)
     _alterou(db, p)
 
 
 @router.put("/{pid}/devolucoes", status_code=204)
 def gravar_devolucoes(pid: int, valores: list[ValorCompetencia], db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     _gravar_mensal(db, p, DevolucaoMensal, valores)
     _alterou(db, p)
 
 
 @router.put("/{pid}/folha", status_code=204)
 def gravar_folha(pid: int, valores: list[FolhaCompetencia], db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     for v in valores:
         _competencia_valida(p, v.competencia)
         f = db.scalar(select(FolhaMensal).where(FolhaMensal.planejamento_id == pid,
@@ -275,7 +275,7 @@ def baixar_planilha_mensal(pid: int, db: DB, _: UsuarioAtual):
 @router.post("/{pid}/planilha-mensal")
 def importar_planilha_mensal(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     """Planilha padrão preenchida: grava compras, devoluções, folha e pró-labore; célula vazia não altera."""
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     _recusar_se_aprovado(db, p)
     if not (arquivo.filename or "").lower().endswith(".xlsx"):
         raise ErroNegocio("Envie a planilha padrão em .xlsx", 415)
@@ -304,14 +304,14 @@ def importar_planilha_mensal(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAt
 @router.delete("/{pid}/composicao-compras", status_code=204)
 def apagar_composicao(pid: int, db: DB, _: UsuarioAtual):
     """Volta a origem das compras para o valor das notas (ou para pendente, sem notas de compra)."""
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     db.execute(delete(CompraOrigem).where(CompraOrigem.planejamento_id == pid))
     _alterou(db, p)
 
 
 @router.put("/{pid}/composicao-compras", status_code=204)
 def gravar_composicao(pid: int, origens: list[OrigemCompra], db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     if abs(sum((o.percentual for o in origens), Decimal(0)) - 1) > Decimal("0.0001"):
         raise ErroNegocio("A composição das compras deve somar 100%", campos={"percentual": "soma ≠ 100%"})
     db.execute(delete(CompraOrigem).where(CompraOrigem.planejamento_id == pid))
@@ -345,7 +345,7 @@ def _validar_premissa(chave: str, valor) -> str:
 @router.put("/{pid}/premissas", status_code=204)
 def gravar_premissas(pid: int, premissas: dict, db: DB, u: Contador):
     """Valor vazio apaga a premissa, e o planejamento volta ao padrão."""
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     invalidas = set(premissas) - set(PREMISSAS)
     if invalidas:
         raise ErroNegocio("Premissas desconhecidas", campos={k: "não existe" for k in invalidas})
@@ -413,7 +413,7 @@ def ver_levantamento(pid: int, competencia: str, db: DB, _: UsuarioAtual):
 @router.put("/{pid}/levantamentos/{competencia}", status_code=204)
 def gravar_levantamento(pid: int, competencia: str, dados: LevantamentoEntrada, db: DB, u: UsuarioAtual):
     """Salvamento parcial: só os itens enviados são alterados."""
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     _competencia_valida(p, competencia)
     lv = db.scalar(select(Levantamento).where(Levantamento.planejamento_id == pid,
                                               Levantamento.competencia == competencia))
@@ -458,7 +458,7 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
         raise ErroNegocio("Envie um XML de NF-e ou um .zip com XMLs", 415)
     s = get_settings()
     limite = s.nfe_zip_max_mb if nome.lower().endswith(".zip") else s.nfe_xml_max_mb
-    notas, erros = ler_arquivos(nome, ler_limitado(arquivo, limite))
+    notas, erros, cancelados = ler_arquivos(nome, ler_limitado(arquivo, limite))
     imp = ImportacaoNfe(planejamento_id=pid, origem="XML", arquivo=nome, importado_por=u.id, lidos=len(notas),
                         importados=0, ignorados=0)
     db.add(imp)
@@ -470,7 +470,15 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     sem_st = _itens_sem_st(db, list(existentes.values()))
     vistas: dict[str, list] = {}  # chave -> itens da nota nova; a mesma nota pode vir repetida no .zip
     novas: list[tuple[dict, list]] = []
+    # cancelada por evento (no mesmo envio ou depois): a nota nova é ignorada e a já importada sai do cálculo
+    canceladas = list(_notas_existentes(db, pid, list(cancelados)).values()) if cancelados else []
+    for nf in canceladas:
+        log.append(f"NF {nf.numero}: cancelada; removida do planejamento")
     for n in notas:
+        if n.chave_acesso in cancelados:
+            imp.ignorados += 1
+            log.append(f"NF {n.numero}: cancelada, ignorada")
+            continue
         if n.competencia not in comps:
             imp.ignorados += 1
             log.append(f"NF {n.numero}: competência {n.competencia} fora do período")
@@ -515,8 +523,13 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
         imp.importados += 1
     # notas de fornecedor de importações antigas: o CFOP passa para o lado da entrada e o mês é recalculado
     antigas = relatorio_contabil.entradas_com_cfop_do_fornecedor(db, pid)
-    comps_entrada = {nf["competencia"] for nf, _ in novas if nf["tipo"] == "ENTRADA"} | {c for _, c in antigas}
+    comps_entrada = ({nf["competencia"] for nf, _ in novas if nf["tipo"] == "ENTRADA"} | {c for _, c in antigas}
+                     | {nf.competencia for nf in canceladas if nf.tipo == "ENTRADA"})
     antes = relatorio_contabil.somar_entradas(db, pid, comps_entrada) if comps_entrada else {}
+    if canceladas:
+        ids_canceladas = [nf.id for nf in canceladas]
+        db.execute(delete(NotaItem).where(NotaItem.nota_fiscal_id.in_(ids_canceladas)))
+        db.execute(delete(NotaFiscal).where(NotaFiscal.id.in_(ids_canceladas)))
     for item, _ in antigas:
         item.cfop = relatorio_contabil.cfop_de_entrada(item.cfop)
     if novas:
@@ -569,7 +582,7 @@ def _itens_sem_st(db: Session, notas: list[NotaFiscal]) -> dict[int, list[NotaIt
 @router.post("/{pid}/relatorio-contabil")
 def importar_relatorio_contabil(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     """Relatório "Movimentação de Produtos – ICMS – PIS – COFINS" do Domínio (.xls ou .xlsx), de saídas ou de entradas."""
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     _recusar_se_aprovado(db, p)
     nome = arquivo.filename or "relatorio.xls"
     if not nome.lower().endswith((".xls", ".xlsx")):
@@ -680,7 +693,7 @@ def ver_estoque_st(pid: int, db: DB, _: UsuarioAtual):
 
 @router.put("/{pid}/estoque-st")
 def gravar_estoque_st(pid: int, dados: EstoqueStEntrada, db: DB, u: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     pr = db.scalar(select(PremissaPlanejamento).where(PremissaPlanejamento.planejamento_id == pid,
                                                       PremissaPlanejamento.chave == estoque_st.CHAVE))
     if dados.valor is None:

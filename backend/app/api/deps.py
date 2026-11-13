@@ -74,8 +74,11 @@ SidAtual = Annotated[str | None, Depends(sid_atual)]
 ProtecaoCsrf = Depends(protecao_csrf)
 
 
-def obter_planejamento(db: Session, planejamento_id: int) -> Planejamento:
+def obter_planejamento(db: Session, planejamento_id: int, alterar: bool = False) -> Planejamento:
+    """alterar=True: recusa gravar dados num planejamento aprovado (o relatório entregue deixaria de bater)."""
     p = db.get(Planejamento, planejamento_id)
     if p is None:
         raise NaoEncontrado("Planejamento")
+    if alterar and p.status == "APROVADO":
+        raise ErroNegocio("Planejamento aprovado: o contador precisa reabri-lo (volta para Em coleta) antes de alterar os dados", 409)
     return p
