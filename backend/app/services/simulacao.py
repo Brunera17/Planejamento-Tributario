@@ -19,7 +19,7 @@ from app.models import (
 )
 from app.motor import simular
 from app.motor.tipos import Memoria
-from app.services import memoria_calculo, nfe_canceladas, progresso, retencao
+from app.services import memoria_calculo, progresso, retencao
 from app.services.entrada import montar_entrada
 from app.services.serializacao import hash_entrada, para_json
 
@@ -104,7 +104,6 @@ def aprovar(db: Session, sim: Simulacao, usuario_id: int) -> Simulacao:
                            motivo=f"Simulação v{sim.versao} aprovada; {notas} notas e {itens} itens apagados"))
     p.status = "APROVADO"
     db.commit()
-    nfe_canceladas.esquecer(p.id)  # as notas foram apagadas: as chaves canceladas não servem mais
     return sim
 
 

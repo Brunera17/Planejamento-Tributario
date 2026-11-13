@@ -95,6 +95,8 @@ def executar(operacao: Callable[[redis.Redis], T]) -> T:
     except (redis.ConnectionError, redis.TimeoutError) as e:
         disjuntor.falha()
         raise RedisIndisponivel() from e
+    except redis.ResponseError as e:  # ex.: memória cheia (noeviction) ou carregando: 503, não erro 500
+        raise RedisIndisponivel() from e
     disjuntor.sucesso()
     return resultado
 

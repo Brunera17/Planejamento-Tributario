@@ -458,8 +458,8 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
         raise ErroNegocio("Envie um XML de NF-e ou um .zip com XMLs", 415)
     s = get_settings()
     limite = s.nfe_zip_max_mb if nome.lower().endswith(".zip") else s.nfe_xml_max_mb
-    notas, erros, cancelados = ler_arquivos(nome, ler_limitado(arquivo, limite))
-    cancelados = nfe_canceladas.lembrar(pid, cancelados)  # inclui as canceladas em envios anteriores
+    notas, erros, novas_canceladas = ler_arquivos(nome, ler_limitado(arquivo, limite))
+    cancelados = nfe_canceladas.canceladas(pid, novas_canceladas)  # inclui as canceladas em envios anteriores
     imp = ImportacaoNfe(planejamento_id=pid, origem="XML", arquivo=nome, importado_por=u.id, lidos=len(notas),
                         importados=0, ignorados=0)
     db.add(imp)
@@ -551,6 +551,7 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
     imp.status = "CONCLUIDA"
     imp.log = "\n".join(log + avisos) or None
     _alterou(db, p)
+    nfe_canceladas.guardar(pid, novas_canceladas)
     auditar("NFE_IMPORTADA", usuario=u, planejamento=p, recurso_tipo="importacao_nfe", recurso_id=imp.id,
             detalhes={"arquivo": nome, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados,
                       "erros": len(erros)})

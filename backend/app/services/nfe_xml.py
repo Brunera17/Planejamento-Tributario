@@ -90,7 +90,9 @@ def cancelamento(raiz) -> str | None:
     if ev is None or _txt(ev, "n:tpEvento") != CANCELAMENTO:
         return None
     ret = _txt(raiz, ".//n:retEvento/n:infEvento/n:cStat")
-    return _txt(ev, "n:chNFe") if ret in EVENTO_REGISTRADO else None  # sem retorno da SEFAZ, não vale
+    chave = _txt(ev, "n:chNFe")
+    valida = len(chave) == 44 and chave.isdigit()
+    return chave if valida and ret in EVENTO_REGISTRADO else None  # sem retorno da SEFAZ, não vale
 
 
 def ler_xml(conteudo: bytes | None = None, raiz=None) -> NotaLida:
