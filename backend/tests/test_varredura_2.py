@@ -58,9 +58,33 @@ def test_protocolo_de_cancelada_ou_denegada_e_recusado(cliente, contador, pid):
     assert r["importados"] == 0 and _notas(pid) == 0
 
 
-def test_evento_que_nao_e_cancelamento_vira_erro(cliente, contador, pid):
-    carta = EVENTO.replace("110111", "110110")  # carta de correção
-    assert _enviar(cliente, contador, pid, "cce.xml", carta.encode())["importados"] == 0
+@pytest.mark.parametrize("evento", [
+    EVENTO.replace("110111", "110110"),  # carta de correção
+    EVENTO.replace("<cStat>135</cStat>", "<cStat>136</cStat>"),  # registrado sem vínculo com a NF-e
+    EVENTO.split("<retEvento>")[0] + "</procEventoNFe>",  # sem o retorno da SEFAZ
+])
+def test_evento_que_nao_e_cancelamento_valido_nao_remove_a_nota(cliente, contador, pid, evento):
+    assert _enviar(cliente, contador, pid, "nota.xml", NOTA.encode())["importados"] in (0, 1) and _notas(pid) == 1
+    r = _enviar(cliente, contador, pid, "evento.xml", evento.encode())
+    assert any("evento.xml" in linha for linha in r["log"]) and not any("cancelada" in linha for linha in r["log"])
+    assert _notas(pid) == 1
+
+
+def test_compras_do_mes_zeram_quando_a_ultima_entrada_e_cancelada(cliente, contador):
+    cnpj, fornecedor = "55666777000181", "12345678000195"
+    chave = f"352609{fornecedor}550010000000021000000021"
+    emp = cliente.post("/api/empresas", headers=contador, json={
+        "razao_social": "COMPRADORA LTDA", "cnpj": cnpj, "regime_tributario": "SIMPLES_NACIONAL", "anexo_simples": "I"}).json()
+    pid = cliente.post("/api/planejamentos", headers=contador, json={
+        "empresa_id": emp["id"], "competencia_inicial": "2026-09", "competencia_final": "2026-09"}).json()["id"]
+    entrada = (NFE.replace("NFe35260912345678000195550010000000011000000011", f"NFe{chave}")
+               .replace("<dest><CPF>12345678909</CPF>", f"<dest><CNPJ>{cnpj}</CNPJ>").replace("<nNF>1</nNF>", "<nNF>2</nNF>")
+               .replace("<CFOP>5117</CFOP>", "<CFOP>5102</CFOP>"))
+    _enviar(cliente, contador, pid, "entrada.xml", entrada.encode())
+    compras = lambda: cliente.get(f"/api/planejamentos/{pid}/coleta", headers=contador).json()["compras"].get("2026-09")  # noqa: E731
+    assert Decimal(compras()) == Decimal("500.00")
+    _enviar(cliente, contador, pid, "cancelamento.xml", EVENTO.replace(CHAVE, chave).encode())
+    assert Decimal(compras()) == 0
 
 
 @pytest.fixture(scope="module")

@@ -17,7 +17,7 @@ NS ={"n": "http://www.portalfiscal.inf.br/nfe"}
 ZERO = Decimal("0")
 AUTORIZADA = {"100", "150"}  # cStat do protocolo: autorizada (150 = fora do prazo)
 CANCELAMENTO = "110111"  # tpEvento
-EVENTO_REGISTRADO = {"135", "136", "155"}  # cStat do retorno do evento
+EVENTO_REGISTRADO = {"135", "155"}  # cStat do retorno: registrado e vinculado (136 = registrado sem vínculo)
 
 
 @dataclass
@@ -90,7 +90,7 @@ def cancelamento(raiz) -> str | None:
     if ev is None or _txt(ev, "n:tpEvento") != CANCELAMENTO:
         return None
     ret = _txt(raiz, ".//n:retEvento/n:infEvento/n:cStat")
-    return _txt(ev, "n:chNFe") if not ret or ret in EVENTO_REGISTRADO else None
+    return _txt(ev, "n:chNFe") if ret in EVENTO_REGISTRADO else None  # sem retorno da SEFAZ, não vale
 
 
 def ler_xml(conteudo: bytes | None = None, raiz=None) -> NotaLida:

@@ -543,7 +543,10 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
             db.execute(insert(NotaItem), itens[k:k + LOTE_ITENS])
     avisos = []
     if comps_entrada:
-        avisos = relatorio_contabil.preencher_pelas_entradas(db, p, antes, relatorio_contabil.somar_entradas(db, pid, comps_entrada))
+        depois = relatorio_contabil.somar_entradas(db, pid, comps_entrada)
+        # mês sem nota de entrada restante (a última foi cancelada) não aparece na soma: vale zero
+        depois = {c: depois.get(c, (Decimal(0), Decimal(0))) for c in comps_entrada}
+        avisos = relatorio_contabil.preencher_pelas_entradas(db, p, antes, depois)
     imp.status = "CONCLUIDA"
     imp.log = "\n".join(log + avisos) or None
     _alterou(db, p)
@@ -632,7 +635,7 @@ def exportar_revisao(pid: int, db: DB, u: UsuarioAtual):
 
 @router.put("/{pid}/revisao", status_code=204)
 def revisar_produto(pid: int, dados: RevisaoEntrada, db: DB, u: Contador):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     produtos = revisao_produtos.analisar(db, p)
     if not any(x.cod_produto == dados.cod_produto and x.ncm_nota == dados.ncm_nota for x in produtos):
         raise NaoEncontrado("Produto")
@@ -665,7 +668,7 @@ def _revisao_da_empresa_mudou(db: Session, p: Planejamento) -> None:
 
 @router.delete("/{pid}/revisao/{revisao_id}", status_code=204)
 def desfazer_revisao(pid: int, revisao_id: int, db: DB, _: Contador):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     r = db.get(RevisaoProduto, revisao_id)
     if r is None or r.planejamento_id != pid:
         raise NaoEncontrado("Revisão")
