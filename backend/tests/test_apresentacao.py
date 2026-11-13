@@ -51,3 +51,15 @@ def test_frase_nao_corta_a_ideia(texto, esperado):
     from app.services.apresentacao_pptx import frase
 
     assert frase(texto) == esperado
+
+
+def test_identidade_visual_do_escritorio(cliente, contador, sim):
+    prs = Presentation(io.BytesIO(cliente.get(f"/api/simulacoes/{sim['id']}/apresentacao", headers=contador).content))
+    slides = list(prs.slides)
+    capa = {s.name: s for s in slides[0].shapes}
+    assert "Logo" in capa and "Marca d'água" in capa  # logo e leão na capa escura
+    assert str(slides[0].background.fill.fore_color.rgb) == "18181B"
+    titulo = next(s for s in slides[1].shapes if s.name == "Título")
+    assert titulo.text_frame.paragraphs[0].runs[0].font.name == "Cambria"
+    numero = next(s for s in slides[1].shapes if s.name == "Número do slide")
+    assert numero.text_frame.text == f"2 / {len(slides)}"

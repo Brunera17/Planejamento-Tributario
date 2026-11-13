@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import re
+from pathlib import Path
 
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
@@ -19,30 +20,34 @@ from pptx.util import Inches, Pt
 
 from app.services.relatorio_pdf import REGIMES, DadosRelatorio, enquadramento_simples, mes
 
-# paleta do sistema (paleta A): petróleo domina, verde só para o regime de menor carga
-ESCURO = RGBColor(0x0E, 0x3A, 0x49)
-MARCA = RGBColor(0x15, 0x5E, 0x75)
-TEXTO = RGBColor(0x1F, 0x29, 0x33)
-APOIO = RGBColor(0x52, 0x60, 0x6D)
-SUAVE = RGBColor(0x9A, 0xA5, 0xB1)
-GRADE = RGBColor(0xE4, 0xE9, 0xEF)
-FUNDO_CARTAO = RGBColor(0xF3, 0xF6, 0xF8)
-MELHOR = RGBColor(0x2F, 0x85, 0x5A)
-MELHOR_FUNDO = RGBColor(0xE6, 0xF4, 0xEC)
-ALERTA = RGBColor(0xB7, 0x79, 0x1F)
-ALERTA_FUNDO = RGBColor(0xFB, 0xEF, 0xD9)
+# identidade do escritório (apresentação de referência): fundo escuro na capa e no fechamento, cinzas neutros
+# no resto e verde só para o regime de menor carga; títulos e números grandes em Cambria, texto em Calibri
+ESCURO = RGBColor(0x18, 0x18, 0x1B)
+MARCA = RGBColor(0x27, 0x27, 0x2A)
+TEXTO = RGBColor(0x11, 0x11, 0x11)
+APOIO = RGBColor(0x52, 0x52, 0x5B)
+SUAVE = RGBColor(0x71, 0x71, 0x7A)
+GRADE = RGBColor(0xE4, 0xE4, 0xE7)
+FUNDO_CARTAO = RGBColor(0xF4, 0xF4, 0xF5)
+MELHOR = RGBColor(0x16, 0x65, 0x34)
+MELHOR_FUNDO = RGBColor(0xDC, 0xFC, 0xE7)
+ALERTA = RGBColor(0xB4, 0x53, 0x09)
+ALERTA_FUNDO = RGBColor(0xFE, 0xF3, 0xC7)
 BRANCO = RGBColor(0xFF, 0xFF, 0xFF)
-CLARO = RGBColor(0xCF, 0xE3, 0xEA)  # texto de apoio sobre o fundo escuro
+CLARO = RGBColor(0xD4, 0xD4, 0xD8)  # texto de apoio sobre o fundo escuro
+APAGADO = RGBColor(0xA1, 0xA1, 0xAA)  # rótulos sobre o fundo escuro
 
 GRUPOS = [  # grupo de tributo, tributos do resultado, cor
-    ("ICMS", ("ICMS", "IPI"), RGBColor(0x15, 0x5E, 0x75)),  # IPI só no DAS da indústria (Anexo II)
-    ("PIS e COFINS", ("PIS", "COFINS", "PIS/COFINS"), RGBColor(0x4F, 0x8F, 0xA4)),
-    ("IRPJ e CSLL", ("IRPJ", "CSLL"), RGBColor(0x9E, 0xC5, 0xD3)),
-    ("INSS patronal", ("CPP", "INSS patronal"), RGBColor(0x52, 0x60, 0x6D)),
+    ("ICMS", ("ICMS", "IPI"), RGBColor(0x27, 0x27, 0x2A)),  # IPI só no DAS da indústria (Anexo II)
+    ("PIS e COFINS", ("PIS", "COFINS", "PIS/COFINS"), RGBColor(0x71, 0x71, 0x7A)),
+    ("IRPJ e CSLL", ("IRPJ", "CSLL"), RGBColor(0xA1, 0xA1, 0xAA)),
+    ("INSS patronal", ("CPP", "INSS patronal"), RGBColor(0xD4, 0xD4, 0xD8)),
 ]
 ORDEM = ("SIMPLES_NACIONAL", "LUCRO_PRESUMIDO", "LUCRO_REAL")
-COR_REGIME = {"SIMPLES_NACIONAL": RGBColor(0x9E, 0xC5, 0xD3), "LUCRO_PRESUMIDO": MARCA, "LUCRO_REAL": APOIO}
+COR_REGIME = {"SIMPLES_NACIONAL": RGBColor(0xA1, 0xA1, 0xAA), "LUCRO_PRESUMIDO": MARCA, "LUCRO_REAL": APOIO}
 
+TITULO = "Cambria"
+MARCA_DIR = Path(__file__).parent / "marca"  # logo e leão do escritório (brancos e pretos sobre transparente)
 FONTE = "Calibri"
 LARGURA, ALTURA = Inches(13.333), Inches(7.5)
 MARGEM = Inches(0.6)
@@ -124,9 +129,9 @@ def _texto(slide, x, y, w, h, paragrafos, tamanho=16, cor=TEXTO, negrito=False, 
             r = p.add_run()
             r.text = t
             f = r.font
-            f.name = FONTE
             f.size = Pt(o.get("tamanho", tamanho))
             f.bold = o.get("negrito", negrito)
+            f.name = TITULO if f.bold and o.get("tamanho", tamanho) >= 20 else FONTE
             f.italic = o.get("italico", False)
             f.color.rgb = o.get("cor", cor)
     return caixa
@@ -135,10 +140,14 @@ def _texto(slide, x, y, w, h, paragrafos, tamanho=16, cor=TEXTO, negrito=False, 
 def _caixa(slide, x, y, w, h, cor, nome=None, arredondado=True):
     forma = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE if arredondado else MSO_SHAPE.RECTANGLE, x, y, w, h)
     if arredondado:
-        forma.adjustments[0] = 0.08
+        forma.adjustments[0] = 0.06
     forma.fill.solid()
     forma.fill.fore_color.rgb = cor
-    forma.line.fill.background()
+    if cor == FUNDO_CARTAO:
+        forma.line.color.rgb = GRADE
+        forma.line.width = Pt(0.75)
+    else:
+        forma.line.fill.background()
     forma.shadow.inherit = False
     if nome:
         forma.name = nome
@@ -161,6 +170,27 @@ def _etiqueta(slide, x, y, texto, cor_texto, cor_fundo, tamanho=11):
     return forma
 
 
+def _sobretitulo(slide, x, y, texto, cor):
+    """Rótulo em maiúsculas com espaçamento largo acima do título, como na apresentação de referência."""
+    caixa = _texto(slide, x, y, LARGURA - 2 * MARGEM, Inches(0.28), texto.upper(), tamanho=11, negrito=True, cor=cor, nome="Sobretítulo")
+    caixa.text_frame.paragraphs[0].runs[0].font._rPr.set("spc", "200")
+    return caixa
+
+
+def _imagem(slide, nome, x, y, w, transparencia: int | None = None):
+    foto = slide.shapes.add_picture(str(MARCA_DIR / nome), x, y, width=w)
+    if transparencia is not None:  # opacidade em milésimos de ponto percentual (15000 = 15%)
+        blip = foto._element.blipFill.find(qn("a:blip"))
+        blip.append(blip.makeelement(qn("a:alphaModFix"), {"amt": str(transparencia)}))
+    return foto
+
+
+def _leao(slide):
+    """Marca d'água do escritório à direita dos slides escuros."""
+    foto = _imagem(slide, "leao.png", Inches(9.2), Inches(0.55), Inches(3.75), transparencia=15000)
+    foto.name = "Marca d'água"
+
+
 class Deck:
     def __init__(self, d: DadosRelatorio):
         self.d = d
@@ -170,20 +200,25 @@ class Deck:
         self.prs.core_properties.author = d.escritorio
         self.periodo = f"{mes(d.competencias[0])} a {mes(d.competencias[-1])}"
         self.numero = 0
+        self.numeros = []  # caixas do número: o total só se sabe no fim
 
     def slide(self, titulo: str | None = None, escuro: bool = False, notas: str = ""):
         s = self.prs.slides.add_slide(self.prs.slide_layouts[6])
         self.numero += 1
         s.background.fill.solid()
         s.background.fill.fore_color.rgb = ESCURO if escuro else BRANCO
+        if escuro:
+            _leao(s)
         if titulo:
-            _texto(s, MARGEM, Inches(0.45), LARGURA - 2 * MARGEM, Inches(1.1), titulo, tamanho=30, negrito=True,
+            _sobretitulo(s, MARGEM, Inches(0.42), f"{self.d.razao_social}  •  {self.periodo}", APAGADO if escuro else SUAVE)
+            _texto(s, MARGEM, Inches(0.7), LARGURA - 2 * MARGEM, Inches(0.95), titulo, tamanho=26, negrito=True,
                    cor=BRANCO if escuro else TEXTO, ancora=MSO_ANCHOR.TOP, nome="Título")
+            s.shapes[-1].text_frame.paragraphs[0].runs[0].font.name = TITULO
         if not escuro:
-            _texto(s, MARGEM, ALTURA - Inches(0.45), Inches(9), Inches(0.25),
-                   f"{self.d.razao_social}, planejamento tributário de {self.periodo}", tamanho=10, cor=SUAVE, nome="Rodapé")
-            _texto(s, LARGURA - MARGEM - Inches(1), ALTURA - Inches(0.45), Inches(1), Inches(0.25), str(self.numero),
-                   tamanho=10, cor=SUAVE, alinhar=PP_ALIGN.RIGHT, nome="Número do slide")
+            _texto(s, MARGEM, ALTURA - Inches(0.45), Inches(10.5), Inches(0.25),
+                   f"{self.d.escritorio}  •  Material exclusivo para clientes", tamanho=9, cor=SUAVE, nome="Rodapé")
+            self.numeros.append(_texto(s, LARGURA - MARGEM - Inches(1.2), ALTURA - Inches(0.45), Inches(1.2), Inches(0.25),
+                                       str(self.numero), tamanho=9, cor=SUAVE, alinhar=PP_ALIGN.RIGHT, nome="Número do slide"))
         if notas:
             s.notes_slide.notes_text_frame.text = notas
         return s
@@ -249,12 +284,12 @@ def _grupos(r: dict, regime: str) -> dict[str, float]:
 def _paleta(melhor: str, atual: str) -> dict[str, tuple[RGBColor, RGBColor]]:
     """Cor forte e tinta de cada regime, sempre três cores distintas.
 
-    Verde = menor carga, petróleo = regime atual; os demais recebem azul-acinzentado e ardósia, nessa ordem.
+    Verde = menor carga, grafite = regime atual; os demais recebem cinza médio e cinza-chumbo, nessa ordem.
     """
-    out = {melhor: (MELHOR, RGBColor(0xD5, 0xEB, 0xDE))}
+    out = {melhor: (MELHOR, MELHOR_FUNDO)}
     if atual != melhor:
-        out[atual] = (MARCA, RGBColor(0xD3, 0xE5, 0xEB))
-    resto = iter([(RGBColor(0x4F, 0x8F, 0xA4), RGBColor(0xDB, 0xE9, 0xEE)), (APOIO, RGBColor(0xE1, 0xE5, 0xE9))])
+        out[atual] = (MARCA, GRADE)
+    resto = iter([(SUAVE, FUNDO_CARTAO), (APOIO, GRADE)])
     for k in ORDEM:
         if k not in out:
             out[k] = next(resto)
@@ -323,15 +358,15 @@ def montar(d: DadosRelatorio) -> bytes:
     s = deck.slide(escuro=True, notas=(
         f"Apresentação do planejamento tributário da {d.razao_social}. Período analisado: {deck.periodo} "
         f"({_meses(meses)}). Objetivo: comparar quanto a empresa pagaria de tributos em cada regime e indicar o de menor carga."))
-    _texto(s, MARGEM, Inches(1.6), Inches(11), Inches(0.4), "Planejamento tributário", tamanho=20, cor=CLARO)
-    _texto(s, MARGEM, Inches(2.1), Inches(12), Inches(1.6), d.razao_social, tamanho=44, negrito=True, cor=BRANCO,
+    _imagem(s, "logo.png", MARGEM, MARGEM, Inches(2.7)).name = "Logo"
+    _sobretitulo(s, MARGEM, Inches(2.45), "Planejamento tributário", APAGADO)
+    _texto(s, MARGEM, Inches(2.8), Inches(8.5), Inches(1.55), d.razao_social, tamanho=44, negrito=True, cor=BRANCO,
            ancora=MSO_ANCHOR.TOP, nome="Empresa")
-    _texto(s, MARGEM, Inches(3.55), LARGURA - 2 * MARGEM, Inches(0.9),
-           [f"Simples Nacional, Lucro Presumido e Lucro Real comparados com os dados de {deck.periodo}"], tamanho=20, cor=CLARO)
-    _texto(s, MARGEM, Inches(6.3), Inches(8), Inches(0.6),
-           [[(d.escritorio, {"negrito": True, "cor": BRANCO})], f"{d.gerado_em:%d/%m/%Y}"], tamanho=14, cor=CLARO)
+    _texto(s, MARGEM, Inches(4.6), Inches(7.9), Inches(1.0),
+           [f"Simples Nacional, Lucro Presumido e Lucro Real comparados com os dados de {deck.periodo}"], tamanho=16, cor=CLARO)
     if d.preliminar:
-        _etiqueta(s, MARGEM, Inches(1.05), "Versão preliminar", ESCURO, ALERTA_FUNDO, tamanho=12)
+        _etiqueta(s, MARGEM, Inches(5.75), "Versão preliminar", ESCURO, ALERTA_FUNDO, tamanho=11)
+    _texto(s, MARGEM, Inches(6.65), Inches(8), Inches(0.3), f"{d.escritorio}  •  {d.gerado_em:%d/%m/%Y}", tamanho=12, cor=APAGADO)
 
     # 2. a resposta ------------------------------------------------------------
     if muda:
@@ -412,7 +447,7 @@ def montar(d: DadosRelatorio) -> bytes:
         [("Em 12 meses", {"negrito": True, "cor": TEXTO})],
         f"{REGIMES[maior['regime']]} custaria {brl((maior['total'] - menor['total']) * anual)} a mais que o {REGIMES[menor['regime']]}.",
     ], tamanho=16, cor=APOIO, espaco=4)
-    _texto(s, xc, Inches(6.05), Inches(4.0), Inches(0.5), "Verde: menor carga. Azul-petróleo: regime atual.", tamanho=11, cor=SUAVE)
+    _texto(s, xc, Inches(6.05), Inches(4.0), Inches(0.5), "Verde: menor carga. Grafite: regime atual.", tamanho=11, cor=SUAVE)
 
     # 4. de onde vem a diferença -----------------------------------------------
     grupos = {k: _grupos(r, k) for k in ORDEM}
@@ -455,7 +490,7 @@ def montar(d: DadosRelatorio) -> bytes:
         for j, v in enumerate(linha):
             cel = t.cell(i, j)
             cel.fill.solid()
-            cel.fill.fore_color.rgb = GRADE if i == 0 else (FUNDO_CARTAO if i == len(linhas) else BRANCO)
+            cel.fill.fore_color.rgb = MARCA if i == 0 else (FUNDO_CARTAO if i == len(linhas) else BRANCO)
             cel.margin_left = cel.margin_right = Inches(0.08)
             tf = cel.text_frame
             tf.paragraphs[0].alignment = PP_ALIGN.RIGHT if j else PP_ALIGN.LEFT
@@ -465,7 +500,7 @@ def montar(d: DadosRelatorio) -> bytes:
             f.name, f.size = FONTE, Pt(13)
             f.bold = i == 0 or i == len(linhas)
             menor = i > 0 and j == 2 and _valor(linhas[i - 1][2]) < _valor(linhas[i - 1][1])
-            f.color.rgb = MELHOR if menor else TEXTO
+            f.color.rgb = BRANCO if i == 0 else (MELHOR if menor else TEXTO)
     _texto(s, xt, Inches(5.6), wt, Inches(0.9),
            "Em verde, onde o outro regime paga menos. No Simples, a CPP dentro do DAS faz o papel do INSS patronal, "
            "mas é paga sobre o faturamento, com ou sem empregados.", tamanho=12, cor=APOIO)
@@ -486,7 +521,7 @@ def montar(d: DadosRelatorio) -> bytes:
     plot = ch.plots[0]
     plot.gap_width = 80
     plot.overlap = -10
-    for serie, cor in zip(plot.series, (MARCA, RGBColor(0x9E, 0xC5, 0xD3), SUAVE)):
+    for serie, cor in zip(plot.series, (MARCA, APAGADO, CLARO)):
         serie.format.fill.solid()
         serie.format.fill.fore_color.rgb = cor
     tot = base["TOTAL"]
@@ -514,7 +549,7 @@ def montar(d: DadosRelatorio) -> bytes:
     for i, (titulo_g, fatias, cores, texto_apoio) in enumerate((
         ("PIS e COFINS", [("Monofásicos", mono), ("Tributação normal", receita - mono)], (MARCA, GRADE),
          "A parte monofásica não paga PIS e COFINS de novo na revenda."),
-        ("ICMS", [("Para outros estados", interest), ("Dentro do estado", receita - interest)], (RGBColor(0x4F, 0x8F, 0xA4), GRADE),
+        ("ICMS", [("Para outros estados", interest), ("Dentro do estado", receita - interest)], (SUAVE, GRADE),
          "Vendas para outros estados usam a alíquota interestadual: 4% para importados, 7% ou 12% conforme o destino."),
     )):
         x = MARGEM + i * Inches(6.2)
@@ -656,13 +691,16 @@ def montar(d: DadosRelatorio) -> bytes:
         "antes disso, confirmar as premissas do slide anterior."))
     y = Inches(1.75)
     for i, linha in enumerate(_passos(r, atual, anual, d.oportunidades), start=1):
-        _circulo(s, MARGEM, y, Inches(0.5), str(i), MARCA, BRANCO, 18, f"Passo {i}")
+        _circulo(s, MARGEM, y, Inches(0.5), str(i), BRANCO, ESCURO, 18, f"Passo {i}")
         linhas_texto = -(-len(linha) // 115)  # ~115 caracteres por linha a 17pt nessa largura
         _texto(s, MARGEM + Inches(0.85), y + Inches(0.08), Inches(11.2), Inches(0.32 * linhas_texto + 0.1), linha, tamanho=17, cor=BRANCO)
         y += Inches(max(0.75, 0.32 * linhas_texto + 0.45))
     _texto(s, MARGEM, Inches(6.75), Inches(12), Inches(0.4),
            f"{d.escritorio}. Valores calculados com os dados de {deck.periodo}; anuais = média do período × 12.", tamanho=11, cor=CLARO)
 
+    for caixa in deck.numeros:
+        run = caixa.text_frame.paragraphs[0].runs[0]
+        run.text = f"{run.text} / {deck.numero}"
     buf = io.BytesIO()
     deck.prs.save(buf)
     return buf.getvalue()
