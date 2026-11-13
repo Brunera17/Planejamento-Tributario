@@ -1,0 +1,29 @@
+{
+ "_legenda": "Despesas de referência por atividade: percentual do faturamento do mês (ou valor fixo mensal) por item do catálogo. Só estimativa: o cliente substitui pelos valores reais.",
+ "perfis": [
+  {
+   "codigo": "RESTAURANTE",
+   "nome": "Bares, restaurantes e lanchonetes",
+   "cnae_divisoes": [56],
+   "fonte": "Referência de mercado para operação deste porte (planejamento G. Jose Cardoso, out/2026), validada pelo contador",
+   "percentuais": {
+    "Aluguel de Imóveis": "0.053",
+    "Energia Elétrica": "0.050",
+    "Tarifas de Venda / Comissão (marketplace)": "0.050",
+    "Taxas de Maquininha de Cartão": "0.042",
+    "Copa e Cozinha": "0.033",
+    "Fretes": "0.033",
+    "Publicidade e Propaganda": "0.017",
+    "Manutenção e Conservação de Imóveis": "0.016",
+    "Embalagens": "0.015",
+    "Materiais de Higiene e Limpeza": "0.015",
+    "Telefone e Internet": "0.007",
+    "Softwares": "0.007",
+    "Seguros": "0.007"
+   },
+   "fixos": {
+    "Honorários Contábeis": "3500.00"
+   }
+  }
+ ]
+}

@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -59,6 +59,8 @@ class LevantamentoItem(Base):
     levantamento_id: Mapped[int] = mapped_column(ForeignKey("levantamento.id", ondelete="CASCADE"))
     item_despesa_id: Mapped[int] = mapped_column(ForeignKey("item_despesa.id"))
     valor: Mapped[Valor]
+    # preenchido por "Simular despesas" (referência de mercado); vira False quando alguém digita o valor
+    estimado: Mapped[bool] = mapped_column(default=False, server_default=false())
 
 
 class LevantamentoGrupo(Base):

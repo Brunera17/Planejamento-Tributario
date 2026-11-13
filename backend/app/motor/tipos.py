@@ -194,6 +194,7 @@ class EntradaSimulacao:
     # informações da coleta usadas pelas regras de oportunidade
     folha_informada: bool = False
     despesas_nao_informadas: list[str] = field(default_factory=list)
+    despesas_estimadas: Decimal = ZERO  # preenchidas por referência de mercado, ainda não substituídas
     ncms_indicio_incorreto: set[str] = field(default_factory=set)
     ncms_confianca_media: set[str] = field(default_factory=set)
     icms_entradas_real: dict[str, Decimal] | None = None  # ICMS destacado nos XML de entrada

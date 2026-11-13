@@ -203,8 +203,9 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     # despesas: itens do catálogo + outras despesas descritas
     despesas: list[Despesa] = []
     informados: set[int] = set()
-    for comp, item, valor in db.execute(
-        select(Levantamento.competencia, ItemDespesa, LevantamentoItem.valor)
+    estimadas = ZERO
+    for comp, item, valor, estimado in db.execute(
+        select(Levantamento.competencia, ItemDespesa, LevantamentoItem.valor, LevantamentoItem.estimado)
         .join(LevantamentoItem, LevantamentoItem.levantamento_id == Levantamento.id)
         .join(ItemDespesa, ItemDespesa.id == LevantamentoItem.item_despesa_id)
         .where(Levantamento.planejamento_id == p.id)
@@ -216,6 +217,8 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         if valor:
             despesas.append(Despesa(comp, item.nome, valor, item.dedutivel_irpj_csll, item.credito_pis_cofins,
                                     item.credito_ibs_cbs))
+            if estimado:
+                estimadas += valor
     for comp, outra in db.execute(
         select(Levantamento.competencia, OutraDespesa)
         .join(OutraDespesa, OutraDespesa.levantamento_id == Levantamento.id)
@@ -256,6 +259,7 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         premissas=premissas_do_planejamento(db, p, auto),
         folha_informada=folha_informada,
         despesas_nao_informadas=nao_informadas,
+        despesas_estimadas=estimadas,
         ncms_confianca_media={x.ncm for x in produtos if x.avaliacao.enquadramento == Enquadramento.CONDICIONAL and not x.revisado},
         icms_entradas_real=icms_entradas,
         composicao_informada=db.scalar(select(CompraOrigem.id).where(CompraOrigem.planejamento_id == p.id).limit(1)) is not None
