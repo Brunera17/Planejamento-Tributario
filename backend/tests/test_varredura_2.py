@@ -34,6 +34,11 @@ def _enviar(cliente, h, pid, nome, conteudo):
     return cliente.post(f"/api/planejamentos/{pid}/nfe", headers=h, files={"arquivo": (nome, conteudo, "application/octet-stream")}).json()
 
 
+def _limpar_canceladas(pid):
+    from app.core import redis as redis_cliente
+    redis_cliente.executar(lambda r: r.delete(f"nfe_canceladas:{pid}"))
+
+
 def _notas(pid):
     from sqlalchemy import func, select
 
@@ -47,12 +52,14 @@ def test_nota_cancelada_nao_entra_e_sai_se_ja_importada(cliente, contador, pid):
     r = _enviar(cliente, contador, pid, "lote.zip", {"nota.xml": NOTA, "cancelamento.xml": EVENTO})
     assert r["importados"] == 0 and "NF 1: cancelada, ignorada" in r["log"] and _notas(pid) == 0
 
+    _limpar_canceladas(pid)  # agora o caso da nota importada antes de o cancelamento chegar
     assert _enviar(cliente, contador, pid, "nota.xml", NOTA.encode())["importados"] == 1 and _notas(pid) == 1
     r = _enviar(cliente, contador, pid, "cancelamento.xml", EVENTO.encode())
     assert "NF 1: cancelada; removida do planejamento" in r["log"] and _notas(pid) == 0
 
 
 def test_protocolo_de_cancelada_ou_denegada_e_recusado(cliente, contador, pid):
+    _limpar_canceladas(pid)  # senão a nota seria ignorada por já estar cancelada, e não pelo protocolo
     com_protocolo = NOTA.replace("</NFe>", "</NFe><protNFe><infProt><cStat>101</cStat></infProt></protNFe>")
     r = _enviar(cliente, contador, pid, "nota.xml", com_protocolo.encode())
     assert r["importados"] == 0 and _notas(pid) == 0
@@ -64,6 +71,7 @@ def test_protocolo_de_cancelada_ou_denegada_e_recusado(cliente, contador, pid):
     EVENTO.split("<retEvento>")[0] + "</procEventoNFe>",  # sem o retorno da SEFAZ
 ])
 def test_evento_que_nao_e_cancelamento_valido_nao_remove_a_nota(cliente, contador, pid, evento):
+    _limpar_canceladas(pid)  # cancelamentos válidos de testes anteriores não contam aqui
     assert _enviar(cliente, contador, pid, "nota.xml", NOTA.encode())["importados"] in (0, 1) and _notas(pid) == 1
     r = _enviar(cliente, contador, pid, "evento.xml", evento.encode())
     assert any("evento.xml" in linha for linha in r["log"]) and not any("cancelada" in linha for linha in r["log"])
@@ -138,3 +146,22 @@ def test_painel_ignora_oportunidade_descartada(cliente, contador, aprovado):
                                         prioridade="ALTA", acao="a", situacao=situacao))
         db.commit()
     assert recuperacoes() - antes == Decimal("250.00")
+
+
+def test_nota_cancelada_nao_volta_se_reenviada(cliente, contador, pid):
+    from app.services import nfe_canceladas
+    _limpar_canceladas(pid)
+    _enviar(cliente, contador, pid, "cancelamento.xml", EVENTO.encode())
+    assert CHAVE in nfe_canceladas.canceladas(pid, set())
+    r = _enviar(cliente, contador, pid, "nota.xml", NOTA.encode())  # só o XML original, sem o evento
+    assert r["importados"] == 0 and "NF 1: cancelada, ignorada" in r["log"] and _notas(pid) == 0
+
+
+def test_limite_de_canceladas_por_planejamento(monkeypatch, pid):
+    from app.core.erros import ErroNegocio
+    from app.services import nfe_canceladas
+    _limpar_canceladas(pid)
+    monkeypatch.setattr(nfe_canceladas, "LIMITE", 1)
+    assert nfe_canceladas.canceladas(pid, {CHAVE}) == {CHAVE}
+    with pytest.raises(ErroNegocio):
+        nfe_canceladas.canceladas(pid, {CHAVE, "1" * 44})
