@@ -130,6 +130,9 @@ class Premissas:
 
     rbt12_informado: Decimal | None = None
     aplicar_st_vendas_internas: bool = False
+    # regime especial de fornecimento de refeições (SP, Decreto 51.597/2007): ICMS = receita sem ST × alíquota, sem
+    # créditos, no LP e no LR. Vazio = regime normal (débito − crédito)
+    aliq_icms_refeicao: Decimal | None = None
     excluir_icms_base_pis_cofins: bool = False  # Tema 69/STF
     credito_frete_integral: bool = False  # False = proporcional aos não monofásicos
     pct_compras_credito_ibs_cbs: Decimal = UM

@@ -19,6 +19,7 @@ type Produto = {
   motivo_lei: string;
   condicional: boolean;
   monofasico: boolean;
+  sem_st: boolean;
   pendente: boolean;
   revisado: boolean;
   alertas: Alerta[];
@@ -155,6 +156,7 @@ export function Revisao({ pid }: { pid: number }) {
                 </td>
                 <td className="px-2 py-2">
                   {p.monofasico ? "Monofásico" : "Tributado"}
+                  {p.sem_st && <span className="block text-xs text-text-muted">Produção própria, sem ST</span>}
                   {p.csts.length > 0 && <span className="block text-xs text-text-muted">CST na nota: {p.csts.join(", ")}</span>}
                 </td>
                 <td className="num px-2 py-2">{brl(Number(p.receita))}</td>
@@ -214,6 +216,7 @@ function FormRevisao({ pid, produto, fechar, concluido }: { pid: number; produto
   const [ncm, setNcm] = useState(produto.ncm);
   const [decisao, setDecisao] = useState<"SIM" | "NAO" | null>(produto.revisado && produto.condicional ? (produto.monofasico ? "SIM" : "NAO") : null);
   const [motivo, setMotivo] = useState(produto.motivo ?? "");
+  const [semSt, setSemSt] = useState(produto.sem_st);
   const [erro, setErro] = useState<string | null>(null);
   const valido = /^\d{8}$/.test(ncm);
   const { data: consulta } = useQuery({
@@ -226,7 +229,7 @@ function FormRevisao({ pid, produto, fechar, concluido }: { pid: number; produto
     mutationFn: () =>
       api.put(`/planejamentos/${pid}/revisao`, {
         cod_produto: produto.cod_produto, ncm_nota: produto.ncm_nota, ncm_corrigido: ncm === produto.ncm_nota ? null : ncm,
-        monofasico: condicional ? decisao === "SIM" : null, motivo: motivo.trim(),
+        monofasico: condicional ? decisao === "SIM" : null, sem_st: semSt, motivo: motivo.trim(),
       }),
     onSuccess: () => {
       concluido();
@@ -279,6 +282,16 @@ function FormRevisao({ pid, produto, fechar, concluido }: { pid: number; produto
             </div>
           </fieldset>
         )}
+        <label className="flex items-start gap-2 md:col-span-2">
+          <input type="checkbox" className="mt-1" checked={semSt} onChange={(e) => setSemSt(e.target.checked)} />
+          <span>
+            Produção própria: sem ICMS-ST
+            <span className="block text-xs text-text-muted">
+              Para o que a empresa prepara, como lanches e pizzas de um restaurante. A tabela de ST é por NCM e não separa o produto industrializado revendido do
+              preparado na casa.
+            </span>
+          </span>
+        </label>
         <label className="md:col-span-2">
           Motivo da decisão<Obrigatorio />
           <textarea

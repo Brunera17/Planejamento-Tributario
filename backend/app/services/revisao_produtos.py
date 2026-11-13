@@ -160,7 +160,7 @@ def serializar(db: Session, produtos: list[Produto]) -> list[dict]:
             "receita": pr.receita, "itens": pr.itens, "csts": sorted(pr.csts),
             "enquadramento": a.enquadramento.value, "fundamento": a.fundamento, "motivo_lei": a.motivo,
             "condicional": a.enquadramento == Enquadramento.CONDICIONAL,
-            "monofasico": pr.monofasico, "pendente": pr.pendente, "revisado": pr.revisado,
+            "monofasico": pr.monofasico, "sem_st": bool(r and r.sem_st), "pendente": pr.pendente, "revisado": pr.revisado,
             "alertas": [{"tipo": t, "rotulo": TIPOS[t][0], "trava": TIPOS[t][1]} for t in pr.alertas],
             "motivo": r.motivo if r else None, "revisado_por": nomes.get(r.revisado_por) if r else None,
             "revisado_em": r.revisado_em if r else None,

@@ -55,6 +55,7 @@ COBERTURA_MINIMA = Decimal("0.95")  # notas de compra ÷ compras informadas para
 PREMISSAS = {
     "rbt12_informado": Decimal,
     "aplicar_st_vendas_internas": bool,
+    "aliq_icms_refeicao": Decimal,
     "excluir_icms_base_pis_cofins": bool,
     "credito_frete_integral": bool,
     "pct_compras_credito_ibs_cbs": Decimal,
@@ -153,7 +154,10 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         pr = por_produto.get((cod or "", ncm))
         decidido = pr.monofasico if pr and pr.revisao else None
         ncm_final = pr.ncm if pr else ncm
-        st = None if st_vigente.vazia else st_vigente.vigente(ncm_final, c) is not None
+        if pr and pr.revisao and pr.revisao.sem_st:
+            st = False  # produção própria, decidida na revisão
+        else:
+            st = None if st_vigente.vazia else st_vigente.vigente(ncm_final, c) is not None
         brutos.append(ItemBruto(c, ncm_final, cfop, uf, Decimal(str(v)), monofasico=decidido, sujeito_st=st,
                                 origem=origem, difal=_difal(destinos, p.empresa.uf, uf, c, final, contribuinte),
                                 reducao_ibs_cbs=_reducao(reducoes, ncm_final)))

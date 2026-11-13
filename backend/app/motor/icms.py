@@ -9,6 +9,7 @@ from .tipos import ZERO, Ambito, DestinoDifal, EntradaSimulacao, Memoria
 
 FUNDAMENTO = "LC 87/1996, art. 20 (não cumulatividade)"
 FUNDAMENTO_DIFAL = "EC 87/2015 e LC 87/1996, art. 13, § 1º, X, com a redação da LC 190/2022"
+FUNDAMENTO_REFEICAO = "RICMS/SP: regime especial de fornecimento de refeições (Decreto 51.597/2007)"
 FUNDAMENTO_INTERESTADUAL = "Resoluções do Senado 22/1989 (12% e 7%) e 13/2012 (4% para importados)"
 
 # origem da mercadoria na NF-e (tabela A do CST): 1 e 2 estrangeiras; 3 e 8 nacionais com conteúdo de importação acima
@@ -88,6 +89,7 @@ def calcular_icms_normal(
     memoria: Memoria,
 ) -> ResultadoIcms:
     r = ResultadoIcms()
+    refeicao = entrada.premissas.aliq_icms_refeicao
     aliq_credito = aliquota_media_compras(entrada)
     for c in entrada.competencias:
         r.debito[c] = ZERO
@@ -96,7 +98,7 @@ def calcular_icms_normal(
         # CST 00 = tributado; CST 60 (ST) e 41 (remessa) não geram débito
         if not it.item.gera_receita or it.st_interna:
             continue
-        deb = it.receita_liquida * aliquota_item(it, entrada)
+        deb = it.receita_liquida * (refeicao if refeicao is not None else aliquota_item(it, entrada))
         r.debito_por_item[i] = deb
         r.debito[it.item.competencia] += deb
         if it.item.difal is not None:
@@ -104,7 +106,10 @@ def calcular_icms_normal(
 
     saldo = ZERO
     for c in entrada.competencias:
-        if entrada.icms_entradas_real is not None:
+        if refeicao is not None:
+            cred = ZERO
+            formula = "regime de refeições: créditos das compras vedados"
+        elif entrada.icms_entradas_real is not None:
             cred = entrada.icms_entradas_real.get(c, ZERO)
             formula = "Σ ICMS destacado nas NF-e de entrada"
         else:
@@ -114,8 +119,12 @@ def calcular_icms_normal(
         apurado = r.debito[c] - cred - saldo
         r.a_recolher[c] = max(ZERO, apurado) + r.difal[c]  # o DIFAL é do destino: o saldo credor daqui não o abate
         saldo = max(ZERO, -apurado)  # saldo credor transportado para o mês seguinte
-        memoria.registrar("ICMS", "ICMS débito nas vendas", "Σ base × alíquota (interna; interestadual de 4%, 7% ou 12% por item)",
-                          r.debito[c], c, FUNDAMENTO_INTERESTADUAL)
+        if refeicao is not None:
+            memoria.registrar("ICMS", "ICMS débito nas vendas", f"Σ receita sem ST × {refeicao * 100:.2f}% (regime de refeições)".replace(".", ","),
+                              r.debito[c], c, FUNDAMENTO_REFEICAO)
+        else:
+            memoria.registrar("ICMS", "ICMS débito nas vendas", "Σ base × alíquota (interna; interestadual de 4%, 7% ou 12% por item)",
+                              r.debito[c], c, FUNDAMENTO_INTERESTADUAL)
         memoria.registrar("ICMS", "Crédito de ICMS sobre as compras", formula, cred, c, FUNDAMENTO)
         if r.difal[c]:
             memoria.registrar("ICMS", "DIFAL e FCP das vendas a não contribuinte de outro estado",

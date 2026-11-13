@@ -59,7 +59,14 @@ def regras_ncm() -> dict[str, RegraNcm]:
     return {r["ncm"]: RegraNcm(r["ncm"], r["monofasico"], r["sujeito_st"]) for r in ler("ncm_regras.json")}
 
 
+# bebidas frias: PIS/COFINS concentrado no fabricante ou importador; a revenda (bares, restaurantes, varejo) não paga de novo
+BEBIDAS_FRIAS = (("22.01", "2201", "águas minerais e gaseificadas"), ("22.02", "2202", "refrigerantes, isotônicos, energéticos e "
+                 "outras bebidas não alcoólicas"), ("22.03", "2203", "cervejas de malte"))
+
+
 @cache
 def lei_monofasico() -> tuple[ItemLei, ...]:
-    return tuple(ItemLei(i["anexo"], i["item"], i["codigo"], i["prefixo"], tuple(i["ex"]), i["condicao"], i["padrao"])
-                 for i in ler("lei_10485.json")["itens"])
+    autopecas = tuple(ItemLei(i["anexo"], i["item"], i["codigo"], i["prefixo"], tuple(i["ex"]), i["condicao"], i["padrao"])
+                      for i in ler("lei_10485.json")["itens"])
+    bebidas = tuple(ItemLei("", None, codigo, prefixo, lei="Lei 13.097/2015, art. 14") for codigo, prefixo, _ in BEBIDAS_FRIAS)
+    return autopecas + bebidas

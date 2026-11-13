@@ -65,6 +65,8 @@ FONTES_LEGAIS = [
     "Leis 9.249/1995, 9.430/1996 e 9.718/1998 (IRPJ, CSLL e PIS/COFINS cumulativos)",
     "Leis 10.637/2002 e 10.833/2003 (PIS/COFINS não cumulativos)",
     "Lei 10.485/2002 (PIS/COFINS monofásico de autopeças)",
+    "Lei 13.097/2015 (PIS/COFINS monofásico de bebidas frias)",
+    "Decreto 51.597/2007 (SP: ICMS no fornecimento de refeições)",
     "LC 87/1996 (ICMS)",
     "LC 224/2025 e IN RFB 2.305/2025 (acréscimo da presunção)",
     "EC 132/2023 e LC 214/2025 (Reforma Tributária: CBS e IBS)",
@@ -686,7 +688,7 @@ def montar_pdf(d: DadosRelatorio) -> bytes:
                                     for i, x in enumerate(ncms) if x["requer_revisao"]]))
         s.append(quadro)
         s.append(Paragraph(t("Linhas destacadas: NCMs com ação pendente no cadastro. Monofásico: revenda com alíquota zero de "
-                             "PIS/COFINS (Lei 10.485/2002); deixa de existir com a CBS em 2027."), E["apoio"]))
+                             "PIS/COFINS (Lei 10.485/2002, autopeças; Lei 13.097/2015, bebidas frias); deixa de existir com a CBS em 2027."), E["apoio"]))
 
     if d.despesas:
         s.append(CondPageBreak(60 * mm))

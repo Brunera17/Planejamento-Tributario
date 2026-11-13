@@ -331,6 +331,8 @@ def _validar_premissa(chave: str, valor) -> str:
         raise ErroNegocio("Valor inválido", campos={chave: "precisa ser um número"}) from e
     if not numero.is_finite() or numero < 0:
         raise ErroNegocio("Valor inválido", campos={chave: "não pode ser negativo"})
+    if chave == "aliq_icms_refeicao" and numero > Decimal("0.2"):
+        raise ErroNegocio("Valor inválido", campos={chave: "a alíquota do regime de refeições fica entre 0% e 20%"})
     if chave == "pct_compras_credito_ibs_cbs" and numero > 1:
         raise ErroNegocio("Valor inválido", campos={chave: "precisa ficar entre 0% e 100%"})
     if chave == "rat" and numero not in (Decimal("0.01"), Decimal("0.02"), Decimal("0.03")):
@@ -617,6 +619,7 @@ class RevisaoEntrada(Esquema):
     ncm_nota: str = Field(pattern=r"^\d{8}$")
     ncm_corrigido: str | None = Field(default=None, pattern=r"^\d{8}$")
     monofasico: bool | None = None
+    sem_st: bool = False  # produção própria: a ST da tabela não se aplica
     motivo: str = Field(min_length=5, max_length=500)
 
 
@@ -654,6 +657,7 @@ def revisar_produto(pid: int, dados: RevisaoEntrada, db: DB, u: Contador):
     # fora dos condicionais quem decide é a lei: a revisão não pode contrariá-la
     r.ncm_corrigido = dados.ncm_corrigido if dados.ncm_corrigido != dados.ncm_nota else None
     r.monofasico = dados.monofasico if condicional else None
+    r.sem_st = dados.sem_st
     r.motivo, r.revisado_por, r.revisado_em = dados.motivo.strip(), u.id, datetime.now(UTC)
     _revisao_da_empresa_mudou(db, p)
     _alterou(db, p)
