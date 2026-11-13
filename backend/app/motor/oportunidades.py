@@ -160,6 +160,9 @@ def pontos_criticos(entrada: EntradaSimulacao, simples: ResultadoRegime) -> list
         pts.append(PontoCritico("IPI", "Indústria (Anexo II): o DAS inclui o IPI, mas no Lucro Presumido e no Lucro Real o IPI não está no "
                                        "cálculo, porque depende da alíquota de cada produto na TIPI. A comparação favorece esses dois "
                                        "regimes; confira o IPI das saídas antes de recomendar a mudança."))
+    if entrada.despesas_estimadas:
+        pts.append(PontoCritico("DESPESAS_ESTIMADAS", f"{_brl(entrada.despesas_estimadas)} em despesas estimadas por referência de "
+                                "mercado da atividade: substituir pelos valores reais. Elas reduzem o lucro do Lucro Real."))
     if not entrada.folha_informada:
         pts.append(PontoCritico("FOLHA", "Folha e pró-labore não informados: LP e LR calculados sem INSS sobre folha; "
                                          "cada R$ 1.000/mês de pró-labore acrescenta R$ 600 de INSS por trimestre."))

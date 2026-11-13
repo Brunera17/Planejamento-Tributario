@@ -41,7 +41,7 @@ from app.schemas.planejamento import (
     StatusEntrada,
     ValorCompetencia,
 )
-from app.services import estoque_st, nfe_canceladas, planilha_mensal, progresso, relatorio_contabil, retencao, revisao_produtos
+from app.services import despesas_referencia, estoque_st, nfe_canceladas, planilha_mensal, progresso, relatorio_contabil, retencao, revisao_produtos
 from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
@@ -400,11 +400,12 @@ def ver_levantamento(pid: int, competencia: str, db: DB, _: UsuarioAtual):
     lv = db.scalar(select(Levantamento).where(Levantamento.planejamento_id == pid,
                                               Levantamento.competencia == competencia))
     if lv is None:
-        return {"competencia": competencia, "status": None, "itens": {}, "grupos_sem_outras": [], "outras": []}
+        return {"competencia": competencia, "status": None, "itens": {}, "estimados": [], "grupos_sem_outras": [], "outras": []}
+    itens = db.scalars(select(LevantamentoItem).where(LevantamentoItem.levantamento_id == lv.id)).all()
     return {
         "id": lv.id, "competencia": competencia, "status": lv.status,
-        "itens": {i.item_despesa_id: i.valor for i in
-                  db.scalars(select(LevantamentoItem).where(LevantamentoItem.levantamento_id == lv.id))},
+        "itens": {i.item_despesa_id: i.valor for i in itens},
+        "estimados": [i.item_despesa_id for i in itens if i.estimado],
         "grupos_sem_outras": [g.grupo_id for g in db.scalars(select(LevantamentoGrupo).where(
             LevantamentoGrupo.levantamento_id == lv.id, LevantamentoGrupo.possui_outras.is_(False)))],
         "outras": [{"grupo_id": o.grupo_id, "descricao": o.descricao, "valor": o.valor}
@@ -432,7 +433,7 @@ def gravar_levantamento(pid: int, competencia: str, dados: LevantamentoEntrada, 
             if atual:
                 db.delete(atual)
         elif atual:
-            atual.valor = it.valor
+            atual.valor, atual.estimado = it.valor, False
         else:
             db.add(LevantamentoItem(levantamento_id=lv.id, item_despesa_id=it.item_despesa_id, valor=it.valor))
     if dados.outras is not None:
@@ -445,6 +446,27 @@ def gravar_levantamento(pid: int, competencia: str, dados: LevantamentoEntrada, 
                    for g in set(dados.grupos_sem_outras) - com_outras)
     lv.alterado_em = datetime.now(UTC)
     _alterou(db, p)
+
+
+@router.get("/{pid}/despesas-simuladas")
+def ver_despesas_simuladas(pid: int, db: DB, _: Contador, competencia: str | None = None, zerados: bool = False):
+    """Prévia: o que "Simular despesas" preencheria (itens não informados, e os de 0,00 com zerados, nos meses abertos)."""
+    return despesas_referencia.previa(db, obter_planejamento(db, pid), competencia, zerados)
+
+
+@router.post("/{pid}/despesas-simuladas")
+def simular_despesas(pid: int, db: DB, u: Contador, competencia: str | None = None, zerados: bool = False):
+    p = obter_planejamento(db, pid, alterar=True)
+    if competencia:
+        _competencia_valida(p, competencia)
+    if despesas_referencia.perfil(p) is None:
+        raise ErroNegocio("Não há despesas de referência para a atividade (CNAE) desta empresa", 422)
+    r = despesas_referencia.preencher(db, p, competencia, u.id, zerados)
+    _alterou(db, p)
+    auditar("DESPESAS_SIMULADAS", usuario=u, planejamento=p, recurso_tipo="planejamento", recurso_id=p.id,
+            detalhes={"meses": r["meses"], "itens": r["itens"], "total": str(r["total"]), "perfil": r["perfil"],
+                     "substituiu_zerados": zerados})
+    return r
 
 
 # ------------------------------------------------------------------ NF-e

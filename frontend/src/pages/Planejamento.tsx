@@ -326,7 +326,11 @@ function ImportarDocumentos({
 }
 
 type OutraDespesa = { grupo_id: number; descricao: string; valor: number };
-type LevantamentoDados = { status: string | null; itens: Record<string, number>; grupos_sem_outras: number[]; outras: OutraDespesa[] };
+type LevantamentoDados = { status: string | null; itens: Record<string, number>; estimados: number[]; grupos_sem_outras: number[]; outras: OutraDespesa[] };
+type PreviaDespesas = {
+  perfil: { codigo: string; nome: string; fonte: string } | null;
+  meses: { competencia: string; faturamento: number; total: number; itens: { item: string; percentual: number | null; fixo: number | null; valor: number; ja_informado: boolean }[] }[];
+};
 
 const ESPERA_LOTE_MS = 800;
 
@@ -453,7 +457,7 @@ function Despesas({ pid }: { pid: number }) {
       const itens = { ...antes.itens };
       if (valor == null) delete itens[String(item_despesa_id)];
       else itens[String(item_despesa_id)] = valor;
-      return { ...antes, itens };
+      return { ...antes, itens, estimados: (antes.estimados ?? []).filter((id) => id !== item_despesa_id) };
     });
     agendar();
   };
@@ -507,6 +511,7 @@ function Despesas({ pid }: { pid: number }) {
 
   if (!atual || !lev) return <p>Carregando…</p>;
   const valor = (id: number) => lev.itens[String(id)];
+  const estimado = (id: number) => (lev.estimados ?? []).includes(id);
   const editavel = !lev.status || lev.status === "EM_PREENCHIMENTO";
   const outrasDo = (id: number) => lev.outras.filter((o) => o.grupo_id === id).reduce((t, o) => t + Number(o.valor), 0);
   const total = catalogo.reduce((s, g) => s + outrasDo(g.id) + g.itens.filter((i) => i.ativo).reduce((t, i) => t + (valor(i.id) ?? 0), 0), 0);
@@ -526,6 +531,7 @@ function Despesas({ pid }: { pid: number }) {
             Zerar despesas do mês
           </Botao>
         )}
+        {editavel && <SimularDespesas pid={pid} atual={atual} />}
         <span className="ml-auto font-semibold">Total da competência: {brl(total)}</span>
       </div>
       {janelaConfirmacao}
@@ -538,7 +544,14 @@ function Despesas({ pid }: { pid: number }) {
             <div className="grid gap-x-6 gap-y-1 md:grid-cols-2">
               {g.itens.filter((i) => i.ativo).map((i) => (
                 <label key={`${atual}-${i.id}`} className="flex items-center justify-between gap-2 border-b border-surface/50 py-1 text-sm">
-                  <span>{i.nome}</span>
+                  <span>
+                    {i.nome}
+                    {estimado(i.id) && (
+                      <span className="ml-1.5 rounded bg-highlight px-1 text-xs text-text-muted" title="Preenchido por Simular despesas: substitua pelo valor real">
+                        estimado
+                      </span>
+                    )}
+                  </span>
                   <CampoMoeda rotulo={i.nome} valor={valor(i.id)} desabilitado={!editavel} onChange={(v) => editar(i.id, v)} />
                 </label>
               ))}
@@ -548,6 +561,97 @@ function Despesas({ pid }: { pid: number }) {
         );
       })}
     </div>
+  );
+}
+
+/** Despesas pela referência de mercado da atividade: prévia antes de gravar; só preenche itens vazios. Só para o contador. */
+function SimularDespesas({ pid, atual }: { pid: number; atual: string }) {
+  const contador = lerSessao()?.usuario.perfil === "CONTADOR";
+  const qc = useQueryClient();
+  const atualizar = useAtualizar(pid);
+  const [aberto, setAberto] = useState(false);
+  const [todos, setTodos] = useState(false);
+  const [zerados, setZerados] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const filtro = `?zerados=${zerados}` + (todos ? "" : `&competencia=${atual}`);
+  const { data } = useQuery({
+    queryKey: ["despesas-simuladas", pid, todos ? "todos" : atual, zerados],
+    enabled: contador,
+    queryFn: async () => (await api.get<PreviaDespesas>(`/planejamentos/${pid}/despesas-simuladas${filtro}`)).data,
+  });
+  const preencher = useMutation({
+    scope: { id: `despesas-${pid}` }, // depois das edições que ainda estão na fila
+    mutationFn: async () => (await api.post<{ itens: number; total: number }>(`/planejamentos/${pid}/despesas-simuladas${filtro}`)).data,
+    onSuccess: () => {
+      setAberto(false);
+      qc.invalidateQueries({ queryKey: ["levantamento", pid] });
+      qc.invalidateQueries({ queryKey: ["despesas-simuladas", pid] });
+      atualizar();
+    },
+    onError: (e) => setErro(mensagemErro(e)),
+  });
+  if (!contador || !data?.perfil) return null;
+  const novos = data.meses.reduce((s, m) => s + m.itens.filter((x) => !x.ja_informado).length, 0);
+  const total = data.meses.reduce((s, m) => s + Number(m.total), 0);
+  return (
+    <>
+      <Botao variante="secundario" onClick={() => setAberto(true)}>
+        Simular despesas
+      </Botao>
+      <Modal aberto={aberto} fechar={() => setAberto(false)} titulo="Simular despesas" descricao={`Referência: ${data.perfil.nome}. ${data.perfil.fonte}.`}>
+        <div className="space-y-3 text-sm">
+          <fieldset className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-1.5">
+              <input type="radio" name="alcance" checked={!todos} onChange={() => setTodos(false)} />
+              {competenciaExtenso(atual)}
+            </label>
+            <label className="flex items-center gap-1.5">
+              <input type="radio" name="alcance" checked={todos} onChange={() => setTodos(true)} />
+              Todos os meses abertos
+            </label>
+          </fieldset>
+          <label className="flex items-start gap-2">
+            <input type="checkbox" className="mt-1" checked={zerados} onChange={(e) => setZerados(e.target.checked)} />
+            <span>
+              Substituir também os itens com 0,00
+              <span className="block text-xs text-text-muted">Para quando o mês foi zerado sem as despesas reais. Valores maiores que zero nunca são substituídos.</span>
+            </span>
+          </label>
+          {data.meses.map((m) => (
+            <div key={m.competencia}>
+              <p className="font-medium">
+                {competenciaExtenso(m.competencia)}: faturamento de {brl(Number(m.faturamento))}
+              </p>
+              <Tabela cabecalho={["Despesa", "Referência", "Valor"]} numericas={[1, 2]}>
+                  {m.itens.map((x) => (
+                    <tr key={x.item} className={x.ja_informado ? "text-text-muted" : ""}>
+                      <td className="px-2 py-1">{x.item}</td>
+                      <td className="num px-2 py-1 text-right">
+                        {x.fixo != null ? "valor fixo" : `${(Number(x.percentual) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
+                      </td>
+                      <td className="num px-2 py-1 text-right">{x.ja_informado ? "já informado" : brl(Number(x.valor))}</td>
+                    </tr>
+                  ))}
+              </Tabela>
+            </div>
+          ))}
+          {data.meses.length === 0 && <p className="text-text-muted">Nenhum mês aberto para preencher.</p>}
+          <p className="text-text-muted">
+            Só os itens ainda vazios são preenchidos, marcados como "estimado". O relatório avisa enquanto houver despesa estimada; digitar o valor real tira a
+            marca.
+          </p>
+          <Erro mensagem={erro} />
+          <div className="flex justify-end gap-2 border-t border-surface pt-3">
+            <Botao variante="secundario" onClick={() => setAberto(false)}>
+              Cancelar
+            </Botao>
+            <Botao disabled={novos === 0 || preencher.isPending} onClick={() => preencher.mutate()}>
+              Preencher {novos} {novos === 1 ? "item" : "itens"} ({brl(total)})
+            </Botao>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }
 
