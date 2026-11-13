@@ -144,6 +144,7 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
     rat: valor("rat") != null ? String(Math.round(Number(valor("rat")) * 100)) : "",
     fap: valor("fap") != null ? Number(valor("fap")).toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : "",
     terceiros: valor("terceiros") != null ? editarMoeda(Number(valor("terceiros")) * 100) : "",
+    refeicao: valor("aliq_icms_refeicao") != null ? editarMoeda(Number(valor("aliq_icms_refeicao")) * 100) : "",
     comp: Object.fromEntries(
       origens.map((l) => {
         const o = compBase.find((x) => Math.abs(Number(x.aliquota) - l.aliquota) < 0.0001);
@@ -202,6 +203,8 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
         corpo.fap = lerMoeda(f.fap);
         const terceiros = lerMoeda(f.terceiros);
         corpo.terceiros = terceiros == null ? null : terceiros / 100;
+        const refeicao = lerMoeda(f.refeicao);
+        corpo.aliq_icms_refeicao = refeicao == null ? null : refeicao / 100;
         // valor igual ao das notas, sem nada informado antes: continua seguindo as notas
         for (const k of Object.keys(corpo)) if (!informado(k) && auto[k] && mesmo(corpo[k], auto[k].valor)) corpo[k] = null;
         await api.put(`/planejamentos/${pid}/premissas`, corpo);
@@ -342,6 +345,26 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
             {moeda("adicoes_lr")}
             {moeda("exclusoes_lr")}
             {moeda("prejuizo_fiscal_compensar")}
+          </Bloco>
+          <Bloco titulo="ICMS de refeições (LP e LR)">
+            <Caixa
+              rotulo="Alíquota sobre o fornecimento de refeições"
+              marca={null}
+              ajuda="Bares, restaurantes e lanchonetes de SP podem optar pelo regime especial (Decreto 51.597/2007): ICMS = alíquota × receita sem ST, sem crédito das compras. Em branco, o Lucro Presumido e o Lucro Real usam o regime normal (débito menos crédito)."
+            >
+              <div className="flex items-center gap-1">
+                <input
+                  aria-label="Alíquota do ICMS de refeições (%)"
+                  inputMode="decimal"
+                  disabled={!contador}
+                  className={entrada}
+                  placeholder="regime normal"
+                  value={f.refeicao}
+                  onChange={(e) => mudar({ refeicao: soNumero(e.target.value) })}
+                />
+                <span className="text-text-muted">%</span>
+              </div>
+            </Caixa>
           </Bloco>
           <Bloco titulo="Encargos sobre a folha (LP e LR)">
             <Caixa

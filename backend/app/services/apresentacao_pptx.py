@@ -508,7 +508,7 @@ def montar(d: DadosRelatorio) -> bytes:
     interest = tot.get("receita_interestadual", 0) or 0
     s = deck.slide(f"{pct(mono / receita, 0)} da receita vem de produtos com PIS e COFINS já pagos na fábrica" if receita else
                    "Como é formada a receita", notas=(
-        "Produtos monofásicos (Lei 10.485/2002, autopeças): o PIS e a COFINS são cobrados uma vez só, no fabricante ou importador. "
+        "Produtos monofásicos (autopeças, Lei 10.485/2002; bebidas frias, Lei 13.097/2015): o PIS e a COFINS são cobrados uma vez só, no fabricante ou importador. "
         "Na revenda, essa parte da receita não paga PIS/COFINS de novo, em nenhum regime; no Simples, precisa ser segregada no PGDAS-D. "
         "Vendas para outros estados usam alíquota interestadual de ICMS."))
     for i, (titulo_g, fatias, cores, texto_apoio) in enumerate((

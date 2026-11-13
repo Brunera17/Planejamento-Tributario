@@ -1,7 +1,7 @@
 """Planejamento (cabeçalho do estudo), premissas e histórico de status."""
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -84,6 +84,8 @@ class RevisaoProduto(Base):
     ncm_nota: Mapped[str] = mapped_column(String(8))
     ncm_corrigido: Mapped[str | None] = mapped_column(String(8))
     monofasico: Mapped[bool | None]  # decisão sobre Ex ou destinação; vazio segue a lei
+    # produção própria (ex.: lanche ou pizza do restaurante): sem ICMS-ST, mesmo com o NCM na tabela de ST
+    sem_st: Mapped[bool] = mapped_column(default=False, server_default=false())
     motivo: Mapped[str] = mapped_column(Text)
     revisado_por: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
     revisado_em: Mapped[Momento]

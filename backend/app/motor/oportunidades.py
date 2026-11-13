@@ -81,7 +81,8 @@ def avaliar_oportunidades(
 
     share_interna = pr.composicao_compras.get(p.aliq_icms_interna, ZERO)
     compras = sum((b.compras for b in bases.values()), ZERO)
-    if share_interna > 0 and p.aliq_icms_interna > p.aliq_icms_interestadual:
+    # no regime de refeições os créditos das compras são vedados
+    if share_interna > 0 and p.aliq_icms_interna > p.aliq_icms_interestadual and pr.aliq_icms_refeicao is None:
         ops.append(Oportunidade(
             "CREDITO_ICMS_INTERNAS", "Crédito de ICMS à alíquota interna nas compras internas",
             compras * share_interna * (p.aliq_icms_interna - p.aliq_icms_interestadual), "MEDIA",
