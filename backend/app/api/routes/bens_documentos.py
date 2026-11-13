@@ -76,7 +76,7 @@ def listar_bens(pid: int, db: DB, _: UsuarioAtual):
 
 @router.post("/{pid}/bens", response_model=BemSaida, status_code=201)
 def criar_bem(pid: int, dados: BemEntrada, db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     b = Bem(empresa_id=p.empresa_id, **dados.model_dump())
     db.add(b)
     p.sem_bens = False
@@ -86,7 +86,7 @@ def criar_bem(pid: int, dados: BemEntrada, db: DB, _: UsuarioAtual):
 
 @router.put("/{pid}/bens/{bem_id}", response_model=BemSaida)
 def editar_bem(pid: int, bem_id: int, dados: BemEntrada, db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     b = _bem(db, p, bem_id)
     for k, v in dados.model_dump().items():
         setattr(b, k, v)
@@ -96,14 +96,14 @@ def editar_bem(pid: int, bem_id: int, dados: BemEntrada, db: DB, _: UsuarioAtual
 
 @router.delete("/{pid}/bens/{bem_id}", status_code=204)
 def excluir_bem(pid: int, bem_id: int, db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     db.delete(_bem(db, p, bem_id))
     _progresso(db, p)
 
 
 @router.put("/{pid}/sem-bens", status_code=204)
 def declarar_sem_bens(pid: int, sem_bens: bool, db: DB, _: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     if sem_bens and db.scalar(select(Bem.id).where(Bem.empresa_id == p.empresa_id).limit(1)):
         raise ErroNegocio("Exclua os bens cadastrados antes de declarar que a empresa não possui bens", 409)
     p.sem_bens = sem_bens
@@ -161,7 +161,7 @@ def listar_documentos(pid: int, db: DB, _: UsuarioAtual):
 
 @router.post("/{pid}/documentos/{competencia}/{tipo_id}", status_code=201)
 def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     nome = (arquivo.filename or "documento").replace("\\", "/").rsplit("/", 1)[-1][:200]
     conteudo = ler_limitado(arquivo, get_settings().upload_max_mb)
     ext = documentos.validar(nome, conteudo)
@@ -180,7 +180,7 @@ def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFi
 
 @router.put("/{pid}/documentos/{competencia}/{tipo_id}/nao-se-aplica", status_code=204)
 def marcar_nao_se_aplica(pid: int, competencia: str, tipo_id: int, dados: NaoSeAplica, db: DB, u: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     doc = _documento(db, _levantamento(db, p, competencia, u.id), tipo_id)
     if dados.somente_pendente and (doc.arquivo or doc.nao_se_aplica):
         raise ErroNegocio("Este documento já foi resolvido por outra pessoa; recarregue a tela", 409)
@@ -193,7 +193,7 @@ def marcar_nao_se_aplica(pid: int, competencia: str, tipo_id: int, dados: NaoSeA
 
 @router.delete("/{pid}/documentos/{doc_id}", status_code=204)
 def excluir_documento(pid: int, doc_id: int, db: DB, u: UsuarioAtual):
-    p = obter_planejamento(db, pid)
+    p = obter_planejamento(db, pid, alterar=True)
     doc, lv = _doc_do_planejamento(db, pid, doc_id)
     if lv.status != "EM_PREENCHIMENTO":
         raise ErroNegocio(MES_FECHADO, 409)

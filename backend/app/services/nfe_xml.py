@@ -15,6 +15,9 @@ from app.core.erros import ErroNegocio
 MB = 1024 * 1024
 NS ={"n": "http://www.portalfiscal.inf.br/nfe"}
 ZERO = Decimal("0")
+AUTORIZADA = {"100", "150"}  # cStat do protocolo: autorizada (150 = fora do prazo)
+CANCELAMENTO = "110111"  # tpEvento
+EVENTO_REGISTRADO = {"135", "155"}  # cStat do retorno: registrado e vinculado (136 = registrado sem vínculo)
 
 
 @dataclass
@@ -75,11 +78,29 @@ def _contribuinte(inf) -> bool | None:
     return False if _txt(inf, "n:dest/n:CPF") else None
 
 
-def ler_xml(conteudo: bytes) -> NotaLida:
-    raiz = etree.fromstring(conteudo, parser=etree.XMLParser(resolve_entities=False, no_network=True))
+def _raiz(conteudo: bytes):
+    return etree.fromstring(conteudo, parser=etree.XMLParser(resolve_entities=False, no_network=True))
+
+
+def cancelamento(raiz) -> str | None:
+    """Chave da NF-e cancelada, se o XML é um evento de cancelamento registrado; senão None."""
+    ev = raiz.find(".//n:evento/n:infEvento", NS)
+    if ev is None and etree.QName(raiz).localname == "infEvento":
+        ev = raiz
+    if ev is None or _txt(ev, "n:tpEvento") != CANCELAMENTO:
+        return None
+    ret = _txt(raiz, ".//n:retEvento/n:infEvento/n:cStat")
+    return _txt(ev, "n:chNFe") if ret in EVENTO_REGISTRADO else None  # sem retorno da SEFAZ, não vale
+
+
+def ler_xml(conteudo: bytes | None = None, raiz=None) -> NotaLida:
+    raiz = _raiz(conteudo) if raiz is None else raiz
     inf = raiz.find(".//n:infNFe", NS)
     if inf is None:
         raise ValueError("Arquivo não é uma NF-e (infNFe não encontrado)")
+    situacao = _txt(raiz, ".//n:protNFe/n:infProt/n:cStat")
+    if situacao and situacao not in AUTORIZADA:  # cancelada no próprio protocolo (101, 151) ou denegada (110, 301...)
+        raise ValueError(f"NF-e não autorizada (situação {situacao} no protocolo), ignorada")
     ide = inf.find("n:ide", NS)
     emissao = _txt(ide, "n:dhEmi") or _txt(ide, "n:dEmi")
     nota = NotaLida(
@@ -141,13 +162,25 @@ def _ler_entrada(z: zipfile.ZipFile, info: zipfile.ZipInfo, limite: int) -> byte
     return None if len(dados) > limite else dados
 
 
-def ler_arquivos(nome: str, conteudo: bytes) -> tuple[list[NotaLida], list[str]]:
-    """Retorna (notas lidas, erros por arquivo).
+def _ler(nome: str, dados: bytes, notas: list, cancelados: set, erros: list) -> None:
+    try:
+        raiz = _raiz(dados)
+        chave = cancelamento(raiz)
+        if chave:
+            cancelados.add(chave)
+        else:
+            notas.append(ler_xml(raiz=raiz))
+    except Exception as e:  # noqa: BLE001 – arquivo inválido vira linha do relatório
+        erros.append(f"{nome}: {e}")
+
+
+def ler_arquivos(nome: str, conteudo: bytes) -> tuple[list[NotaLida], list[str], set[str]]:
+    """Retorna (notas lidas, erros por arquivo, chaves das notas canceladas por evento).
 
     O .zip é lido entrada por entrada, com teto por XML, pela soma descompactada e pela quantidade de arquivos:
     um "zip bomb" ou um lote grande demais é recusado sem estourar a memória do servidor.
     """
-    notas, erros = [], []
+    notas, erros, cancelados = [], [], set()
     if nome.lower().endswith(".zip"):
         s = get_settings()
         max_xml, max_total = s.nfe_xml_max_mb * MB, s.nfe_zip_descompactado_max_mb * MB
@@ -174,13 +207,7 @@ def ler_arquivos(nome: str, conteudo: bytes) -> tuple[list[NotaLida], list[str]]
                 if total > max_total:
                     raise ErroNegocio(f"O conteúdo descompactado do .zip passa de {s.nfe_zip_descompactado_max_mb} MB — divida em partes",
                                       413, {"arquivo": "conteúdo grande demais"})
-                try:
-                    notas.append(ler_xml(dados))
-                except Exception as e:  # noqa: BLE001 – arquivo inválido vira linha do relatório
-                    erros.append(f"{info.filename}: {e}")
+                _ler(info.filename, dados, notas, cancelados, erros)
     else:
-        try:
-            notas.append(ler_xml(conteudo))
-        except Exception as e:  # noqa: BLE001
-            erros.append(f"{nome}: {e}")
-    return notas, erros
+        _ler(nome, conteudo, notas, cancelados, erros)
+    return notas, erros, cancelados

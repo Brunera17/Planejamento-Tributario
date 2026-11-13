@@ -31,14 +31,14 @@ def limites(monkeypatch):
 
 
 def test_zip_dentro_dos_limites_le_as_notas():
-    notas, erros = ler_arquivos("lote.zip", _zip({"a.xml": NFE.encode(), "leia-me.txt": b"x"}))
+    notas, erros, _ = ler_arquivos("lote.zip", _zip({"a.xml": NFE.encode(), "leia-me.txt": b"x"}))
     assert len(notas) == 1 and erros == []
 
 
 def test_xml_grande_demais_dentro_do_zip_e_ignorado(limites):
     limites(nfe_xml_max_mb=1)
     bomba = b"<a>" + b" " * (2 * MB) + b"</a>"  # comprime para poucos KB
-    notas, erros = ler_arquivos("lote.zip", _zip({"bomba.xml": bomba, "a.xml": NFE.encode()}))
+    notas, erros, _ = ler_arquivos("lote.zip", _zip({"bomba.xml": bomba, "a.xml": NFE.encode()}))
     assert len(notas) == 1
     assert "bomba.xml" in erros[0] and "acima de 1 MB" in erros[0]
 
