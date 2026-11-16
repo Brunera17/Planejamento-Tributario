@@ -6,8 +6,10 @@ fornecedor confere o monofásico da lei.
 """
 from __future__ import annotations
 
+import collections
 from collections import defaultdict
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -22,6 +24,7 @@ from app.utils.simples import anexo_da_empresa
 # ICMS-ST retido pelo fornecedor (CST 10, 30, 70; CSOSN 201 a 203) ou cobrado em etapa anterior (CST 60; CSOSN 500)
 CST_COM_ST = {"10", "30", "60", "70", "201", "202", "203", "500"}
 VENDA_COM_ST = {"60", "500"}  # na nota de venda: ST já recolhido, o ICMS sai do DAS
+CFOP_LANCAMENTO_DE_CUPOM = {5929, 6929}  # NF-e que só lança operação já registrada em NFC-e ou cupom fiscal
 SEM_COMPRAS = ("As notas de compra são opcionais, mas melhoram o cálculo: com elas o ST de cada produto segue o que o fornecedor "
                "cobrou e o monofásico é conferido pelo CST de PIS da compra. Sem elas, o ST segue o CSOSN das notas de venda.")
 SEM_CANCELAMENTOS = ("Nenhum evento de cancelamento no envio. Se houve nota cancelada no mês, envie também os XML de evento "
@@ -42,6 +45,10 @@ def anexo_mercadorias(empresa: Empresa) -> str:
     """Nota de produto entra no anexo da empresa quando é I ou II; empresa de serviço vendendo mercadoria, no I."""
     anexo, _ = anexo_da_empresa(empresa.anexo_simples, empresa.cnae, empresa.atividade)
     return anexo if anexo in ("I", "II") else "I"
+
+
+def _brl(v: Decimal) -> str:
+    return f"R$ {v:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")  # sem quebra após o R$
 
 
 def _compra_com_st(i: ItemLido) -> bool:
@@ -73,11 +80,23 @@ def linhas_da_nfe(db: Session, empresa: Empresa, notas: list[NotaLida]) -> Leitu
 
     divergencias: dict[str, dict] = {}  # por NCM, para avisar uma vez só
     for n in vendas:
+        if any(i.cfop in CFOP_LANCAMENTO_DE_CUPOM for i in n.itens):
+            # a nota só lança vendas já registradas em NFC-e/cupom; um item de venda nela contaria a receita duas vezes
+            vendas_na_nota = sum((i.vl_total for i in n.itens if i.cfop not in CFOP_LANCAMENTO_DE_CUPOM and gera_receita.get(i.cfop)),
+                                 Decimal(0))
+            out.avisos.append(f"NF {n.numero}: lançamento de vendas já registradas em NFC-e (CFOP 5929/6929) e ficou fora do cálculo"
+                              + (f"; ela tem itens com CFOP de venda ({_brl(vendas_na_nota)}): se forem vendas novas, inclua o "
+                                 "valor à mão" if vendas_na_nota else ""))
+            continue
+        fora = collections.Counter(i.cfop for i in n.itens if not gera_receita.get(i.cfop, False))
+        if fora:
+            out.avisos.append(f"NF {n.numero}: " + ", ".join(f"{q} {'item' if q == 1 else 'itens'} com CFOP {c}" for c, q in fora.items())
+                              + " não geram receita e ficaram fora do cálculo")
         for i in n.itens:
             if not gera_receita.get(i.cfop, False):
-                out.avisos.append(f"NF {n.numero}, item {i.n_item}: CFOP {i.cfop} não gera receita e ficou fora do cálculo")
                 continue
             na_venda = (i.cst_icms or "") in VENDA_COM_ST
+            # o ST segue o que o fornecedor cobrou quando há compra do produto; sem compra, o padrão da nota de venda (CSOSN)
             st = (True in st_compra[i.ncm]) if i.ncm in st_compra else na_venda
             mono = avaliar(i.ncm, lei).monofasico_presumido
             if st != na_venda:
@@ -93,7 +112,7 @@ def linhas_da_nfe(db: Session, empresa: Empresa, notas: list[NotaLida]) -> Leitu
             ))
 
     for ncm, d in divergencias.items():
-        valor = f"R$ {d['valor']:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")  # sem quebra após o R$
+        valor = _brl(d["valor"])
         if d["st"]:
             out.avisos.append(f"NCM {ncm} ({d['desc'][:40]}): vendido sem ST, mas a compra veio com ST cobrado. O cálculo tira o ICMS "
                               f"do DAS; confira o CSOSN das vendas ({valor})")

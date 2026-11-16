@@ -1,7 +1,9 @@
 """Leitura de XML de NF-e (layout 4.00), avulsos ou dentro de um .zip."""
 from __future__ import annotations
 
+import codecs
 import io
+import re
 import zipfile
 from dataclasses import dataclass, field
 from datetime import date
@@ -78,8 +80,30 @@ def _contribuinte(inf) -> bool | None:
     return False if _txt(inf, "n:dest/n:CPF") else None
 
 
+def _como_cp1252(erro: UnicodeDecodeError) -> tuple[str, int]:
+    return erro.object[erro.start:erro.end].decode("cp1252", errors="replace"), erro.end
+
+
+codecs.register_error("nfe_cp1252", _como_cp1252)
+DECLARACAO = re.compile(rb"^\s*<\?xml[^>]*\?>")
+
+
 def _raiz(conteudo: bytes):
-    return etree.fromstring(conteudo, parser=etree.XMLParser(resolve_entities=False, no_network=True))
+    parser = etree.XMLParser(resolve_entities=False, no_network=True)
+    try:
+        return etree.fromstring(conteudo, parser=parser)
+    except etree.XMLSyntaxError:
+        # a mensagem do libxml2 muda de versão para versão ("not proper UTF-8", "Invalid bytes in character encoding"):
+        # quem decide são os bytes; se forem UTF-8 válido, o erro é outro e sobe como está
+        try:
+            conteudo.decode("utf-8")
+            raise
+        except UnicodeDecodeError:
+            pass
+    # há emissores que gravam os acentos em Windows-1252 num XML declarado UTF-8: os bytes inválidos são relidos nessa
+    # codificação e o resto continua UTF-8; sem a declaração, o lxml lê o resultado como UTF-8
+    texto = DECLARACAO.sub(b"", conteudo).decode("utf-8", errors="nfe_cp1252")
+    return etree.fromstring(texto.encode("utf-8"), parser=parser)
 
 
 def cancelamento(raiz) -> str | None:
