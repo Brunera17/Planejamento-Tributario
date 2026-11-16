@@ -73,6 +73,11 @@
   font-stretch: 112%;
 }
 
+/* fatias e barras recebem foco do Recharts ao clicar; o teclado usa a lista ao lado, então a moldura só atrapalha */
+.recharts-wrapper :focus {
+  outline: none;
+}
+
 .num {
   font-variant-numeric: tabular-nums;
   text-align: right;

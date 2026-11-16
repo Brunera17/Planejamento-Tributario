@@ -135,7 +135,8 @@ export function CalculadoraSimples() {
         fator_r: fatorR,
       },
     ]);
-    setNova({ ...nova, descricao: "", valor: "" });
+    // as marcações voltam ao padrão: a próxima nota não herda ST, monofásico ou ISS da anterior sem ninguém ver
+    setNova({ ...nova, descricao: "", valor: "", st: false, monofasico: false, iss_fora_do_das: "" });
     setErro(null);
   }
 

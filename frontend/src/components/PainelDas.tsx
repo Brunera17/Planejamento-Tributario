@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { brl, competenciaExtenso, percentual } from "../lib/formato";
 import { Ficha, Tabela } from "./ui";
@@ -15,6 +15,7 @@ export type LinhaPainel = {
 
 type Dimensao = "nota" | "atividade" | "anexo" | "mes";
 type Medida = "das" | "aliquota" | "receita";
+type Forma = "barras" | "rosca";
 
 // cores validadas como paleta categórica (validate_palette.js, modo claro): petróleo da marca, laranja, violeta, amarelo
 const GRUPOS = [
@@ -27,6 +28,9 @@ const GRUPOS = [
 const ROTULO_DIMENSAO: Record<Dimensao, string> = { nota: "Nota", atividade: "Atividade", anexo: "Anexo", mes: "Mês" };
 const ROTULO_MEDIDA: Record<Medida, string> = { das: "DAS (R$)", aliquota: "Alíquota", receita: "Receita (R$)" };
 const MAX_BARRAS = 12;
+const MAX_FATIAS = 4; // a paleta validada tem 4 cores: acima disso, as menores viram "Outros"
+const COR_FATIA = ["var(--color-serie-1)", "var(--color-serie-2)", "var(--color-serie-3)", "var(--color-serie-4)"];
+const COR_OUTROS = "var(--color-t-cpp)";
 
 const atividade = (anexo: string) => (anexo === "I" ? "Comércio" : anexo === "II" ? "Indústria" : "Serviço");
 
@@ -55,11 +59,11 @@ function agregar(linhas: LinhaPainel[], d: Dimensao): Barra[] {
   return [...mapa.values()].sort((a, b) => b.das - a.das);
 }
 
-/** Na visão por nota, as menores entram juntas numa barra só para o gráfico continuar legível. */
-function limitar(barras: Barra[]): Barra[] {
-  if (barras.length <= MAX_BARRAS) return barras;
-  const resto = barras.slice(MAX_BARRAS - 1);
-  const outras = { nome: `Outras ${resto.length} notas`, receita: 0, das: 0, notas: 0, indices: [], ...Object.fromEntries(GRUPOS.map((g) => [g.chave, 0])) } as Barra;
+/** As menores entram juntas num grupo só para o gráfico continuar legível. */
+function limitar(barras: Barra[], maximo: number, dimensao: Dimensao): Barra[] {
+  if (barras.length <= maximo) return barras;
+  const resto = barras.slice(maximo - 1);
+  const outras = { nome: dimensao === "nota" ? `Outras ${resto.length} notas` : `Outros ${resto.length}`, outros: 1, receita: 0, das: 0, notas: 0, indices: [], ...Object.fromEntries(GRUPOS.map((g) => [g.chave, 0])) } as Barra;
   for (const b of resto) {
     outras.indices.push(...b.indices);
     outras.receita += b.receita;
@@ -67,7 +71,7 @@ function limitar(barras: Barra[]): Barra[] {
     outras.notas += b.notas;
     for (const g of GRUPOS) outras[g.chave] = (outras[g.chave] as number) + (b[g.chave] as number);
   }
-  return [...barras.slice(0, MAX_BARRAS - 1), outras];
+  return [...barras.slice(0, maximo - 1), outras];
 }
 
 function Segmentado<T extends string>({ rotulo, valor, opcoes, aoMudar }: { rotulo: string; valor: T; opcoes: [T, string][]; aoMudar: (v: T) => void }) {
@@ -101,14 +105,16 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
   ];
   const [dimensao, setDimensao] = useState<Dimensao>(dimensoes[0]);
   const [medida, setMedida] = useState<Medida>("das");
+  const [forma, setForma] = useState<Forma>("barras");
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [ocultos, setOcultos] = useState<Set<string>>(new Set());
 
   const d = dimensoes.includes(dimensao) ? dimensao : dimensoes[0];
   const barras = useMemo(() => {
     const todas = agregar(linhas, d);
-    return d === "nota" ? limitar(todas) : todas;
-  }, [linhas, d]);
+    if (forma === "rosca") return limitar(todas, MAX_FATIAS, d);
+    return d === "nota" ? limitar(todas, MAX_BARRAS, d) : todas;
+  }, [linhas, d, forma]);
 
   // a alíquota de cada fatia é o tributo ÷ a receita do grupo; a receita é uma série só
   const dados = barras.map((b) => ({
@@ -128,19 +134,28 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
     setSelecionado(null); // o filtro de uma visão não vale na outra
   }
   const alternarSelecao = (nome: string) => setSelecionado((s) => (s === nome ? null : nome));
+  function mudarForma(v: Forma) {
+    setForma(v);
+    setSelecionado(null); // na rosca os grupos pequenos se juntam: o filtro anterior pode não existir
+    if (v === "rosca" && medida === "aliquota") setMedida("das"); // alíquota não se soma em fatias
+  }
+  const medidas: Medida[] = forma === "rosca" ? ["das", "receita"] : ["das", "aliquota", "receita"];
+  const corFatia = (b: Barra, i: number) => (b.outros ? COR_OUTROS : COR_FATIA[i]);
+  const totalRosca = barras.reduce((s, b) => s + (medida === "receita" ? b.receita : b.das), 0);
 
   return (
     <section className="rounded-md border border-surface bg-white" aria-labelledby="titulo-painel-das">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-surface px-4 py-2.5">
         <div className="flex flex-wrap items-baseline gap-x-3">
           <h2 id="titulo-painel-das">Painel do DAS</h2>
-          <p className="text-sm text-text-muted">Clique numa barra para filtrar os números e a tabela abaixo.</p>
+          <p className="text-sm text-text-muted">Clique numa {forma === "rosca" ? "fatia" : "barra"} para filtrar os números e a tabela abaixo.</p>
         </div>
       </header>
       <div className="space-y-4 p-4">
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <Segmentado rotulo="Ver por" valor={d} opcoes={dimensoes.map((x) => [x, ROTULO_DIMENSAO[x]])} aoMudar={mudarDimensao} />
-          <Segmentado rotulo="Medida" valor={medida} opcoes={(["das", "aliquota", "receita"] as Medida[]).map((x) => [x, ROTULO_MEDIDA[x].replace(" (R$)", "")])} aoMudar={setMedida} />
+          <Segmentado rotulo="Medida" valor={medida} opcoes={medidas.map((x) => [x, ROTULO_MEDIDA[x].replace(" (R$)", "")])} aoMudar={setMedida} />
+          <Segmentado rotulo="Gráfico" valor={forma} opcoes={[["barras", "Barras"], ["rosca", "Rosca"]]} aoMudar={mudarForma} />
         </div>
 
         {escolhida && (
@@ -164,7 +179,7 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
           ]}
         />
 
-        {series.length > 0 && (
+        {forma === "barras" && series.length > 0 && (
           <div className="flex flex-wrap gap-2 text-sm" aria-label="Grupos de tributo: clique para mostrar ou esconder">
             {GRUPOS.map((g) => {
               const visivel = !ocultos.has(g.chave);
@@ -191,6 +206,64 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
           </div>
         )}
 
+        {forma === "rosca" ? (
+          <div className="grid items-center gap-4 md:grid-cols-[18rem_minmax(0,1fr)]">
+            <div className="relative h-72" role="img" aria-label={`${ROTULO_MEDIDA[medida]} por ${ROTULO_DIMENSAO[d].toLowerCase()}: ${barras.map((b) => `${b.nome} ${brl(medida === "receita" ? b.receita : b.das)}`).join(", ")}`}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie
+                    data={barras}
+                    dataKey={medida === "receita" ? "receita" : "das"}
+                    nameKey="nome"
+                    innerRadius="62%"
+                    outerRadius="95%"
+                    stroke="#fff"
+                    strokeWidth={2}
+                    startAngle={90}
+                    endAngle={-270}
+                    isAnimationActive={false}
+                    onClick={(b: { nome: string }) => alternarSelecao(b.nome)}
+                    cursor="pointer"
+                  >
+                    {barras.map((b, i) => (
+                      <Cell key={b.nome} fill={corFatia(b, i)} fillOpacity={!escolhida || escolhida.nome === b.nome ? 1 : 0.3} />
+                    ))}
+                  </Pie>
+                  {/* por cima do total escrito no centro da rosca */}
+                  <Tooltip content={<Dica medida="das" semCores />} isAnimationActive={false} wrapperStyle={{ zIndex: 10 }} />
+                </PieChart>
+              </ResponsiveContainer>
+              {/* o centro mostra o total, ou a fatia escolhida quando há filtro */}
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-xs text-text-muted">{escolhida ? escolhida.nome : medida === "receita" ? "Receita total" : "DAS total"}</span>
+                <span className="num text-lg font-semibold">{brl(escolhida ? (medida === "receita" ? escolhida.receita : escolhida.das) : totalRosca)}</span>
+                {escolhida && totalRosca > 0 && (
+                  <span className="num text-xs text-text-muted">{percentual((medida === "receita" ? escolhida.receita : escolhida.das) / totalRosca)} do total</span>
+                )}
+              </div>
+            </div>
+            <ul className="space-y-1 text-sm">
+              {barras.map((b, i) => {
+                const v = medida === "receita" ? b.receita : b.das;
+                return (
+                  <li key={b.nome}>
+                    <button
+                      type="button"
+                      aria-pressed={escolhida?.nome === b.nome}
+                      onClick={() => alternarSelecao(b.nome)}
+                      className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto_4.5rem] items-center gap-2 rounded px-2 py-1 text-left hover:bg-highlight ${escolhida?.nome === b.nome ? "bg-highlight" : ""} ${escolhida && escolhida.nome !== b.nome ? "text-text-muted" : ""}`}
+                    >
+                      <span aria-hidden className="h-2.5 w-2.5 rounded-sm" style={{ background: corFatia(b, i) }} />
+                      <span className="truncate">{b.nome}</span>
+                      <span className="num">{brl(v)}</span>
+                      <span className="num text-right text-text-muted">{percentual(totalRosca ? v / totalRosca : 0)}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : (
         <div style={{ height: Math.max(140, barras.length * 38 + 40) }} role="img" aria-label={`${ROTULO_MEDIDA[medida]} por ${ROTULO_DIMENSAO[d].toLowerCase()}: ${dados.map((b) => `${b.nome} ${formatar(medida === "aliquota" ? (b.receita ? b.das / b.receita : 0) : medida === "receita" ? b.receita : b.das)}`).join(", ")}`}>
           <ResponsiveContainer>
             <BarChart data={dados} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 4 }} barCategoryGap={8}>
@@ -237,6 +310,7 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        )}
 
         <Tabela
           cabecalho={["Nota", "Atividade", "Anexo", "Valor", "Alíquota", "DAS", ...(iss ? ["ISS ao município"] : [])]}
@@ -259,7 +333,8 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
   );
 }
 
-function Dica({ active, payload, medida }: { active?: boolean; payload?: { payload: Barra }[]; medida: Medida }) {
+// semCores: na rosca as cores já identificam as fatias, então os tributos da dica ficam sem cor para não dar dois sentidos à mesma cor
+function Dica({ active, payload, medida, semCores }: { active?: boolean; payload?: { payload: Barra }[]; medida: Medida; semCores?: boolean }) {
   if (!active || !payload?.length) return null;
   const b = payload[0].payload;
   // a dica usa os valores em R$ da barra, qualquer que seja a medida do gráfico
@@ -271,7 +346,7 @@ function Dica({ active, payload, medida }: { active?: boolean; payload?: { paylo
         {GRUPOS.filter((g) => (original[g.chave] as number) > 0).map((g) => (
           <div key={g.chave} className="contents">
             <dt className="flex items-center gap-1.5 text-text-muted">
-              <span aria-hidden className="h-2 w-2 rounded-sm" style={{ background: g.cor }} />
+              {!semCores && <span aria-hidden className="h-2 w-2 rounded-sm" style={{ background: g.cor }} />}
               {g.nome}
             </dt>
             <dd className="text-right">{brl(original[g.chave] as number)}</dd>
