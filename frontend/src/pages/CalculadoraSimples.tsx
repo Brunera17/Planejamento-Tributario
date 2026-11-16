@@ -238,14 +238,34 @@ export function CalculadoraSimples() {
           {empresaId ? (
             <div>
               <EnvioArquivo formatos={[".xml", ".zip"]} multiplo arquivos={arquivos.length <= 20 ? arquivos : []} aoEscolher={mudarArquivos} />
-              {arquivos.length > 20 && (
-                <p className="mt-2 flex items-center justify-between text-sm text-text-muted">
-                  {arquivos.length} arquivos enviados
-                  <Botao variante="linha-perigo" onClick={() => mudarArquivos([])}>
-                    Retirar todos
-                  </Botao>
-                </p>
-              )}
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-text-muted">
+                <label className="inline-flex cursor-pointer items-center gap-2">
+                  <span className="rounded border border-border bg-white px-3 py-1.5 font-medium text-brand hover:border-brand hover:bg-highlight">
+                    Escolher pasta
+                  </span>
+                  <span>a pasta inteira, com as subpastas (canceladas, compras)</span>
+                  {/* webkitdirectory: o navegador entrega todos os arquivos da pasta e das subpastas */}
+                  <input
+                    type="file"
+                    multiple
+                    className="sr-only"
+                    {...({ webkitdirectory: "" } as object)}
+                    onChange={(e) => {
+                      const fs = [...(e.target.files ?? [])].filter((f) => /\.(xml|zip)$/i.test(f.name));
+                      e.target.value = "";
+                      if (fs.length) mudarArquivos(fs);
+                    }}
+                  />
+                </label>
+                {arquivos.length > 20 && (
+                  <span className="flex items-center gap-3">
+                    {arquivos.length.toLocaleString("pt-BR")} arquivos enviados
+                    <Botao variante="linha-perigo" onClick={() => mudarArquivos([])}>
+                      Retirar todos
+                    </Botao>
+                  </span>
+                )}
+              </div>
               {lerNfe.isPending && <p role="status" className="mt-2 text-sm text-text-muted">Lendo os arquivos…</p>}
             </div>
           ) : (

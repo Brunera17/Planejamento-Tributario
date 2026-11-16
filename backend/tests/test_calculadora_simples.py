@@ -119,7 +119,8 @@ def test_rota_le_nfe_e_calcula(cliente, analista, empresa):
     assert len(lido["linhas"]) == 1 and lido["linhas"][0]["valor"] == 1000
     assert (lido["vendas"], lido["compras"]) == (1, 0)
     assert "opcionais" in lido["info"][0]  # sem compras: avisa que elas melhoram o cálculo, sem exigir
-    outra = _ler(cliente, analista, empresa, [_venda(2, "87089990", emitente="99888777000161")])
+    assert "evento de cancelamento" in lido["info"][1]  # sem eventos: a nota cancelada entraria como venda
+    outra =_ler(cliente, analista, empresa, [_venda(2, "87089990", emitente="99888777000161")])
     assert outra["linhas"] == [] and "fora do cálculo" in outra["avisos"][0]
 
     calc = cliente.post("/api/calculadora-simples", headers=analista,
@@ -129,6 +130,19 @@ def test_rota_le_nfe_e_calcula(cliente, analista, empresa):
     assert corpo["das"] > 0 and corpo["faixas"]["I"]["faixa"] == 3
     assert corpo["por_competencia"]["2026-11"] == corpo["das"]
     assert corpo["parcelas"] == [{"anexo": "I", "monofasico": True, "st": False, "iss_fora_do_das": None, "receita": 1000}]
+
+
+def _evento_cancelamento(n: int) -> bytes:
+    return (f'<procEventoNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00"><evento><infEvento>'
+            f"<chNFe>35{n:042d}</chNFe><tpEvento>110111</tpEvento><detEvento><descEvento>Cancelamento</descEvento></detEvento>"
+            "</infEvento></evento><retEvento><infEvento><cStat>135</cStat></infEvento></retEvento></procEventoNFe>").encode()
+
+
+def test_evento_de_cancelamento_tira_a_nota_e_o_aviso(cliente, analista, empresa):
+    lido = _ler(cliente, analista, empresa, [_venda(40, "30049069"), _venda(41, "30049069"), _evento_cancelamento(41)])
+    assert len(lido["linhas"]) == 1 and lido["linhas"][0]["descricao"].startswith("NF 40")
+    assert "1 nota(s) cancelada(s)" in lido["avisos"][0]
+    assert not any("evento de cancelamento" in t for t in lido["info"])
 
 
 def test_sem_compras_o_st_segue_a_nota_de_venda(cliente, analista, empresa):
@@ -146,7 +160,8 @@ def test_com_compras_o_st_segue_o_fornecedor_e_avisa(cliente, analista, empresa)
         _compra(31, "40141000", com_st=False, cst_pis="01"),
         _compra(32, "19059090", com_st=False, cst_pis="04"),
     ])
-    assert (lido["vendas"], lido["compras"]) == (3, 3) and lido["info"] == []
+    assert (lido["vendas"], lido["compras"]) == (3, 3)
+    assert not any("opcionais" in t for t in lido["info"])  # com compras, a mensagem delas some
     assert [(l["st"], l["monofasico"]) for l in lido["linhas"]] == [(True, False), (False, False), (False, False)]
     avisos = " | ".join(lido["avisos"])
     assert "19011090" in avisos and "compra veio com ST" in avisos

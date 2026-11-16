@@ -24,6 +24,9 @@ CST_COM_ST = {"10", "30", "60", "70", "201", "202", "203", "500"}
 VENDA_COM_ST = {"60", "500"}  # na nota de venda: ST já recolhido, o ICMS sai do DAS
 SEM_COMPRAS = ("As notas de compra são opcionais, mas melhoram o cálculo: com elas o ST de cada produto segue o que o fornecedor "
                "cobrou e o monofásico é conferido pelo CST de PIS da compra. Sem elas, o ST segue o CSOSN das notas de venda.")
+SEM_CANCELAMENTOS = ("Nenhum evento de cancelamento no envio. Se houve nota cancelada no mês, envie também os XML de evento "
+                     "(costumam ficar numa pasta CANCELADAS): sem eles, a nota cancelada entra como venda. Use \"Escolher pasta\" "
+                     "para mandar a pasta inteira, com as subpastas.")
 
 
 @dataclass

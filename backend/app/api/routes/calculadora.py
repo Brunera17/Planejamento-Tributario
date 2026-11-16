@@ -102,6 +102,9 @@ def _ler_nfe(db, empresa_id: int, arquivos: list[StarletteUploadFile]) -> dict:
     leitura = servico.linhas_da_nfe(db, e, validas)
     if len(validas) < len(notas):
         leitura.avisos.append(f"{len(notas) - len(validas)} nota(s) cancelada(s) ficaram fora do cálculo")
+    elif leitura.vendas and not canceladas:
+        # a nota cancelada é idêntica a uma válida: só o XML do evento de cancelamento diz que ela não vale
+        leitura.info.append(servico.SEM_CANCELAMENTOS)
     return {"linhas": para_json(leitura.linhas), "avisos": leitura.avisos, "info": leitura.info, "erros": erros,
             "vendas": leitura.vendas, "compras": leitura.compras}
 
