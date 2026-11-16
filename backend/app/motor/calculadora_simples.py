@@ -8,10 +8,12 @@ do DAS, pela alíquota do município (art. 13-A).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from .simples import FATOR_R_MINIMO, AliquotaSimples, aliquota_efetiva, anexo_pelo_fator_r, fator_r, reparticao
 from .tipos import ZERO, FaixaSimples, Parametros
+
+CENTAVO = Decimal("0.01")
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,7 @@ def calcular(
     sem_aliquota_iss = False
 
     aliquotas: dict[str, AliquotaSimples] = {}
+    atividades: dict[tuple[str, bool], dict[str, Decimal]] = {}
     resultado = ResultadoCalculadora(rbt12, [], ZERO, ZERO, {}, {}, {}, fr)
     for l in linhas:
         anexo = anexo_pelo_fator_r(fr) if l.fator_r else l.anexo
@@ -106,12 +109,19 @@ def calcular(
                 iss_municipio = l.valor * aliq_iss_municipio
                 resultado.iss_municipio += iss_municipio
         resultado.linhas.append(ResultadoLinha(l, anexo, sum(partes.values(), ZERO), das, tributos, iss_municipio))
-        resultado.das += das
         resultado.receita += l.valor
+        # o PGDAS-D separa a receita por atividade (anexo, com ou sem ST/monofásico/ISS fora) e arredonda cada tributo nela
+        atividade = atividades.setdefault((anexo, bool(fora)), {})
         for k, v in tributos.items():
-            resultado.tributos[k] = resultado.tributos.get(k, ZERO) + v
+            atividade[k] = atividade.get(k, ZERO) + v
         if l.competencia:
             resultado.por_competencia[l.competencia] = resultado.por_competencia.get(l.competencia, ZERO) + das
+
+    for atividade in atividades.values():
+        for k, v in atividade.items():
+            resultado.tributos[k] = resultado.tributos.get(k, ZERO) + v.quantize(CENTAVO, ROUND_HALF_UP)
+    resultado.das = sum(resultado.tributos.values(), ZERO)
+    resultado.por_competencia = {m: v.quantize(CENTAVO, ROUND_HALF_UP) for m, v in resultado.por_competencia.items()}
 
     for anexo, a in aliquotas.items():
         f = a.faixa

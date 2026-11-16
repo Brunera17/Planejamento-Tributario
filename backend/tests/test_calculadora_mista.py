@@ -30,18 +30,20 @@ def test_comercio_e_servico_juntos_rbt12_900_mil():
     assert r.faixas["III"]["aliquota_efetiva"] == D("0.1204")
     # por nota: 40.000 × 8,20%; 20.000 × 8,20% × (1 − 33,5% de ICMS); 30.000 × 12,04%; 10.000 × 12,04% × (1 − 32,5% de ISS)
     assert [c(l.das) for l in r.linhas] == [D("3280.00"), D("1090.60"), D("3612.00"), D("812.70")]
-    assert c(r.das) == D("8795.30")
+    # cada tributo é arredondado por atividade, como no PGDAS-D: (I sem ST), (I com ST), (III), (III com ISS retido).
+    # A conta exata dá R$ 8.795,30; os arredondamentos da COFINS e da CPP somam 2 centavos.
+    assert r.das == D("8795.32")
     esperado = {
         "ICMS": D("1098.80"),   # 40.000 × 8,20% × 33,5%
         "ISS": D("1173.90"),    # 30.000 × 12,04% × 32,5%
         "IRPJ": D("463.24"),    # 4.920 × 5,5% + 4.816 × 4%
         "CSLL": D("340.76"),    # 4.920 × 3,5% + 4.816 × 3,5%
-        "COFINS": D("1283.71"), # 4.920 × 12,74% + 4.816 × 13,64%
-        "PIS": D("278.35"),     # 4.920 × 2,76% + 4.816 × 2,96%
-        "CPP": D("4156.54"),    # 4.920 × 42% + 4.816 × 43,4%
+        "COFINS": D("1283.72"), # 417,87 + 208,94 + 492,68 + 164,23 (exato: 1.283,7104)
+        "PIS": D("278.35"),     # 90,53 + 45,26 + 106,92 + 35,64
+        "CPP": D("4156.55"),    # 1.377,60 + 688,80 + 1.567,61 + 522,54 (exato: 4.156,544)
     }
-    assert {k: c(v) for k, v in r.tributos.items()} == esperado
-    assert c(r.aliquota_media) == c(D("8795.30") / D("100000"))
+    assert r.tributos == esperado
+    assert c(r.aliquota_media) == c(D("8795.32") / D("100000"))
 
 
 def test_fator_r_muda_o_anexo_do_servico_e_nao_o_do_comercio():
@@ -55,20 +57,18 @@ def test_fator_r_muda_o_anexo_do_servico_e_nao_o_do_comercio():
     assert c(com.linhas[0].das) == c(sem.linhas[0].das) == D("820.00")
 
 
-def test_bate_com_a_guia_real_de_uma_farmacia():
-    """DAS de 09/2026 de uma farmácia do Anexo I, só com os totais de receita (sem dado do cliente).
+def test_bate_no_centavo_com_o_extrato_real_de_uma_farmacia():
+    """Extrato do PGDAS-D de 09/2026 de uma farmácia do Anexo I, só com as parcelas declaradas (sem dado do cliente).
 
-    A guia não traz o RBT12: ele sai da efetiva implícita no IRPJ (298,57 ÷ 5,5% ÷ 68.368,31 = 7,9401%), na 4ª faixa.
-    PIS e COFINS conferem a separação do monofásico; o ICMS confere a do ST.
+    RBT12 R$ 815.208,56 (4ª faixa). Duas atividades: sem ST/monofásico (R$ 14.283,50) e com (as outras três parcelas).
+    O PGDAS arredonda cada tributo por atividade; arredondar só no total erra 1 centavo em IRPJ, COFINS e CPP.
     """
-    receita = {(False, False): D("14283.50"), (False, True): D("1258.23"), (True, False): D("52807.08"), (True, True): D("19.50")}
-    r = calcular([LinhaNota("", v, "I", monofasico=mono, st=st) for (mono, st), v in receita.items()], D("815261"), FAIXAS)
-    guia = {"IRPJ": D("298.57"), "CSLL": D("189.99"), "COFINS": D("157.22"), "PIS": D("34.06"), "CPP": D("2279.93"), "ICMS": D("1784.54")}
-    assert c(r.tributos["COFINS"]) == guia["COFINS"]
-    assert c(r.tributos["PIS"]) == guia["PIS"]
-    for t, v in guia.items():  # o RBT12 é estimado: sobra no máximo 10 centavos em cada tributo
-        assert abs(c(r.tributos[t]) - v) <= D("0.10"), t
-    assert abs(c(r.das) - D("4744.31")) <= D("0.20")
+    parcelas = [(D("14283.50"), False, False), (D("52807.08"), True, False), (D("1258.23"), False, True), (D("19.50"), True, True)]
+    r = calcular([LinhaNota("", v, "I", monofasico=mono, st=st) for v, mono, st in parcelas], D("815208.56"), FAIXAS)
+    extrato = {"IRPJ": D("298.57"), "CSLL": D("189.99"), "COFINS": D("157.22"), "PIS": D("34.06"), "CPP": D("2279.93"),
+               "ICMS": D("1784.54")}
+    assert r.tributos == extrato
+    assert r.das == D("4744.31")
 
 
 def test_teto_de_5_por_cento_do_iss_na_5a_faixa():
