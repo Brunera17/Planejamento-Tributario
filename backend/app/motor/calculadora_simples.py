@@ -39,6 +39,17 @@ class ResultadoLinha:
 
 
 @dataclass
+class Parcela:
+    """Uma parcela de receita do PGDAS-D: anexo e o que sai do DAS (ST de ICMS, monofásico de PIS/COFINS, ISS)."""
+
+    anexo: str
+    monofasico: bool
+    st: bool
+    iss_fora_do_das: str | None
+    receita: Decimal
+
+
+@dataclass
 class ResultadoCalculadora:
     rbt12: Decimal
     linhas: list[ResultadoLinha]
@@ -50,6 +61,7 @@ class ResultadoCalculadora:
     fator_r: Decimal | None = None
     iss_municipio: Decimal = ZERO
     avisos: list[str] = field(default_factory=list)
+    parcelas: list[Parcela] = field(default_factory=list)  # receita segregada como se lança no PGDAS-D
 
     @property
     def aliquota_media(self) -> Decimal:
@@ -90,6 +102,7 @@ def calcular(
 
     aliquotas: dict[str, AliquotaSimples] = {}
     atividades: dict[tuple[str, bool], dict[str, Decimal]] = {}
+    parcelas: dict[tuple[str, bool, bool, str | None], Decimal] = {}
     resultado = ResultadoCalculadora(rbt12, [], ZERO, ZERO, {}, {}, {}, fr)
     for l in linhas:
         anexo = anexo_pelo_fator_r(fr) if l.fator_r else l.anexo
@@ -116,12 +129,15 @@ def calcular(
             atividade[k] = atividade.get(k, ZERO) + v
         if l.competencia:
             resultado.por_competencia[l.competencia] = resultado.por_competencia.get(l.competencia, ZERO) + das
+        chave = (anexo, l.monofasico, l.st, l.iss_fora_do_das)
+        parcelas[chave] = parcelas.get(chave, ZERO) + l.valor
 
     for atividade in atividades.values():
         for k, v in atividade.items():
             resultado.tributos[k] = resultado.tributos.get(k, ZERO) + v.quantize(CENTAVO, ROUND_HALF_UP)
     resultado.das = sum(resultado.tributos.values(), ZERO)
     resultado.por_competencia = {m: v.quantize(CENTAVO, ROUND_HALF_UP) for m, v in resultado.por_competencia.items()}
+    resultado.parcelas = [Parcela(a, m, s, i, v) for (a, m, s, i), v in sorted(parcelas.items(), key=lambda kv: (kv[0][0], -kv[1]))]
 
     for anexo, a in aliquotas.items():
         f = a.faixa

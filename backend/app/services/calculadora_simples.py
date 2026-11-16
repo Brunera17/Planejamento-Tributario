@@ -1,16 +1,38 @@
-"""Calculadora do Simples por nota: transforma XML de NF-e em linhas do motor, com ST e monofásico já marcados."""
+"""Calculadora do Simples por nota: transforma XML de NF-e em linhas do motor, com ST e monofásico já marcados.
+
+As notas de venda (emitidas pela empresa) viram as linhas do cálculo. As notas de compra (a empresa é a destinatária) são
+opcionais e só melhoram a marcação: o ST de cada produto passa a seguir o que o fornecedor cobrou, e o CST de PIS do
+fornecedor confere o monofásico da lei.
+"""
 from __future__ import annotations
+
+from collections import defaultdict
+from dataclasses import dataclass, field
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import CfopRegra, Empresa, NcmRegra
+from app.models import CfopRegra, Empresa
 from app.motor.calculadora_simples import LinhaNota
 from app.motor.lei_monofasico import avaliar
 from app.seeds import tabelas
-from app.services import substituicao
-from app.services.nfe_xml import NotaLida
+from app.services.nfe_xml import ItemLido, NotaLida
 from app.utils.simples import anexo_da_empresa
+
+# ICMS-ST retido pelo fornecedor (CST 10, 30, 70; CSOSN 201 a 203) ou cobrado em etapa anterior (CST 60; CSOSN 500)
+CST_COM_ST = {"10", "30", "60", "70", "201", "202", "203", "500"}
+VENDA_COM_ST = {"60", "500"}  # na nota de venda: ST já recolhido, o ICMS sai do DAS
+SEM_COMPRAS = ("As notas de compra são opcionais, mas melhoram o cálculo: com elas o ST de cada produto segue o que o fornecedor "
+               "cobrou e o monofásico é conferido pelo CST de PIS da compra. Sem elas, o ST segue o CSOSN das notas de venda.")
+
+
+@dataclass
+class Leitura:
+    linhas: list[LinhaNota] = field(default_factory=list)
+    avisos: list[str] = field(default_factory=list)
+    info: list[str] = field(default_factory=list)
+    vendas: int = 0
+    compras: int = 0
 
 
 def anexo_mercadorias(empresa: Empresa) -> str:
@@ -19,30 +41,73 @@ def anexo_mercadorias(empresa: Empresa) -> str:
     return anexo if anexo in ("I", "II") else "I"
 
 
-def linhas_da_nfe(db: Session, empresa: Empresa, notas: list[NotaLida]) -> tuple[list[LinhaNota], list[str]]:
-    """(linhas, avisos). Só entram notas de saída emitidas pela empresa e itens com CFOP que gera receita."""
+def _compra_com_st(i: ItemLido) -> bool:
+    return bool(i.vl_icms_st) or (i.cst_icms or "") in CST_COM_ST
+
+
+def linhas_da_nfe(db: Session, empresa: Empresa, notas: list[NotaLida]) -> Leitura:
+    """Vendas da empresa viram linhas (só itens com CFOP que gera receita); compras, se vierem, conferem ST e monofásico."""
     anexo = anexo_mercadorias(empresa)
     gera_receita = {r.cfop: r.gera_receita for r in db.scalars(select(CfopRegra))}
-    st_tabela = substituicao.carregar(db, empresa.uf)
-    st_ncm = {r.ncm: r.sujeito_st for r in db.scalars(select(NcmRegra))}
     lei = tabelas.lei_monofasico()
-    linhas: list[LinhaNota] = []
-    avisos: list[str] = []
+    out = Leitura()
+
+    vendas = [n for n in notas if n.tipo_nf == 1 and n.cnpj_emitente == empresa.cnpj]
+    compras = [n for n in notas if n.cnpj_destinatario == empresa.cnpj and n.cnpj_emitente != empresa.cnpj]
+    usadas = {id(n) for n in vendas} | {id(n) for n in compras}
     for n in notas:
-        if n.tipo_nf != 1 or n.cnpj_emitente != empresa.cnpj:
-            avisos.append(f"NF {n.numero}: não é nota de saída emitida pela empresa e ficou fora do cálculo")
-            continue
+        if id(n) not in usadas:
+            out.avisos.append(f"NF {n.numero}: não é venda nem compra da empresa e ficou fora do cálculo")
+    out.vendas, out.compras = len(vendas), len(compras)
+
+    st_compra: dict[str, set[bool]] = defaultdict(set)
+    cst_pis_compra: dict[str, set[str]] = defaultdict(set)
+    for n in compras:
+        for i in n.itens:
+            st_compra[i.ncm].add(_compra_com_st(i))
+            if i.cst_pis:
+                cst_pis_compra[i.ncm].add(i.cst_pis)
+
+    divergencias: dict[str, dict] = {}  # por NCM, para avisar uma vez só
+    for n in vendas:
         for i in n.itens:
             if not gera_receita.get(i.cfop, False):
-                avisos.append(f"NF {n.numero}, item {i.n_item}: CFOP {i.cfop} não gera receita e ficou fora do cálculo")
+                out.avisos.append(f"NF {n.numero}, item {i.n_item}: CFOP {i.cfop} não gera receita e ficou fora do cálculo")
                 continue
-            st = st_ncm.get(i.ncm, False) if st_tabela.vazia else st_tabela.vigente(i.ncm, n.competencia) is not None
-            linhas.append(LinhaNota(
+            na_venda = (i.cst_icms or "") in VENDA_COM_ST
+            st = (True in st_compra[i.ncm]) if i.ncm in st_compra else na_venda
+            mono = avaliar(i.ncm, lei).monofasico_presumido
+            if st != na_venda:
+                d = divergencias.setdefault(i.ncm, {"st": st, "desc": i.descricao, "valor": 0})
+                d["valor"] += i.vl_total
+            out.linhas.append(LinhaNota(
                 descricao=f"NF {n.numero}, item {i.n_item}: {i.descricao}"[:150],
                 valor=i.vl_total,
                 anexo=anexo,
                 competencia=n.competencia,
                 st=st,
-                monofasico=avaliar(i.ncm, lei).monofasico_presumido,
+                monofasico=mono,
             ))
-    return linhas, avisos
+
+    for ncm, d in divergencias.items():
+        valor = f"R$ {d['valor']:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")  # sem quebra após o R$
+        if d["st"]:
+            out.avisos.append(f"NCM {ncm} ({d['desc'][:40]}): vendido sem ST, mas a compra veio com ST cobrado. O cálculo tira o ICMS "
+                              f"do DAS; confira o CSOSN das vendas ({valor})")
+        else:
+            out.avisos.append(f"NCM {ncm} ({d['desc'][:40]}): vendido como ST, mas a compra veio sem ST. O cálculo mantém o ICMS "
+                              f"no DAS; confira o CSOSN das vendas ({valor})")
+    vendidos = {i.ncm: i.descricao for n in vendas for i in n.itens}
+    for ncm, csts in cst_pis_compra.items():
+        if ncm not in vendidos:
+            continue
+        lei_mono = avaliar(ncm, lei).monofasico_presumido
+        if "04" in csts and not lei_mono:
+            out.avisos.append(f"NCM {ncm} ({vendidos[ncm][:40]}): o fornecedor informou monofásico (CST 04), mas o NCM não está nas leis "
+                              "do monofásico. O cálculo tributa PIS e COFINS; confira o NCM do produto")
+        elif lei_mono and csts == {"01"}:  # 02 e 03 também são monofásico (no fabricante); 01 é tributação normal
+            out.avisos.append(f"NCM {ncm} ({vendidos[ncm][:40]}): está na lei do monofásico, mas o fornecedor tributou PIS e COFINS "
+                              f"(CST {', '.join(sorted(csts))}). O cálculo segue a lei; confira o produto")
+    if vendas and not compras:
+        out.info.append(SEM_COMPRAS)
+    return out

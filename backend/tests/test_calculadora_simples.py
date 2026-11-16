@@ -65,14 +65,38 @@ def test_previsao_do_mes_e_avisos_de_limite():
     assert any("faixa 6" in a for a in r.avisos)
 
 
-def _venda(n: int, ncm: str, cfop: int = 5102, emitente: str = CNPJ) -> bytes:
+FORNECEDOR = "11222333000181"
+
+
+def _venda(n: int, ncm: str, cfop: int = 5102, emitente: str = CNPJ, csosn: str = "102") -> bytes:
+    icms = f"<ICMSSN{csosn}><orig>0</orig><CSOSN>{csosn}</CSOSN></ICMSSN{csosn}>"
     return (f'<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe35{n:042d}"><ide><nNF>{n}</nNF>'
             f"<dhEmi>2026-11-10T10:00:00-03:00</dhEmi><tpNF>1</tpNF></ide>"
             f"<emit><CNPJ>{emitente}</CNPJ><enderEmit><UF>SP</UF></enderEmit><CRT>1</CRT></emit>"
             "<dest><CPF>12345678909</CPF><enderDest><UF>SP</UF></enderDest></dest>"
             f'<det nItem="1"><prod><cProd>A</cProd><xProd>PECA</xProd><NCM>{ncm}</NCM><CFOP>{cfop}</CFOP><qCom>1</qCom>'
-            "<vUnCom>1000</vUnCom><vProd>1000.00</vProd></prod><imposto><ICMS><ICMSSN102><orig>0</orig>"
-            "<CSOSN>102</CSOSN></ICMSSN102></ICMS></imposto></det></infNFe></NFe></nfeProc>").encode()
+            f"<vUnCom>1000</vUnCom><vProd>1000.00</vProd></prod><imposto><ICMS>{icms}</ICMS></imposto></det>"
+            "</infNFe></NFe></nfeProc>").encode()
+
+
+def _compra(n: int, ncm: str, com_st: bool, cst_pis: str) -> bytes:
+    """Nota do fornecedor (regime normal) para a empresa: CST 10 com ICMS-ST retido, ou CST 00 sem ST."""
+    icms = ("<ICMS10><orig>0</orig><CST>10</CST><vBCST>120.00</vBCST><vICMSST>9.00</vICMSST></ICMS10>" if com_st
+            else "<ICMS00><orig>0</orig><CST>00</CST><pICMS>18</pICMS><vICMS>18.00</vICMS></ICMS00>")
+    return (f'<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe35{n:042d}"><ide><nNF>{n}</nNF>'
+            f"<dhEmi>2026-11-05T10:00:00-03:00</dhEmi><tpNF>1</tpNF></ide>"
+            f"<emit><CNPJ>{FORNECEDOR}</CNPJ><enderEmit><UF>SP</UF></enderEmit><CRT>3</CRT></emit>"
+            f"<dest><CNPJ>{CNPJ}</CNPJ><enderDest><UF>SP</UF></enderDest></dest>"
+            f'<det nItem="1"><prod><cProd>B</cProd><xProd>ITEM</xProd><NCM>{ncm}</NCM><CFOP>5405</CFOP><qCom>1</qCom>'
+            f"<vUnCom>100</vUnCom><vProd>100.00</vProd></prod><imposto><ICMS>{icms}</ICMS>"
+            f"<PIS><PISAliq><CST>{cst_pis}</CST></PISAliq></PIS></imposto></det></infNFe></NFe></nfeProc>").encode()
+
+
+def _ler(cliente, headers, empresa, arquivos):
+    r = cliente.post("/api/calculadora-simples/nfe", headers=headers, data={"empresa_id": empresa},
+                     files=[("arquivos", (f"{i}.xml", x)) for i, x in enumerate(arquivos)])
+    assert r.status_code == 200, r.text
+    return r.json()
 
 
 @pytest.fixture(scope="module")
@@ -91,13 +115,11 @@ def test_rota_dados_da_empresa(cliente, contador, empresa):
 
 
 def test_rota_le_nfe_e_calcula(cliente, analista, empresa):
-    r = cliente.post("/api/calculadora-simples/nfe", headers=analista, data={"empresa_id": empresa},
-                     files={"arquivo": ("1.xml", _venda(1, "87089990"))})
-    assert r.status_code == 200, r.text
-    lido = r.json()
+    lido = _ler(cliente, analista, empresa, [_venda(1, "87089990"), _venda(1, "87089990")])  # repetida conta uma vez
     assert len(lido["linhas"]) == 1 and lido["linhas"][0]["valor"] == 1000
-    outra = cliente.post("/api/calculadora-simples/nfe", headers=analista, data={"empresa_id": empresa},
-                         files={"arquivo": ("2.xml", _venda(2, "87089990", emitente="99888777000161"))}).json()
+    assert (lido["vendas"], lido["compras"]) == (1, 0)
+    assert "opcionais" in lido["info"][0]  # sem compras: avisa que elas melhoram o cálculo, sem exigir
+    outra = _ler(cliente, analista, empresa, [_venda(2, "87089990", emitente="99888777000161")])
     assert outra["linhas"] == [] and "fora do cálculo" in outra["avisos"][0]
 
     calc = cliente.post("/api/calculadora-simples", headers=analista,
@@ -106,6 +128,38 @@ def test_rota_le_nfe_e_calcula(cliente, analista, empresa):
     corpo = calc.json()
     assert corpo["das"] > 0 and corpo["faixas"]["I"]["faixa"] == 3
     assert corpo["por_competencia"]["2026-11"] == corpo["das"]
+    assert corpo["parcelas"] == [{"anexo": "I", "monofasico": True, "st": False, "iss_fora_do_das": None, "receita": 1000}]
+
+
+def test_sem_compras_o_st_segue_a_nota_de_venda(cliente, analista, empresa):
+    lido = _ler(cliente, analista, empresa, [_venda(10, "21069030", csosn="102"), _venda(11, "22021000", csosn="500")])
+    assert [l["st"] for l in lido["linhas"]] == [False, True]
+    assert lido["avisos"] == []
+
+
+def test_com_compras_o_st_segue_o_fornecedor_e_avisa(cliente, analista, empresa):
+    lido = _ler(cliente, analista, empresa, [
+        _venda(20, "19011090", csosn="102"),   # vendido sem ST, mas comprado com ST cobrado
+        _venda(21, "40141000", csosn="500"),   # vendido como ST, mas comprado sem ST
+        _venda(22, "19059090", csosn="102"),   # fora da lei do monofásico; fornecedor diz CST 04
+        _compra(30, "19011090", com_st=True, cst_pis="06"),
+        _compra(31, "40141000", com_st=False, cst_pis="01"),
+        _compra(32, "19059090", com_st=False, cst_pis="04"),
+    ])
+    assert (lido["vendas"], lido["compras"]) == (3, 3) and lido["info"] == []
+    assert [(l["st"], l["monofasico"]) for l in lido["linhas"]] == [(True, False), (False, False), (False, False)]
+    avisos = " | ".join(lido["avisos"])
+    assert "19011090" in avisos and "compra veio com ST" in avisos
+    assert "40141000" in avisos and "compra veio sem ST" in avisos
+    assert "19059090" in avisos and "CST 04" in avisos
+
+
+def test_rota_recusa_envio_sem_arquivo_e_rar(cliente, analista, empresa):
+    r = cliente.post("/api/calculadora-simples/nfe", headers=analista, data={"empresa_id": empresa})
+    assert r.status_code == 422
+    r = cliente.post("/api/calculadora-simples/nfe", headers=analista, data={"empresa_id": empresa},
+                     files=[("arquivos", ("notas.rar", b"Rar!"))])
+    assert r.status_code == 200 and "RAR" in r.json()["erros"][0]
 
 
 def test_rota_iss_municipio_e_fora_do_das(cliente, analista):

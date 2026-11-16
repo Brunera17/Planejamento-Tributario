@@ -16,7 +16,11 @@ type Linha = {
   monofasico: boolean;
   iss_fora_do_das: string | null;
   fator_r: boolean;
+  xml?: boolean; // veio dos XML enviados: é refeita quando o lote muda
 };
+
+type Leitura = { linhas: Linha[]; avisos: string[]; info: string[]; erros: string[]; vendas: number; compras: number };
+type Parcela = { anexo: string; monofasico: boolean; st: boolean; iss_fora_do_das: string | null; receita: number };
 
 type Resultado = {
   rbt12: number;
@@ -29,6 +33,7 @@ type Resultado = {
   fator_r: number | null;
   iss_municipio: number;
   avisos: string[];
+  parcelas: Parcela[];
   linhas: { linha: Linha; anexo: string; aliquota: number; das: number; iss_municipio: number; tributos: Record<string, number> }[];
 };
 
@@ -59,7 +64,8 @@ export function CalculadoraSimples() {
   const [folha, setFolha] = useState<number | null>(null);
   const [aliqIss, setAliqIss] = useState("");
   const [linhas, setLinhas] = useState<Linha[]>([]);
-  const [avisosLeitura, setAvisosLeitura] = useState<string[]>([]);
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const [leitura, setLeitura] = useState<Omit<Leitura, "linhas"> | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [nova, setNova] = useState({ descricao: "", valor: "", anexo: "I", competencia: mesAtual(), st: false, monofasico: false, iss_fora_do_das: "" });
@@ -75,7 +81,8 @@ export function CalculadoraSimples() {
   });
   useEffect(() => {
     if (!dadosEmpresa) return;
-    setRbt12(dadosEmpresa.rbt12); // o RBT12 do PGDAS é o ponto de partida; o usuário corrige se estiver desatualizado
+    // o RBT12 do PGDAS é o ponto de partida (o usuário corrige se estiver desatualizado); sem PGDAS, fica o que foi digitado
+    if (dadosEmpresa.rbt12 != null) setRbt12(dadosEmpresa.rbt12);
     setNova((n) => ({ ...n, anexo: dadosEmpresa.anexo }));
     setResultado(null);
   }, [dadosEmpresa]);
@@ -85,27 +92,33 @@ export function CalculadoraSimples() {
     setResultado(null); // resultado antigo não pode ficar na tela com notas diferentes
   }
 
+  // o lote inteiro vai de uma vez: as compras (opcionais) conferem o ST e o monofásico de todas as vendas
   const lerNfe = useMutation({
-    mutationFn: async (arquivos: File[]) => {
-      const lidas: Linha[] = [];
-      const avisos: string[] = [];
-      for (const f of arquivos) {
-        const corpo = new FormData();
-        corpo.append("arquivo", f);
-        corpo.append("empresa_id", empresaId);
-        const d = (await api.post<{ linhas: Linha[]; avisos: string[]; erros: string[] }>("/calculadora-simples/nfe", corpo)).data;
-        lidas.push(...d.linhas);
-        avisos.push(...d.avisos, ...d.erros);
-      }
-      return { lidas, avisos };
+    mutationFn: async (lote: File[]) => {
+      if (!lote.length) return null;
+      const corpo = new FormData();
+      lote.forEach((f) => corpo.append("arquivos", f));
+      corpo.append("empresa_id", empresaId);
+      return (await api.post<Leitura>("/calculadora-simples/nfe", corpo)).data;
     },
-    onSuccess: ({ lidas, avisos }) => {
-      mudarLinhas([...linhas, ...lidas]);
-      setAvisosLeitura(avisos);
+    onSuccess: (d) => {
+      const digitadas = linhas.filter((l) => !l.xml);
+      mudarLinhas([...(d?.linhas ?? []).map((l) => ({ ...l, xml: true })), ...digitadas]);
+      setLeitura(d && { avisos: d.avisos, info: d.info, erros: d.erros, vendas: d.vendas, compras: d.compras });
       setErro(null);
     },
     onError: (e) => setErro(mensagemErro(e)),
   });
+
+  /** O componente de envio manda só os novos ao escolher e a lista restante ao retirar um arquivo: a retirada devolve os
+   * mesmos objetos que já estavam no lote; um arquivo escolhido de novo chega como objeto novo e não é retirada. */
+  function mudarArquivos(fs: File[]) {
+    const mesmo = (a: File, b: File) => a.name === b.name && a.size === b.size;
+    const retirada = fs.every((f) => arquivos.includes(f));
+    const lote = retirada ? fs : [...arquivos, ...fs.filter((f) => !arquivos.some((a) => mesmo(a, f)))];
+    setArquivos(lote);
+    lerNfe.mutate(lote);
+  }
 
   const calcular = useMutation({
     mutationFn: async () =>
@@ -220,19 +233,38 @@ export function CalculadoraSimples() {
         </div>
       </Card>
 
-      <Card titulo="Notas" adendo="Envie XML de NF-e (avulso ou .zip) ou digite o valor. Confira as marcações antes de calcular.">
+      <Card titulo="Notas" adendo="Envie os XML de venda do mês (avulsos ou .zip) e, se tiver, os de compra. Ou digite o valor.">
         <div className="space-y-4">
           {empresaId ? (
             <div>
-              <EnvioArquivo formatos={[".xml", ".zip"]} multiplo arquivos={[]} aoEscolher={(fs) => fs.length && lerNfe.mutate(fs)} />
+              <EnvioArquivo formatos={[".xml", ".zip"]} multiplo arquivos={arquivos.length <= 20 ? arquivos : []} aoEscolher={mudarArquivos} />
+              {arquivos.length > 20 && (
+                <p className="mt-2 flex items-center justify-between text-sm text-text-muted">
+                  {arquivos.length} arquivos enviados
+                  <Botao variante="linha-perigo" onClick={() => mudarArquivos([])}>
+                    Retirar todos
+                  </Botao>
+                </p>
+              )}
               {lerNfe.isPending && <p role="status" className="mt-2 text-sm text-text-muted">Lendo os arquivos…</p>}
             </div>
           ) : (
             <p className="text-sm text-text-muted">Escolha a empresa para enviar XML de NF-e.</p>
           )}
-          {avisosLeitura.length > 0 && (
-            <ul className="space-y-1 rounded border border-warning bg-warning-soft px-3 py-2 text-sm text-warning-ink">
-              {avisosLeitura.map((a) => (
+          {leitura && !lerNfe.isPending && (
+            <p className="text-sm">
+              {leitura.vendas} {leitura.vendas === 1 ? "nota de venda" : "notas de venda"} e {leitura.compras}{" "}
+              {leitura.compras === 1 ? "nota de compra" : "notas de compra"} lidas.
+            </p>
+          )}
+          {leitura?.info.map((t) => (
+            <p key={t} className="rounded border border-brand/30 bg-highlight px-3 py-2 text-sm text-text">
+              {t}
+            </p>
+          ))}
+          {leitura && leitura.avisos.length + leitura.erros.length > 0 && (
+            <ul className="max-h-56 space-y-1 overflow-auto rounded border border-warning bg-warning-soft px-3 py-2 text-sm text-warning-ink">
+              {[...leitura.avisos, ...leitura.erros].map((a) => (
                 <li key={a}>{a}</li>
               ))}
             </ul>
@@ -337,7 +369,7 @@ export function CalculadoraSimples() {
           )}
           <div className="flex justify-end gap-2">
             {linhas.length > 0 && (
-              <Botao variante="secundario" onClick={() => { mudarLinhas([]); setAvisosLeitura([]); }}>
+              <Botao variante="secundario" onClick={() => { mudarLinhas([]); setArquivos([]); setLeitura(null); }}>
                 Limpar notas
               </Botao>
             )}
@@ -351,6 +383,16 @@ export function CalculadoraSimples() {
       {resultado && <ResultadoCalculo r={resultado} />}
     </>
   );
+}
+
+/** O nome da parcela segue o PGDAS-D: o que sai do DAS em cada receita. */
+function rotuloParcela(p: Parcela) {
+  const fora = [
+    ...(p.monofasico ? ["tributação monofásica de PIS e COFINS"] : []),
+    ...(p.st ? ["substituição tributária de ICMS"] : []),
+    ...(p.iss_fora_do_das ? [`ISS ${ISS_FORA[p.iss_fora_do_das].toLowerCase()}`] : []),
+  ];
+  return fora.length ? `Com ${fora.join(" e ")}` : "Sem substituição tributária nem tributação monofásica";
 }
 
 function ResultadoCalculo({ r }: { r: Resultado }) {
@@ -376,6 +418,23 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
           ))}
         </ul>
       )}
+      <Card titulo="Receita para o PGDAS-D" adendo="Segregada como se lança na declaração: por anexo, com e sem ST e monofásico.">
+        <Tabela cabecalho={["Anexo", "Parcela", "Receita"]} numericas={[2]}>
+          {r.parcelas.map((p) => (
+            <tr key={`${p.anexo}-${p.monofasico}-${p.st}-${p.iss_fora_do_das}`}>
+              <td className="px-2 py-1">{p.anexo}</td>
+              <td className="px-2 py-1">{rotuloParcela(p)}</td>
+              <td className="num px-2 py-1 text-right">{brl(p.receita)}</td>
+            </tr>
+          ))}
+          <tr className="font-medium">
+            <td className="px-2 py-1" colSpan={2}>
+              Total
+            </td>
+            <td className="num px-2 py-1 text-right">{brl(r.receita)}</td>
+          </tr>
+        </Tabela>
+      </Card>
       <PainelDas linhas={r.linhas} />
       <div className="grid gap-5 lg:grid-cols-2">
         <Card titulo="Faixa e alíquota efetiva">
