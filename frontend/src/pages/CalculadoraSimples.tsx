@@ -403,6 +403,8 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
           ))}
         </ul>
       )}
+      {/* com mais de 20 notas o "Resumo" da lista já mostra esta separação; repetir aqui só alongaria a tela */}
+      {r.linhas.length <= LIMITE_SEM_ABAS && (
       <Card titulo="Receita para o PGDAS-D" adendo="Segregada como se lança na declaração: por anexo, com e sem ST e monofásico.">
         <Tabela cabecalho={["Anexo", "Parcela", "Receita"]} numericas={[2]}>
           {r.parcelas.map((p) => (
@@ -420,6 +422,7 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
           </tr>
         </Tabela>
       </Card>
+      )}
       <PainelDas linhas={r.linhas} />
       <div className="grid gap-5 lg:grid-cols-2">
         <Card titulo="Faixa e alíquota efetiva">
