@@ -55,6 +55,22 @@ def test_fator_r_muda_o_anexo_do_servico_e_nao_o_do_comercio():
     assert c(com.linhas[0].das) == c(sem.linhas[0].das) == D("820.00")
 
 
+def test_bate_com_a_guia_real_de_uma_farmacia():
+    """DAS de 09/2026 de uma farmácia do Anexo I, só com os totais de receita (sem dado do cliente).
+
+    A guia não traz o RBT12: ele sai da efetiva implícita no IRPJ (298,57 ÷ 5,5% ÷ 68.368,31 = 7,9401%), na 4ª faixa.
+    PIS e COFINS conferem a separação do monofásico; o ICMS confere a do ST.
+    """
+    receita = {(False, False): D("14283.50"), (False, True): D("1258.23"), (True, False): D("52807.08"), (True, True): D("19.50")}
+    r = calcular([LinhaNota("", v, "I", monofasico=mono, st=st) for (mono, st), v in receita.items()], D("815261"), FAIXAS)
+    guia = {"IRPJ": D("298.57"), "CSLL": D("189.99"), "COFINS": D("157.22"), "PIS": D("34.06"), "CPP": D("2279.93"), "ICMS": D("1784.54")}
+    assert c(r.tributos["COFINS"]) == guia["COFINS"]
+    assert c(r.tributos["PIS"]) == guia["PIS"]
+    for t, v in guia.items():  # o RBT12 é estimado: sobra no máximo 10 centavos em cada tributo
+        assert abs(c(r.tributos[t]) - v) <= D("0.10"), t
+    assert abs(c(r.das) - D("4744.31")) <= D("0.20")
+
+
 def test_teto_de_5_por_cento_do_iss_na_5a_faixa():
     # Anexo III, 5ª faixa: (3.000.000 × 21% − 125.640) ÷ 3.000.000 = 16,812%; ISS bruto 16,812% × 33,5% = 5,632%
     # O ISS fica em 5% e a sobra (0,632%) vai aos federais na proporção deles (IRPJ 4 de 66,5)

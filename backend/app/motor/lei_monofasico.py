@@ -1,4 +1,5 @@
-"""Confronta um NCM com as leis do PIS/COFINS monofásico: Lei 10.485/2002 (autopeças) e Lei 13.097/2015 (bebidas frias)."""
+"""Confronta um NCM com as leis do PIS/COFINS monofásico: Lei 10.485/2002 (autopeças), Lei 10.147/2000 (farmacêuticos e
+perfumaria) e Lei 13.097/2015 (bebidas frias)."""
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -22,6 +23,7 @@ class ItemLei:
     condicao: str | None = None
     padrao: bool = True  # presunção enquanto o contador não confirma a condição
     lei: str = "Lei 10.485/2002"
+    excluido: bool = False  # exceção da lei dentro de uma posição incluída ("30.04, exceto o código 3004.90.46")
 
 
 @dataclass(frozen=True)
@@ -44,8 +46,11 @@ def avaliar(ncm: str, tabela: Iterable[ItemLei]) -> Avaliacao:
     """Vale a entrada mais específica: a lei cita desde posições (87.08) até códigos completos."""
     candidatos = [i for i in tabela if ncm.startswith(i.prefixo)]
     if not candidatos:
-        return Avaliacao(Enquadramento.NAO_LISTADO, False, None, "O NCM não consta das leis do monofásico (Lei 10.485/2002 e Lei 13.097/2015)")
+        return Avaliacao(Enquadramento.NAO_LISTADO, False, None,
+                         "O NCM não consta das leis do monofásico (Lei 10.485/2002, Lei 10.147/2000 e Lei 13.097/2015)")
     item = max(candidatos, key=lambda i: len(i.prefixo))
+    if item.excluido:
+        return Avaliacao(Enquadramento.NAO_LISTADO, False, item, f"O código {item.codigo} é exceção expressa da {item.lei}")
     if item.ex:
         return Avaliacao(Enquadramento.CONDICIONAL, item.padrao, item,
                          f"O código {item.codigo} só entra nos Ex {' e '.join(item.ex)}: confirme o Ex na nota do fornecedor")

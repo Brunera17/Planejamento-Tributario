@@ -70,5 +70,7 @@ BEBIDAS_FRIAS = (("22.01", "2201", "águas minerais e gaseificadas"), ("22.02", 
 def lei_monofasico() -> tuple[ItemLei, ...]:
     autopecas = tuple(ItemLei(i["anexo"], i["item"], i["codigo"], i["prefixo"], tuple(i["ex"]), i["condicao"], i["padrao"])
                       for i in ler("lei_10485.json")["itens"])
+    farmaceuticos = tuple(ItemLei(i["anexo"], i["item"], i["codigo"], i["prefixo"], tuple(i["ex"]), i["condicao"], i["padrao"],
+                                  i["lei"], i["excluido"]) for i in ler("lei_10147.json")["itens"])
     bebidas = tuple(ItemLei("", None, codigo, prefixo, lei="Lei 13.097/2015, art. 14") for codigo, prefixo, _ in BEBIDAS_FRIAS)
-    return autopecas + bebidas
+    return autopecas + farmaceuticos + bebidas
