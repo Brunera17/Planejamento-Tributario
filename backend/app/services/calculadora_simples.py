@@ -38,7 +38,7 @@ def linhas_da_nfe(db: Session, empresa: Empresa, notas: list[NotaLida]) -> tuple
                 continue
             st = st_ncm.get(i.ncm, False) if st_tabela.vazia else st_tabela.vigente(i.ncm, n.competencia) is not None
             linhas.append(LinhaNota(
-                descricao=f"NF {n.numero} · item {i.n_item} · {i.descricao}"[:150],
+                descricao=f"NF {n.numero}, item {i.n_item}: {i.descricao}"[:150],
                 valor=i.vl_total,
                 anexo=anexo,
                 competencia=n.competencia,

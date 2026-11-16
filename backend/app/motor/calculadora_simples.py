@@ -131,5 +131,5 @@ def _avisos(r: ResultadoCalculadora, p: Parametros) -> list[str]:
         if 0 < f["falta_proxima_faixa"] <= r.receita:
             avisos.append(f"Anexo {anexo}: estas notas levam o RBT12 à faixa {int(f['faixa']) + 1} no próximo mês")
     if r.fator_r is not None and r.fator_r < FATOR_R_MINIMO:
-        avisos.append(f"Fator R de {r.fator_r:.2%}: abaixo de 28%, a atividade vai para o Anexo V")
+        avisos.append(f"Fator R de {r.fator_r * 100:.2f}%".replace(".", ",") + ": abaixo de 28%, a atividade vai para o Anexo V")
     return avisos
