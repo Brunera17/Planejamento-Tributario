@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { api, mensagemErro } from "../api/cliente";
 import type { Empresa } from "../api/tipos";
 import { PainelDas } from "../components/PainelDas";
-import { Botao, Cabecalho, Card, CampoMoeda, EnvioArquivo, Erro, Ficha, Tabela } from "../components/ui";
+import { Botao, Cabecalho, Card, CampoMoeda, EnvioArquivo, Erro, Ficha, Paginacao, Tabela } from "../components/ui";
 import { brl, competenciaExtenso, formatarCnpj, lerMoeda, percentual } from "../lib/formato";
 
 type Linha = {
@@ -543,7 +543,7 @@ function EscolhaEmpresa({
 }
 
 const LIMITE_SEM_ABAS = 20;
-const POR_PAGINA = 50;
+const POR_PAGINA = 20; // cabe numa tela
 type Filtro = "todas" | "st" | "monofasico" | "nenhum";
 const FILTROS: Record<Filtro, string> = { todas: "Todas", st: "Com ICMS-ST", monofasico: "Monofásicas", nenhum: "Sem ST nem monofásico" };
 
@@ -709,19 +709,7 @@ function ListaNotas({
             </span>
           </div>
           {tabela}
-          {paginas > 1 && (
-            <div className="flex items-center justify-end gap-2 text-sm">
-              <span className="text-text-muted">
-                {n(atual * POR_PAGINA + 1)}–{n(Math.min((atual + 1) * POR_PAGINA, visiveis.length))} de {n(visiveis.length)}
-              </span>
-              <Botao variante="secundario" disabled={atual === 0} onClick={() => setPagina(atual - 1)}>
-                Anterior
-              </Botao>
-              <Botao variante="secundario" disabled={atual >= paginas - 1} onClick={() => setPagina(atual + 1)}>
-                Próxima
-              </Botao>
-            </div>
-          )}
+          <Paginacao pagina={atual} total={visiveis.length} porPagina={POR_PAGINA} mudar={setPagina} />
         </div>
       )}
     </div>

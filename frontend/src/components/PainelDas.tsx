@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import { brl, competenciaExtenso, percentual } from "../lib/formato";
-import { Ficha, Tabela } from "./ui";
+import { Ficha, Paginacao, Tabela } from "./ui";
 
 export type LinhaPainel = {
   linha: { descricao: string; valor: number; competencia: string | null };
@@ -30,6 +30,7 @@ const ROTULO_MEDIDA: Record<Medida, string> = { das: "DAS", receita: "Receita" }
 const COR_FATIA = ["var(--color-serie-1)", "var(--color-serie-2)", "var(--color-serie-3)", "var(--color-serie-4)"];
 const COR_OUTROS = "var(--color-t-cpp)";
 const MAX_FATIAS = COR_FATIA.length; // acima disso, as menores viram "Outros"
+const POR_PAGINA = 20; // linhas da tabela de notas abaixo da rosca: cabe numa tela
 
 const atividade = (anexo: string) => (anexo === "I" ? "Comércio" : anexo === "II" ? "Indústria" : "Serviço");
 
@@ -107,8 +108,10 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
   const [dimensao, setDimensao] = useState<Dimensao>(dimensoes[0]);
   const [medida, setMedida] = useState<Medida>("das");
   const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
+  const [pagina, setPagina] = useState(0);
 
-  const d = dimensoes.includes(dimensao) ? dimensao : dimensoes[0];
+  const d =dimensoes.includes(dimensao) ? dimensao : dimensoes[0];
   const fatias = useMemo(() => limitar(agregar(linhas, d), d), [linhas, d]);
   const valor = (f: Fatia) => (medida === "receita" ? f.receita : f.das);
   const total = fatias.reduce((s, f) => s + valor(f), 0);
@@ -118,12 +121,20 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
   const filtradas = escolhida ? escolhida.indices.map((i) => linhas[i]) : linhas;
   const sel = filtradas.reduce((s, l) => ({ receita: s.receita + l.linha.valor, das: s.das + l.das }), { receita: 0, das: 0 });
   const iss = linhas.some((l) => l.iss_municipio > 0);
+  const termo = busca.trim().toLowerCase();
+  const naTabela = termo ? filtradas.filter((l) => l.linha.descricao.toLowerCase().includes(termo)) : filtradas;
+  const atual = Math.min(pagina, Math.max(0, Math.ceil(naTabela.length / POR_PAGINA) - 1));
+  const daPagina = naTabela.slice(atual * POR_PAGINA, (atual + 1) * POR_PAGINA);
 
   function mudarDimensao(v: Dimensao) {
     setDimensao(v);
     setSelecionado(null); // o filtro de uma visão não vale na outra
+    setPagina(0);
   }
-  const alternarSelecao = (nome: string) => setSelecionado((s) => (s === nome ? null : nome));
+  const alternarSelecao = (nome: string) => {
+    setSelecionado((s) => (s === nome ? null : nome));
+    setPagina(0);
+  };
 
   return (
     <section className="rounded-md border border-surface bg-white" aria-labelledby="titulo-painel-das">
@@ -212,22 +223,43 @@ export function PainelDas({ linhas }: { linhas: LinhaPainel[] }) {
           </ul>
         </div>
 
-        <Tabela
-          cabecalho={["Nota", "Atividade", "Anexo", "Valor", "Alíquota", "DAS", ...(iss ? ["ISS ao município"] : [])]}
-          numericas={[3, 4, 5, 6]}
-        >
-          {filtradas.map((l, i) => (
-            <tr key={i}>
-              <td className="px-2 py-1">{l.linha.descricao}</td>
-              <td className="px-2 py-1">{atividade(l.anexo)}</td>
-              <td className="px-2 py-1">{l.anexo}</td>
-              <td className="num px-2 py-1 text-right">{brl(l.linha.valor)}</td>
-              <td className="num px-2 py-1 text-right">{percentual(l.aliquota)}</td>
-              <td className="num px-2 py-1 text-right">{brl(l.das)}</td>
-              {iss && <td className="num px-2 py-1 text-right">{brl(l.iss_municipio)}</td>}
-            </tr>
-          ))}
-        </Tabela>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <input
+              aria-label="Buscar nota ou produto no painel"
+              placeholder="Buscar por produto ou número da nota"
+              className="w-72 rounded border border-border bg-white px-2 py-1"
+              value={busca}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                setPagina(0);
+              }}
+            />
+            <span className="text-text-muted">
+              {naTabela.length.toLocaleString("pt-BR")} {naTabela.length === 1 ? "item" : "itens"}
+              {escolhida ? ` em ${escolhida.nome}` : ""}
+            </span>
+          </div>
+          <Tabela
+            cabecalho={["Nota", "Atividade", "Anexo", "Valor", "Alíquota", "DAS", ...(iss ? ["ISS ao município"] : [])]}
+            numericas={[3, 4, 5, 6]}
+          >
+            {daPagina.map((l, i) => (
+              <tr key={atual * POR_PAGINA + i}>
+                <td className="max-w-[28rem] truncate px-2 py-1" title={l.linha.descricao}>
+                  {l.linha.descricao}
+                </td>
+                <td className="px-2 py-1">{atividade(l.anexo)}</td>
+                <td className="px-2 py-1">{l.anexo}</td>
+                <td className="num px-2 py-1 text-right">{brl(l.linha.valor)}</td>
+                <td className="num px-2 py-1 text-right">{percentual(l.aliquota)}</td>
+                <td className="num px-2 py-1 text-right">{brl(l.das)}</td>
+                {iss && <td className="num px-2 py-1 text-right">{brl(l.iss_municipio)}</td>}
+              </tr>
+            ))}
+          </Tabela>
+          <Paginacao pagina={atual} total={naTabela.length} porPagina={POR_PAGINA} mudar={setPagina} />
+        </div>
       </div>
     </section>
   );
