@@ -18,7 +18,8 @@ def ler(nome: str):
     return json.loads((DADOS / nome).read_text(encoding="utf-8"))
 
 
-ANEXOS_SIMPLES = {"I": "simples_anexo1.json", "II": "simples_anexo2.json"}
+ANEXOS_SIMPLES = {"I": "simples_anexo1.json", "II": "simples_anexo2.json", "III": "simples_anexo3.json",
+                  "IV": "simples_anexo4.json", "V": "simples_anexo5.json"}
 
 
 @cache
@@ -27,7 +28,8 @@ def faixas_simples(anexo: str = "I") -> tuple[FaixaSimples, ...]:
         FaixaSimples(
             faixa=f["faixa"],
             **{k: Decimal(f.get(k, "0")) for k in ("rbt12_de", "rbt12_ate", "aliq_nominal", "parcela_deduzir",
-                                                   "p_irpj", "p_csll", "p_cofins", "p_pis", "p_cpp", "p_icms", "p_ipi")},
+                                                   "p_irpj", "p_csll", "p_cofins", "p_pis", "p_cpp", "p_icms", "p_ipi",
+                                                   "p_iss")},
         )
         for f in ler(ANEXOS_SIMPLES[anexo])["faixas"]
     )

@@ -237,7 +237,7 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         pendencias.append(f"O sistema ainda não calcula o Anexo {anexo} do Simples (serviços); o Simples saiu pelo Anexo I")
         anexo = "I"
     faixas = [FaixaSimples(f.faixa, f.rbt12_de, f.rbt12_ate, f.aliq_nominal, f.parcela_deduzir, f.p_irpj, f.p_csll,
-                           f.p_cofins, f.p_pis, f.p_cpp, f.p_icms, f.p_ipi)
+                           f.p_cofins, f.p_pis, f.p_cpp, f.p_icms, f.p_ipi, f.p_iss)
               for f in _vigentes(db, SimplesFaixa, referencia) if f.anexo == anexo]
     if not faixas:
         raise ValueError("Tabela do Simples Nacional vigente não cadastrada")

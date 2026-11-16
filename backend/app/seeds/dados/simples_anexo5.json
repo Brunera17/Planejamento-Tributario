@@ -1,0 +1,91 @@
+{
+ "anexo": "V",
+ "descricao": "LC 123/2006, Anexo V – Serviços sujeitos ao Fator R (redação da LC 155/2016)",
+ "vigencia_inicio": "2018-01-01",
+ "faixas": [
+  {
+   "faixa": 1,
+   "rbt12_de": "0",
+   "rbt12_ate": "180000",
+   "aliq_nominal": "0.155",
+   "parcela_deduzir": "0",
+   "p_irpj": "0.25",
+   "p_csll": "0.15",
+   "p_cofins": "0.141",
+   "p_pis": "0.0305",
+   "p_cpp": "0.2885",
+   "p_icms": "0",
+   "p_iss": "0.14"
+  },
+  {
+   "faixa": 2,
+   "rbt12_de": "180000.01",
+   "rbt12_ate": "360000",
+   "aliq_nominal": "0.18",
+   "parcela_deduzir": "4500",
+   "p_irpj": "0.23",
+   "p_csll": "0.15",
+   "p_cofins": "0.141",
+   "p_pis": "0.0305",
+   "p_cpp": "0.2785",
+   "p_icms": "0",
+   "p_iss": "0.17"
+  },
+  {
+   "faixa": 3,
+   "rbt12_de": "360000.01",
+   "rbt12_ate": "720000",
+   "aliq_nominal": "0.195",
+   "parcela_deduzir": "9900",
+   "p_irpj": "0.24",
+   "p_csll": "0.15",
+   "p_cofins": "0.1492",
+   "p_pis": "0.0323",
+   "p_cpp": "0.2385",
+   "p_icms": "0",
+   "p_iss": "0.19"
+  },
+  {
+   "faixa": 4,
+   "rbt12_de": "720000.01",
+   "rbt12_ate": "1800000",
+   "aliq_nominal": "0.205",
+   "parcela_deduzir": "17100",
+   "p_irpj": "0.21",
+   "p_csll": "0.15",
+   "p_cofins": "0.1574",
+   "p_pis": "0.0341",
+   "p_cpp": "0.2385",
+   "p_icms": "0",
+   "p_iss": "0.21"
+  },
+  {
+   "faixa": 5,
+   "rbt12_de": "1800000.01",
+   "rbt12_ate": "3600000",
+   "aliq_nominal": "0.23",
+   "parcela_deduzir": "62100",
+   "p_irpj": "0.23",
+   "p_csll": "0.125",
+   "p_cofins": "0.141",
+   "p_pis": "0.0305",
+   "p_cpp": "0.2385",
+   "p_icms": "0",
+   "p_iss": "0.235"
+  },
+  {
+   "faixa": 6,
+   "rbt12_de": "3600000.01",
+   "rbt12_ate": "4800000",
+   "aliq_nominal": "0.305",
+   "parcela_deduzir": "540000",
+   "p_irpj": "0.35",
+   "p_csll": "0.155",
+   "p_cofins": "0.1644",
+   "p_pis": "0.0356",
+   "p_cpp": "0.295",
+   "p_icms": "0",
+   "p_iss": "0"
+  }
+ ]
+}
