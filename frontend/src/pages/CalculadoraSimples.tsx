@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import { api, mensagemErro } from "../api/cliente";
 import type { Empresa } from "../api/tipos";
+import { PainelDas } from "../components/PainelDas";
 import { Botao, Cabecalho, Card, CampoMoeda, EnvioArquivo, Erro, Ficha, Tabela } from "../components/ui";
 import { brl, competenciaExtenso, formatarCnpj, lerMoeda, percentual } from "../lib/formato";
 
@@ -28,7 +29,7 @@ type Resultado = {
   fator_r: number | null;
   iss_municipio: number;
   avisos: string[];
-  linhas: { linha: Linha; anexo: string; aliquota: number; das: number; iss_municipio: number }[];
+  linhas: { linha: Linha; anexo: string; aliquota: number; das: number; iss_municipio: number; tributos: Record<string, number> }[];
 };
 
 type DadosEmpresa = { anexo: string; rbt12: number | null; rbt12_competencia: string | null };
@@ -374,6 +375,7 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
           ))}
         </ul>
       )}
+      <PainelDas linhas={r.linhas} />
       <div className="grid gap-5 lg:grid-cols-2">
         <Card titulo="Faixa e alíquota efetiva">
           <Tabela cabecalho={["Anexo", "Faixa", "Nominal", "Efetiva", "Falta para a próxima"]} numericas={[2, 3, 4]}>
@@ -412,23 +414,6 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
           </Tabela>
         </Card>
       )}
-      <Card titulo="DAS por nota" semPadding>
-        <Tabela
-          cabecalho={["Nota", "Anexo", "Valor", "Alíquota", "DAS", ...(r.iss_municipio > 0 ? ["ISS ao município"] : [])]}
-          numericas={[2, 3, 4, 5]}
-        >
-          {r.linhas.map((l, i) => (
-            <tr key={i}>
-              <td className="px-2 py-1">{l.linha.descricao}</td>
-              <td className="px-2 py-1">{l.anexo}</td>
-              <td className="num px-2 py-1 text-right">{brl(l.linha.valor)}</td>
-              <td className="num px-2 py-1 text-right">{percentual(l.aliquota)}</td>
-              <td className="num px-2 py-1 text-right">{brl(l.das)}</td>
-              {r.iss_municipio > 0 && <td className="num px-2 py-1 text-right">{brl(l.iss_municipio)}</td>}
-            </tr>
-          ))}
-        </Tabela>
-      </Card>
     </>
   );
 }

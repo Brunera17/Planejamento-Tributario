@@ -26,6 +26,11 @@
   --color-t-piscofins: #4f8fa4;
   --color-t-irpjcsll: #9ec5d3;
   --color-t-cpp: #52606d;
+  /* séries de gráfico (paleta categórica validada no modo claro): petróleo da marca, laranja, violeta, amarelo */
+  --color-serie-1: #0e7fa3;
+  --color-serie-2: #eb6834;
+  --color-serie-3: #6250d6;
+  --color-serie-4: #eda100;
   --font-sans: "Archivo", "Segoe UI", system-ui, sans-serif;
 }
 
