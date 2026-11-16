@@ -1,4 +1,4 @@
-"""Simples Nacional — LC 123/2006, Anexos I (comércio) e II (indústria)."""
+"""Simples Nacional — LC 123/2006, Anexos I (comércio), II (indústria) e III, IV e V (serviços)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -48,6 +48,37 @@ def aliquota_efetiva(rbt12: Decimal, faixas: list[FaixaSimples]) -> AliquotaSimp
     f = localizar_faixa(rbt12, faixas)
     efetiva = (rbt12 * f.aliq_nominal - f.parcela_deduzir) / rbt12
     return AliquotaSimples(rbt12, f, efetiva)
+
+
+FATOR_R_MINIMO = Decimal("0.28")  # LC 123/2006, art. 18, §5º-J e §5º-M
+TETO_ISS = Decimal("0.05")  # LC 123/2006, Anexos III e IV, nota da 5ª faixa
+
+
+def fator_r(folha_12m: Decimal, receita_12m: Decimal) -> Decimal:
+    """Folha dos 12 meses (salários, pró-labore, FGTS e CPP) ÷ receita bruta dos 12 meses (LC 123/2006, art. 18, §24)."""
+    return ZERO if receita_12m <= 0 else folha_12m / receita_12m
+
+
+def anexo_pelo_fator_r(fator: Decimal) -> str:
+    """Atividades do §5º-J: Anexo III com Fator R de 28% ou mais; abaixo disso, Anexo V."""
+    return "III" if fator >= FATOR_R_MINIMO else "V"
+
+
+def reparticao(aliq: AliquotaSimples) -> dict[str, Decimal]:
+    """Alíquota efetiva de cada tributo do DAS. O ISS fica limitado a 5% e o excesso passa aos tributos federais,
+    na proporção dos percentuais deles na faixa."""
+    f = aliq.faixa
+    pcts = {"IRPJ": f.p_irpj, "CSLL": f.p_csll, "COFINS": f.p_cofins, "PIS": f.p_pis, "CPP": f.p_cpp,
+            "ICMS": f.p_icms, "IPI": f.p_ipi, "ISS": f.p_iss}
+    out = {k: aliq.efetiva * p for k, p in pcts.items() if p}
+    excesso = out.get("ISS", ZERO) - TETO_ISS
+    if excesso > 0:
+        out["ISS"] = TETO_ISS
+        federais = [k for k in ("IRPJ", "CSLL", "COFINS", "PIS", "CPP") if pcts[k]]
+        soma = sum(pcts[k] for k in federais)
+        for k in federais:
+            out[k] += excesso * pcts[k] / soma
+    return out
 
 
 def calcular_rbt12(entrada: EntradaSimulacao, bases: dict[str, BaseCompetencia]) -> tuple[Decimal, bool]:

@@ -377,6 +377,26 @@ export function Tabela({ cabecalho, children, numericas = [] }: { cabecalho: Rea
   );
 }
 
+/** Rodapé de uma lista paginada na própria tela: posição ("51–100 de 2.816") e os botões de página. */
+export function Paginacao({ pagina, total, porPagina, mudar }: { pagina: number; total: number; porPagina: number; mudar: (p: number) => void }) {
+  const paginas = Math.ceil(total / porPagina);
+  if (paginas <= 1) return null;
+  const n = (v: number) => v.toLocaleString("pt-BR");
+  return (
+    <div className="flex items-center justify-end gap-2 text-sm">
+      <span className="text-text-muted">
+        {n(pagina * porPagina + 1)}–{n(Math.min((pagina + 1) * porPagina, total))} de {n(total)}
+      </span>
+      <Botao variante="secundario" disabled={pagina === 0} onClick={() => mudar(pagina - 1)}>
+        Anterior
+      </Botao>
+      <Botao variante="secundario" disabled={pagina >= paginas - 1} onClick={() => mudar(pagina + 1)}>
+        Próxima
+      </Botao>
+    </div>
+  );
+}
+
 /** Rodapé das listas paginadas: some quando a API não anuncia próxima página. */
 export function CarregarMais({ lista }: { lista: { temMais: boolean; carregarMais: () => void; carregando: boolean; falhou: boolean } }) {
   if (!lista.temMais) return null;

@@ -1,0 +1,91 @@
+{
+ "anexo": "III",
+ "descricao": "LC 123/2006, Anexo III – Serviços (redação da LC 155/2016)",
+ "vigencia_inicio": "2018-01-01",
+ "faixas": [
+  {
+   "faixa": 1,
+   "rbt12_de": "0",
+   "rbt12_ate": "180000",
+   "aliq_nominal": "0.06",
+   "parcela_deduzir": "0",
+   "p_irpj": "0.04",
+   "p_csll": "0.035",
+   "p_cofins": "0.1282",
+   "p_pis": "0.0278",
+   "p_cpp": "0.434",
+   "p_icms": "0",
+   "p_iss": "0.335"
+  },
+  {
+   "faixa": 2,
+   "rbt12_de": "180000.01",
+   "rbt12_ate": "360000",
+   "aliq_nominal": "0.112",
+   "parcela_deduzir": "9360",
+   "p_irpj": "0.04",
+   "p_csll": "0.035",
+   "p_cofins": "0.1405",
+   "p_pis": "0.0305",
+   "p_cpp": "0.434",
+   "p_icms": "0",
+   "p_iss": "0.32"
+  },
+  {
+   "faixa": 3,
+   "rbt12_de": "360000.01",
+   "rbt12_ate": "720000",
+   "aliq_nominal": "0.135",
+   "parcela_deduzir": "17640",
+   "p_irpj": "0.04",
+   "p_csll": "0.035",
+   "p_cofins": "0.1364",
+   "p_pis": "0.0296",
+   "p_cpp": "0.434",
+   "p_icms": "0",
+   "p_iss": "0.325"
+  },
+  {
+   "faixa": 4,
+   "rbt12_de": "720000.01",
+   "rbt12_ate": "1800000",
+   "aliq_nominal": "0.16",
+   "parcela_deduzir": "35640",
+   "p_irpj": "0.04",
+   "p_csll": "0.035",
+   "p_cofins": "0.1364",
+   "p_pis": "0.0296",
+   "p_cpp": "0.434",
+   "p_icms": "0",
+   "p_iss": "0.325"
+  },
+  {
+   "faixa": 5,
+   "rbt12_de": "1800000.01",
+   "rbt12_ate": "3600000",
+   "aliq_nominal": "0.21",
+   "parcela_deduzir": "125640",
+   "p_irpj": "0.04",
+   "p_csll": "0.035",
+   "p_cofins": "0.1282",
+   "p_pis": "0.0278",
+   "p_cpp": "0.434",
+   "p_icms": "0",
+   "p_iss": "0.335"
+  },
+  {
+   "faixa": 6,
+   "rbt12_de": "3600000.01",
+   "rbt12_ate": "4800000",
+   "aliq_nominal": "0.33",
+   "parcela_deduzir": "648000",
+   "p_irpj": "0.35",
+   "p_csll": "0.15",
+   "p_cofins": "0.1603",
+   "p_pis": "0.0347",
+   "p_cpp": "0.305",
+   "p_icms": "0",
+   "p_iss": "0"
+  }
+ ]
+}

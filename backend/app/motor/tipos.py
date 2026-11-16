@@ -87,6 +87,7 @@ class FaixaSimples:
     p_cpp: Decimal
     p_icms: Decimal
     p_ipi: Decimal = Decimal("0")  # só no Anexo II (indústria)
+    p_iss: Decimal = Decimal("0")  # só nos Anexos III, IV e V (serviços)
 
 
 @dataclass(frozen=True)

@@ -18,7 +18,8 @@ def ler(nome: str):
     return json.loads((DADOS / nome).read_text(encoding="utf-8"))
 
 
-ANEXOS_SIMPLES = {"I": "simples_anexo1.json", "II": "simples_anexo2.json"}
+ANEXOS_SIMPLES = {"I": "simples_anexo1.json", "II": "simples_anexo2.json", "III": "simples_anexo3.json",
+                  "IV": "simples_anexo4.json", "V": "simples_anexo5.json"}
 
 
 @cache
@@ -27,7 +28,8 @@ def faixas_simples(anexo: str = "I") -> tuple[FaixaSimples, ...]:
         FaixaSimples(
             faixa=f["faixa"],
             **{k: Decimal(f.get(k, "0")) for k in ("rbt12_de", "rbt12_ate", "aliq_nominal", "parcela_deduzir",
-                                                   "p_irpj", "p_csll", "p_cofins", "p_pis", "p_cpp", "p_icms", "p_ipi")},
+                                                   "p_irpj", "p_csll", "p_cofins", "p_pis", "p_cpp", "p_icms", "p_ipi",
+                                                   "p_iss")},
         )
         for f in ler(ANEXOS_SIMPLES[anexo])["faixas"]
     )
@@ -68,5 +70,7 @@ BEBIDAS_FRIAS = (("22.01", "2201", "águas minerais e gaseificadas"), ("22.02", 
 def lei_monofasico() -> tuple[ItemLei, ...]:
     autopecas = tuple(ItemLei(i["anexo"], i["item"], i["codigo"], i["prefixo"], tuple(i["ex"]), i["condicao"], i["padrao"])
                       for i in ler("lei_10485.json")["itens"])
+    farmaceuticos = tuple(ItemLei(i["anexo"], i["item"], i["codigo"], i["prefixo"], tuple(i["ex"]), i["condicao"], i["padrao"],
+                                  i["lei"], i["excluido"]) for i in ler("lei_10147.json")["itens"])
     bebidas = tuple(ItemLei("", None, codigo, prefixo, lei="Lei 13.097/2015, art. 14") for codigo, prefixo, _ in BEBIDAS_FRIAS)
-    return autopecas + bebidas
+    return autopecas + farmaceuticos + bebidas

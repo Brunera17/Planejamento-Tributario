@@ -33,6 +33,7 @@ class SimplesFaixa(Base, Vigencia):
     p_cpp: Mapped[Decimal] = mapped_column(Aliquota)
     p_icms: Mapped[Decimal] = mapped_column(Aliquota)
     p_ipi: Mapped[Decimal] = mapped_column(Aliquota, default=Decimal("0"))  # só no Anexo II (indústria)
+    p_iss: Mapped[Decimal] = mapped_column(Aliquota, default=Decimal("0"))  # só nos Anexos III, IV e V (serviços)
 
 
 class ParametroTributario(Base, Vigencia):

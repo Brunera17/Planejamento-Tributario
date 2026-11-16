@@ -45,7 +45,7 @@ from app.models import (
     Usuario,
 )
 from app.seeds.exemplo import carregar_exemplo, concluir_exemplo
-from app.seeds.tabelas import ler
+from app.seeds.tabelas import ANEXOS_SIMPLES, ler
 from app.services import progresso
 from app.services.progresso import PESOS_PADRAO
 
@@ -94,7 +94,7 @@ def _incluir_se_falta(db: Session, modelo, chave: dict, valores: dict):
 
 
 def carregar_tabelas(db: Session) -> None:
-    for arquivo in ("simples_anexo1.json", "simples_anexo2.json"):
+    for arquivo in ANEXOS_SIMPLES.values():
         s = ler(arquivo)
         inicio = date.fromisoformat(s["vigencia_inicio"])
         for f in s["faixas"]:

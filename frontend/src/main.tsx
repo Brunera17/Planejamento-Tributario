@@ -7,6 +7,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { renovarSessao, temAccess } from "./api/cliente";
 import { Layout } from "./components/Layout";
+import { CalculadoraSimples } from "./pages/CalculadoraSimples";
 import { Dashboard } from "./pages/Dashboard";
 import { Empresas } from "./pages/Empresas";
 import { Login } from "./pages/Login";
@@ -56,6 +57,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="planejamentos/:id" element={<Planejamento />} />
             <Route path="simulacoes/:id" element={<Resultado />} />
             <Route path="empresas" element={<Empresas />} />
+            <Route path="calculadora-simples" element={<CalculadoraSimples />} />
             <Route path="regras" element={<Regras />} />
             <Route path="usuarios" element={<Usuarios />} />
           </Route>

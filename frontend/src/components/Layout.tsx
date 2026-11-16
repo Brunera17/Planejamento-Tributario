@@ -6,6 +6,7 @@ const MENU = [
   { para: "/", rotulo: "Visão geral" },
   { para: "/planejamentos", rotulo: "Planejamentos" },
   { para: "/empresas", rotulo: "Empresas" },
+  { para: "/calculadora-simples", rotulo: "Calculadora do Simples" },
   { para: "/regras", rotulo: "Base legal" },
 ];
 
