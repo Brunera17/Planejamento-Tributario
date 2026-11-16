@@ -1,8 +1,9 @@
 """Calculadora do Simples Nacional por nota: DAS aproximado de cada nota (ou valor digitado), sem planejamento.
 
 Cada linha usa o seu anexo e o mesmo RBT12 (o da empresa), como no PGDAS-D. Saem do DAS da linha: o ICMS quando a
-mercadoria tem ST, o PIS e a COFINS quando é monofásica e o ISS quando o tomador o reteve (LC 123/2006, art. 18,
-§4º-A, e art. 21, §4º).
+mercadoria tem ST, o PIS e a COFINS quando é monofásica e o ISS quando sai do DAS: retido pelo tomador (art. 21,
+§4º), em valor fixo (art. 18, §22-A) ou isento pelo município (art. 18, §20). Acima do sublimite o ISS é recolhido fora
+do DAS, pela alíquota do município (art. 13-A).
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ class LinhaNota:
     competencia: str | None = None  # AAAA-MM; agrupa a previsão do DAS do mês
     st: bool = False
     monofasico: bool = False
-    iss_retido: bool = False
+    iss_fora_do_das: str | None = None  # RETIDO, FIXO ou ISENTO
     fator_r: bool = False  # atividade do §5º-J: o anexo (III ou V) sai do Fator R
 
 
@@ -32,6 +33,7 @@ class ResultadoLinha:
     aliquota: Decimal  # alíquota efetiva da linha, já sem os tributos que saem do DAS
     das: Decimal
     tributos: dict[str, Decimal]
+    iss_municipio: Decimal = ZERO  # acima do sublimite: ISS fora do DAS, pela alíquota do município
 
 
 @dataclass
@@ -44,6 +46,7 @@ class ResultadoCalculadora:
     por_competencia: dict[str, Decimal]
     faixas: dict[str, dict[str, Decimal]]  # por anexo usado: faixa, alíquota nominal, efetiva, quanto falta para a próxima
     fator_r: Decimal | None = None
+    iss_municipio: Decimal = ZERO
     avisos: list[str] = field(default_factory=list)
 
     @property
@@ -57,7 +60,7 @@ def _fora_do_das(linha: LinhaNota) -> set[str]:
         fora.add("ICMS")
     if linha.monofasico:
         fora |= {"PIS", "COFINS"}
-    if linha.iss_retido:
+    if linha.iss_fora_do_das:
         fora.add("ISS")
     return fora
 
@@ -69,8 +72,10 @@ def calcular(
     parametros: Parametros = Parametros(),
     folha_12m: Decimal | None = None,
     receita_12m: Decimal | None = None,
+    aliq_iss_municipio: Decimal | None = None,
 ) -> ResultadoCalculadora:
-    """faixas: tabela vigente de cada anexo. O Fator R usa a receita dos 12 meses informada ou, sem ela, o RBT12."""
+    """faixas: tabela vigente de cada anexo. O Fator R usa a receita dos 12 meses informada ou, sem ela, o RBT12.
+    aliq_iss_municipio: usada só com RBT12 acima do sublimite, para o ISS das notas de serviço fora do DAS."""
     if rbt12 < 0:
         raise ValueError("RBT12 negativo")
     fr = None
@@ -78,6 +83,8 @@ def calcular(
         if folha_12m is None:
             raise ValueError("Informe a folha dos 12 meses para calcular o Fator R")
         fr = fator_r(folha_12m, receita_12m if receita_12m is not None else rbt12)
+    iss_por_fora = rbt12 > parametros.sublimite_simples
+    sem_aliquota_iss = False
 
     aliquotas: dict[str, AliquotaSimples] = {}
     resultado = ResultadoCalculadora(rbt12, [], ZERO, ZERO, {}, {}, {}, fr)
@@ -91,7 +98,14 @@ def calcular(
         partes = {k: v for k, v in reparticao(aliquotas[anexo]).items() if k not in fora}
         tributos = {k: l.valor * v for k, v in partes.items()}
         das = sum(tributos.values(), ZERO)
-        resultado.linhas.append(ResultadoLinha(l, anexo, sum(partes.values(), ZERO), das, tributos))
+        iss_municipio = ZERO
+        if iss_por_fora and anexo in ("III", "IV", "V") and not l.iss_fora_do_das:
+            if aliq_iss_municipio is None:
+                sem_aliquota_iss = True
+            else:
+                iss_municipio = l.valor * aliq_iss_municipio
+                resultado.iss_municipio += iss_municipio
+        resultado.linhas.append(ResultadoLinha(l, anexo, sum(partes.values(), ZERO), das, tributos, iss_municipio))
         resultado.das += das
         resultado.receita += l.valor
         for k, v in tributos.items():
@@ -110,6 +124,8 @@ def calcular(
             "falta_proxima_faixa": ZERO if ultima else max(f.rbt12_ate - rbt12, ZERO),
         }
     resultado.avisos = _avisos(resultado, parametros)
+    if sem_aliquota_iss:
+        resultado.avisos.append("Informe a alíquota de ISS do município: acima do sublimite o ISS dos serviços é pago fora do DAS")
     return resultado
 
 

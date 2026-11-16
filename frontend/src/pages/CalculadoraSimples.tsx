@@ -13,7 +13,7 @@ type Linha = {
   competencia: string | null;
   st: boolean;
   monofasico: boolean;
-  iss_retido: boolean;
+  iss_fora_do_das: string | null;
   fator_r: boolean;
 };
 
@@ -26,8 +26,9 @@ type Resultado = {
   por_competencia: Record<string, number>;
   faixas: Record<string, { faixa: number; aliquota_nominal: number; aliquota_efetiva: number; falta_proxima_faixa: number }>;
   fator_r: number | null;
+  iss_municipio: number;
   avisos: string[];
-  linhas: { linha: Linha; anexo: string; aliquota: number; das: number }[];
+  linhas: { linha: Linha; anexo: string; aliquota: number; das: number; iss_municipio: number }[];
 };
 
 type DadosEmpresa = { anexo: string; rbt12: number | null; rbt12_competencia: string | null };
@@ -40,6 +41,12 @@ const ANEXOS: Record<string, string> = {
   V: "Anexo V (serviços)",
   R: "Anexo III ou V, pelo Fator R",
 };
+const ISS_FORA: Record<string, string> = {
+  "": "ISS no DAS",
+  RETIDO: "Retido pelo tomador",
+  FIXO: "Valor fixo no município",
+  ISENTO: "Isento pelo município",
+};
 const ORDEM_TRIBUTOS = ["ICMS", "ISS", "IPI", "PIS", "COFINS", "IRPJ", "CSLL", "CPP"];
 const mesAtual = () => new Date().toISOString().slice(0, 7);
 const campo = "mt-1 block w-full rounded border border-border bg-white px-2 py-1.5";
@@ -49,11 +56,12 @@ export function CalculadoraSimples() {
   const [empresaId, setEmpresaId] = useState("");
   const [rbt12, setRbt12] = useState<number | null>(null);
   const [folha, setFolha] = useState<number | null>(null);
+  const [aliqIss, setAliqIss] = useState("");
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [avisosLeitura, setAvisosLeitura] = useState<string[]>([]);
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [nova, setNova] = useState({ descricao: "", valor: "", anexo: "I", competencia: mesAtual(), st: false, monofasico: false, iss_retido: false });
+  const [nova, setNova] = useState({ descricao: "", valor: "", anexo: "I", competencia: mesAtual(), st: false, monofasico: false, iss_fora_do_das: "" });
 
   const { data: empresas = [] } = useQuery({
     queryKey: ["empresas", "escolha", busca],
@@ -100,7 +108,7 @@ export function CalculadoraSimples() {
 
   const calcular = useMutation({
     mutationFn: async () =>
-      (await api.post<Resultado>("/calculadora-simples", { rbt12, folha_12m: folha, linhas })).data,
+      (await api.post<Resultado>("/calculadora-simples", { rbt12, folha_12m: folha, aliq_iss_municipio: aliquotaIss, linhas })).data,
     onSuccess: (r) => {
       setResultado(r);
       setErro(null);
@@ -122,7 +130,7 @@ export function CalculadoraSimples() {
         competencia: nova.competencia || null,
         st: nova.st,
         monofasico: nova.monofasico,
-        iss_retido: nova.iss_retido,
+        iss_fora_do_das: nova.iss_fora_do_das || null,
         fator_r: fatorR,
       },
     ]);
@@ -130,17 +138,22 @@ export function CalculadoraSimples() {
     setErro(null);
   }
 
+  const aliquotaIss = aliqIss.trim() ? Number(aliqIss.replace(",", ".")) / 100 : null;
+
   function enviarCalculo() {
+    if (aliquotaIss != null && !(aliquotaIss >= 0 && aliquotaIss <= 0.05)) return setErro("A alíquota de ISS do município vai de 0% a 5%");
     if (rbt12 == null) return setErro("Informe o RBT12: a receita bruta dos 12 meses anteriores");
     if (!linhas.length) return setErro("Inclua ao menos uma nota ou valor");
     if (linhas.some((l) => l.fator_r) && folha == null) return setErro("Informe a folha dos 12 meses para calcular o Fator R");
     calcular.mutate();
   }
 
-  const alternar = (i: number, chave: "st" | "monofasico" | "iss_retido") =>
+  const alternar = (i: number, chave: "st" | "monofasico") =>
     mudarLinhas(linhas.map((l, j) => (j === i ? { ...l, [chave]: !l[chave] } : l)));
-  const servico = (a: string) => ["III", "IV", "V"].includes(a);
+  const issFora = (i: number, v: string) => mudarLinhas(linhas.map((l, j) => (j === i ? { ...l, iss_fora_do_das: v || null } : l)));
+  const servico = (a: string) => ["III", "IV", "V", "R"].includes(a);
   const usaFatorR = linhas.some((l) => l.fator_r) || nova.anexo === "R";
+  const temServico = linhas.some((l) => l.fator_r || servico(l.anexo)) || servico(nova.anexo);
 
   return (
     <>
@@ -152,7 +165,7 @@ export function CalculadoraSimples() {
       <Erro mensagem={erro} />
 
       <Card titulo="Empresa e receita" adendo="A empresa é necessária só para ler XML; o RBT12 vem do último PGDAS-D enviado.">
-        <div className="grid gap-3 text-sm md:grid-cols-[minmax(0,1fr)_11rem_11rem]">
+        <div className="grid gap-3 text-sm md:grid-cols-[minmax(0,1fr)_11rem_11rem_11rem]">
           <label>
             Empresa
             <input aria-label="Buscar empresa por razão social ou CNPJ" placeholder="Buscar por razão social ou CNPJ" className={campo} value={busca} onChange={(e) => setBusca(e.target.value)} />
@@ -186,6 +199,22 @@ export function CalculadoraSimples() {
               </div>
               <p className="mt-1 text-xs text-text-muted">Salários, pró-labore, FGTS e CPP</p>
             </div>
+          )}
+          {temServico && (
+            <label>
+              ISS do município (%)
+              <input
+                inputMode="decimal"
+                className={`${campo} num`}
+                placeholder="2 a 5"
+                value={aliqIss}
+                onChange={(e) => {
+                  setAliqIss(e.target.value.replace(/[^\d,]/g, ""));
+                  setResultado(null);
+                }}
+              />
+              <span className="mt-1 block text-xs font-normal text-text-muted">Só entra com RBT12 acima de R$ 3,6 milhões, quando o ISS sai do DAS</span>
+            </label>
           )}
         </div>
       </Card>
@@ -244,7 +273,14 @@ export function CalculadoraSimples() {
                   </>
                 ) : (
                   <label className="flex items-center gap-1.5">
-                    <input type="checkbox" checked={nova.iss_retido} onChange={(e) => setNova({ ...nova, iss_retido: e.target.checked })} /> ISS retido pelo tomador
+                    ISS
+                    <select className="rounded border border-border bg-white px-2 py-1" value={nova.iss_fora_do_das} onChange={(e) => setNova({ ...nova, iss_fora_do_das: e.target.value })}>
+                      {Object.entries(ISS_FORA).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 )}
               </div>
@@ -255,7 +291,7 @@ export function CalculadoraSimples() {
           </form>
 
           {linhas.length > 0 && (
-            <Tabela cabecalho={["Nota", "Anexo", "Mês", "Valor", "Sai do DAS", ""]} numericas={[3]}>
+            <Tabela cabecalho={["Nota", "Anexo", "Mês", "Valor", "Fora do DAS", ""]} numericas={[3]}>
               {linhas.map((l, i) => (
                 <tr key={i}>
                   <td className="px-2 py-1">{l.descricao}</td>
@@ -265,9 +301,18 @@ export function CalculadoraSimples() {
                   <td className="px-2 py-1">
                     <div className="flex flex-wrap gap-3 text-xs">
                       {servico(l.anexo) || l.fator_r ? (
-                        <label className="flex items-center gap-1">
-                          <input type="checkbox" checked={l.iss_retido} onChange={() => alternar(i, "iss_retido")} /> ISS retido
-                        </label>
+                        <select
+                          aria-label={`ISS de ${l.descricao}`}
+                          className="rounded border border-border bg-white px-1 py-0.5"
+                          value={l.iss_fora_do_das ?? ""}
+                          onChange={(e) => issFora(i, e.target.value)}
+                        >
+                          {Object.entries(ISS_FORA).map(([k, v]) => (
+                            <option key={k} value={k}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
                         <>
                           <label className="flex items-center gap-1">
@@ -319,6 +364,7 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
           { rotulo: "Receita das notas", valor: brl(r.receita) },
           { rotulo: "DAS estimado", valor: brl(r.das) },
           { rotulo: "Alíquota média", valor: percentual(r.aliquota_media) },
+          ...(r.iss_municipio > 0 ? [{ rotulo: "ISS ao município, fora do DAS", valor: brl(r.iss_municipio), largo: true }] : []),
           ...(r.fator_r != null ? [{ rotulo: "Fator R", valor: percentual(r.fator_r) }] : []),
         ]}
       />
@@ -368,7 +414,10 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
         </Card>
       )}
       <Card titulo="DAS por nota" semPadding>
-        <Tabela cabecalho={["Nota", "Anexo", "Valor", "Alíquota", "DAS"]} numericas={[2, 3, 4]}>
+        <Tabela
+          cabecalho={["Nota", "Anexo", "Valor", "Alíquota", "DAS", ...(r.iss_municipio > 0 ? ["ISS ao município"] : [])]}
+          numericas={[2, 3, 4, 5]}
+        >
           {r.linhas.map((l, i) => (
             <tr key={i}>
               <td className="px-2 py-1">{l.linha.descricao}</td>
@@ -376,6 +425,7 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
               <td className="num px-2 py-1 text-right">{brl(l.linha.valor)}</td>
               <td className="num px-2 py-1 text-right">{percentual(l.aliquota)}</td>
               <td className="num px-2 py-1 text-right">{brl(l.das)}</td>
+              {r.iss_municipio > 0 && <td className="num px-2 py-1 text-right">{brl(l.iss_municipio)}</td>}
             </tr>
           ))}
         </Tabela>

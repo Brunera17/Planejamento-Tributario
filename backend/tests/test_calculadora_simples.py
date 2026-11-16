@@ -19,19 +19,32 @@ def test_valor_digitado_anexo_i():
     assert r.aliquota_media == efetiva
 
 
-def test_st_monofasico_e_iss_retido_saem_do_das():
+def test_st_monofasico_e_iss_fora_saem_do_das():
     rbt12 = D("500000")
     rep_i = reparticao(aliquota_efetiva(rbt12, FAIXAS["I"]))
     rep_iii = reparticao(aliquota_efetiva(rbt12, FAIXAS["III"]))
     r = calcular([
         LinhaNota("peça com ST e monofásica", D("1000"), "I", st=True, monofasico=True),
-        LinhaNota("serviço com ISS retido", D("2000"), "III", iss_retido=True),
+        LinhaNota("serviço com ISS retido", D("2000"), "III", iss_fora_do_das="RETIDO"),
     ], rbt12, FAIXAS)
     peca, servico = r.linhas
     assert set(peca.tributos) == {"IRPJ", "CSLL", "CPP"}
     assert peca.aliquota == rep_i["IRPJ"] + rep_i["CSLL"] + rep_i["CPP"]
     assert "ISS" not in servico.tributos
     assert servico.das == D("2000") * (sum(rep_iii.values()) - rep_iii["ISS"])
+
+
+def test_acima_do_sublimite_iss_vai_para_o_municipio():
+    linhas = [LinhaNota("serviço", D("10000"), "III"), LinhaNota("serviço com ISS fixo", D("5000"), "III", iss_fora_do_das="FIXO"),
+              LinhaNota("venda", D("1000"), "I")]
+    r = calcular(linhas, D("4000000"), FAIXAS, aliq_iss_municipio=D("0.03"))
+    assert "ISS" not in r.tributos  # 6ª faixa: sem ISS no DAS
+    assert r.iss_municipio == D("300") and r.linhas[0].iss_municipio == D("300")
+    assert r.linhas[1].iss_municipio == 0 and r.linhas[2].iss_municipio == 0
+    sem = calcular(linhas, D("4000000"), FAIXAS)
+    assert sem.iss_municipio == 0 and any("alíquota de ISS do município" in a for a in sem.avisos)
+    # abaixo do sublimite a alíquota do município não entra
+    assert calcular(linhas, D("500000"), FAIXAS, aliq_iss_municipio=D("0.03")).iss_municipio == 0
 
 
 def test_fator_r_escolhe_o_anexo():
@@ -93,6 +106,17 @@ def test_rota_le_nfe_e_calcula(cliente, analista, empresa):
     corpo = calc.json()
     assert corpo["das"] > 0 and corpo["faixas"]["I"]["faixa"] == 3
     assert corpo["por_competencia"]["2026-11"] == corpo["das"]
+
+
+def test_rota_iss_municipio_e_fora_do_das(cliente, analista):
+    r = cliente.post("/api/calculadora-simples", headers=analista, json={
+        "rbt12": 4000000, "aliq_iss_municipio": 0.05,
+        "linhas": [{"valor": 1000, "anexo": "III"}, {"valor": 1000, "anexo": "III", "iss_fora_do_das": "ISENTO"}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["iss_municipio"] == 50
+    acima = cliente.post("/api/calculadora-simples", headers=analista,
+                         json={"rbt12": 1, "aliq_iss_municipio": 0.06, "linhas": [{"valor": 1}]})
+    assert acima.status_code == 422
 
 
 def test_rota_recusa_fator_r_sem_folha(cliente, analista):

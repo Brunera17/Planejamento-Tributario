@@ -34,7 +34,7 @@ class Linha(Esquema):
     competencia: CompetenciaStr | None = None
     st: bool = False
     monofasico: bool = False
-    iss_retido: bool = False
+    iss_fora_do_das: Literal["RETIDO", "FIXO", "ISENTO"] | None = None
     fator_r: bool = False
 
 
@@ -42,6 +42,7 @@ class Pedido(Esquema):
     rbt12: ValorMonetario
     folha_12m: ValorMonetario | None = None
     receita_12m: ValorMonetario | None = None
+    aliq_iss_municipio: Annotated[Decimal, Field(ge=0, le=Decimal("0.05"))] | None = None  # 2% a 5% (LC 116/2003)
     linhas: Annotated[list[Linha], Field(min_length=1, max_length=5000)]
 
 
@@ -87,7 +88,7 @@ def calcular(dados: Pedido, db: DB, _: UsuarioAtual):
     linhas = [motor.LinhaNota(**l.model_dump()) for l in dados.linhas]
     try:
         r = motor.calcular(linhas, dados.rbt12, faixas_vigentes(db, hoje), parametros,
-                           dados.folha_12m, dados.receita_12m)
+                           dados.folha_12m, dados.receita_12m, dados.aliq_iss_municipio)
     except ValueError as ex:
         raise ErroNegocio(str(ex), 422) from ex
     return para_json(r) | {"aliquota_media": para_json(r.aliquota_media)}
