@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { api, mensagemErro } from "../api/cliente";
 import type { Empresa } from "../api/tipos";
 import { Botao, Cabecalho, Card, CampoMoeda, EnvioArquivo, Erro, Ficha, Tabela } from "../components/ui";
-import { brl, competenciaExtenso, lerMoeda, percentual } from "../lib/formato";
+import { brl, competenciaExtenso, formatarCnpj, lerMoeda, percentual } from "../lib/formato";
 
 type Linha = {
   descricao: string;
@@ -166,20 +166,19 @@ export function CalculadoraSimples() {
 
       <Card titulo="Empresa e receita" adendo="A empresa é necessária só para ler XML; o RBT12 vem do último PGDAS-D enviado.">
         <div className="grid gap-3 text-sm md:grid-cols-[minmax(0,1fr)_11rem_11rem_11rem]">
-          <label>
-            Empresa
-            <input aria-label="Buscar empresa por razão social ou CNPJ" placeholder="Buscar por razão social ou CNPJ" className={campo} value={busca} onChange={(e) => setBusca(e.target.value)} />
-            <select aria-label="Empresa" className={campo} value={empresaId} onChange={(e) => setEmpresaId(e.target.value)}>
-              <option value="">Nenhuma (só valores digitados)</option>
-              {empresas
-                .filter((e) => e.regime_tributario === "SIMPLES_NACIONAL")
-                .map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.razao_social}
-                  </option>
-                ))}
-            </select>
-          </label>
+          <EscolhaEmpresa
+            busca={busca}
+            escolhida={!!empresaId}
+            opcoes={empresas.filter((e) => e.regime_tributario === "SIMPLES_NACIONAL")}
+            aoDigitar={(t) => {
+              setBusca(t);
+              setEmpresaId("");
+            }}
+            aoEscolher={(e) => {
+              setBusca(e ? e.razao_social : "");
+              setEmpresaId(e ? String(e.id) : "");
+            }}
+          />
           <div>
             <span>RBT12 (R$)</span>
             <div className="mt-1">
@@ -431,5 +430,104 @@ function ResultadoCalculo({ r }: { r: Resultado }) {
         </Tabela>
       </Card>
     </>
+  );
+}
+
+/** Um campo só: digita para filtrar por razão social ou CNPJ e escolhe na lista que abre logo abaixo. */
+function EscolhaEmpresa({
+  busca,
+  escolhida,
+  opcoes,
+  aoDigitar,
+  aoEscolher,
+}: {
+  busca: string;
+  escolhida: boolean;
+  opcoes: Empresa[];
+  aoDigitar: (t: string) => void;
+  aoEscolher: (e: Empresa | null) => void;
+}) {
+  const [aberta, setAberta] = useState(false);
+  const [ativa, setAtiva] = useState(0);
+  const lista = opcoes.slice(0, 8);
+  const mostrar = aberta && !escolhida;
+
+  function escolher(e: Empresa) {
+    aoEscolher(e);
+    setAberta(false);
+  }
+
+  return (
+    <div className="relative">
+      <label htmlFor="empresa-calculadora">Empresa</label>
+      <div className="relative">
+        <input
+          id="empresa-calculadora"
+          role="combobox"
+          aria-expanded={mostrar}
+          aria-controls="empresas-calculadora"
+          aria-activedescendant={mostrar && lista[ativa] ? `empresa-opcao-${lista[ativa].id}` : undefined}
+          autoComplete="off"
+          placeholder="Nenhuma: digite a razão social ou o CNPJ"
+          className={`${campo} pr-8`}
+          value={busca}
+          onFocus={() => setAberta(true)}
+          onBlur={() => setAberta(false)}
+          onChange={(e) => {
+            aoDigitar(e.target.value);
+            setAtiva(0);
+            setAberta(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setAberta(true);
+              setAtiva((i) => Math.min(i + 1, lista.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setAtiva((i) => Math.max(i - 1, 0));
+            } else if (e.key === "Enter" && mostrar && lista[ativa]) {
+              e.preventDefault();
+              escolher(lista[ativa]);
+            } else if (e.key === "Escape") {
+              setAberta(false);
+            }
+          }}
+        />
+        {busca && (
+          <button
+            type="button"
+            aria-label="Limpar empresa"
+            className="absolute right-2 top-1/2 mt-0.5 -translate-y-1/2 px-1 text-text-muted hover:text-alert"
+            onClick={() => aoEscolher(null)}
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {mostrar && (
+        <ul id="empresas-calculadora" role="listbox" className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded border border-border bg-white text-sm">
+          {lista.length === 0 ? (
+            <li className="px-3 py-2 text-text-muted">Nenhuma empresa do Simples encontrada</li>
+          ) : (
+            lista.map((e, i) => (
+              <li
+                key={e.id}
+                id={`empresa-opcao-${e.id}`}
+                role="option"
+                aria-selected={i === ativa}
+                className={`cursor-pointer px-3 py-1.5 ${i === ativa ? "bg-highlight" : ""}`}
+                onMouseDown={(ev) => ev.preventDefault()} // escolhe antes do blur fechar a lista
+                onMouseEnter={() => setAtiva(i)}
+                onClick={() => escolher(e)}
+              >
+                <span className="block">{e.razao_social}</span>
+                <span className="num text-xs text-text-muted">{formatarCnpj(e.cnpj)}</span>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
   );
 }
