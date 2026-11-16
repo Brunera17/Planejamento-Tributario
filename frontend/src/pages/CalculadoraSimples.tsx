@@ -324,48 +324,13 @@ export function CalculadoraSimples() {
           </form>
 
           {linhas.length > 0 && (
-            <Tabela cabecalho={["Nota", "Anexo", "Mês", "Valor", "Fora do DAS", ""]} numericas={[3]}>
-              {linhas.map((l, i) => (
-                <tr key={i}>
-                  <td className="px-2 py-1">{l.descricao}</td>
-                  <td className="px-2 py-1">{l.fator_r ? "Fator R" : l.anexo}</td>
-                  <td className="px-2 py-1">{l.competencia ? competenciaExtenso(l.competencia) : "—"}</td>
-                  <td className="num px-2 py-1 text-right">{brl(l.valor)}</td>
-                  <td className="px-2 py-1">
-                    <div className="flex flex-wrap gap-3 text-xs">
-                      {servico(l.anexo) || l.fator_r ? (
-                        <select
-                          aria-label={`ISS de ${l.descricao}`}
-                          className="rounded border border-border bg-white px-1 py-0.5"
-                          value={l.iss_fora_do_das ?? ""}
-                          onChange={(e) => issFora(i, e.target.value)}
-                        >
-                          {Object.entries(ISS_FORA).map(([k, v]) => (
-                            <option key={k} value={k}>
-                              {v}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <>
-                          <label className="flex items-center gap-1">
-                            <input type="checkbox" checked={l.st} onChange={() => alternar(i, "st")} /> ICMS-ST
-                          </label>
-                          <label className="flex items-center gap-1">
-                            <input type="checkbox" checked={l.monofasico} onChange={() => alternar(i, "monofasico")} /> Monofásico
-                          </label>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-2 py-1 text-right">
-                    <Botao variante="linha-perigo" onClick={() => mudarLinhas(linhas.filter((_, j) => j !== i))}>
-                      Retirar
-                    </Botao>
-                  </td>
-                </tr>
-              ))}
-            </Tabela>
+            <ListaNotas
+              linhas={linhas}
+              alternar={alternar}
+              issFora={issFora}
+              retirar={(i) => mudarLinhas(linhas.filter((_, j) => j !== i))}
+              servico={servico}
+            />
           )}
           <div className="flex justify-end gap-2">
             {linhas.length > 0 && (
@@ -572,6 +537,192 @@ function EscolhaEmpresa({
             ))
           )}
         </ul>
+      )}
+    </div>
+  );
+}
+
+const LIMITE_SEM_ABAS = 20;
+const POR_PAGINA = 50;
+type Filtro = "todas" | "st" | "monofasico" | "nenhum";
+const FILTROS: Record<Filtro, string> = { todas: "Todas", st: "Com ICMS-ST", monofasico: "Monofásicas", nenhum: "Sem ST nem monofásico" };
+
+/** Poucas notas: a lista direto. Muitas: um resumo por parcela e a lista em outra aba, paginada e com busca. */
+function ListaNotas({
+  linhas,
+  alternar,
+  issFora,
+  retirar,
+  servico,
+}: {
+  linhas: Linha[];
+  alternar: (i: number, chave: "st" | "monofasico") => void;
+  issFora: (i: number, v: string) => void;
+  retirar: (i: number) => void;
+  servico: (anexo: string) => boolean;
+}) {
+  const [aba, setAba] = useState<"resumo" | "notas">("resumo");
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState<Filtro>("todas");
+  const [pagina, setPagina] = useState(0);
+  const muitas = linhas.length > LIMITE_SEM_ABAS;
+
+  // o índice original acompanha cada linha: marcar ou retirar numa página filtrada mexe na nota certa
+  const termo = busca.trim().toLowerCase();
+  const visiveis = linhas
+    .map((l, i) => ({ l, i }))
+    .filter(({ l }) => !termo || l.descricao.toLowerCase().includes(termo))
+    .filter(({ l }) =>
+      filtro === "todas" ? true : filtro === "st" ? l.st : filtro === "monofasico" ? l.monofasico : !l.st && !l.monofasico && !l.iss_fora_do_das,
+    );
+  const paginas = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA));
+  const atual = Math.min(pagina, paginas - 1);
+  const daPagina = muitas ? visiveis.slice(atual * POR_PAGINA, (atual + 1) * POR_PAGINA) : visiveis;
+
+  const resumo = new Map<string, Parcela & { itens: number }>();
+  for (const l of linhas) {
+    const anexo = l.fator_r ? "III ou V" : l.anexo;
+    const chave = `${anexo}|${l.monofasico}|${l.st}|${l.iss_fora_do_das ?? ""}`;
+    const p = resumo.get(chave) ?? { anexo, monofasico: l.monofasico, st: l.st, iss_fora_do_das: l.iss_fora_do_das, receita: 0, itens: 0 };
+    p.receita += l.valor;
+    p.itens += 1;
+    resumo.set(chave, p);
+  }
+  const total = linhas.reduce((s, l) => s + l.valor, 0);
+  const n = (v: number) => v.toLocaleString("pt-BR");
+
+  const tabela = (
+    <Tabela cabecalho={["Nota", "Anexo", "Mês", "Valor", "Fora do DAS", ""]} numericas={[3]}>
+      {daPagina.map(({ l, i }) => (
+        <tr key={i}>
+          <td className="max-w-[28rem] truncate px-2 py-1" title={l.descricao}>
+            {l.descricao}
+          </td>
+          <td className="px-2 py-1">{l.fator_r ? "Fator R" : l.anexo}</td>
+          <td className="whitespace-nowrap px-2 py-1">{l.competencia ? competenciaExtenso(l.competencia) : "—"}</td>
+          <td className="num px-2 py-1 text-right">{brl(l.valor)}</td>
+          <td className="px-2 py-1">
+            <div className="flex flex-nowrap gap-3 whitespace-nowrap text-xs">
+              {servico(l.anexo) || l.fator_r ? (
+                <select
+                  aria-label={`ISS de ${l.descricao}`}
+                  className="rounded border border-border bg-white px-1 py-0.5"
+                  value={l.iss_fora_do_das ?? ""}
+                  onChange={(e) => issFora(i, e.target.value)}
+                >
+                  {Object.entries(ISS_FORA).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <label className="flex items-center gap-1">
+                    <input type="checkbox" checked={l.st} onChange={() => alternar(i, "st")} /> ICMS-ST
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input type="checkbox" checked={l.monofasico} onChange={() => alternar(i, "monofasico")} /> Monofásico
+                  </label>
+                </>
+              )}
+            </div>
+          </td>
+          <td className="px-2 py-1 text-right">
+            <Botao variante="linha-perigo" onClick={() => retirar(i)}>
+              Retirar
+            </Botao>
+          </td>
+        </tr>
+      ))}
+    </Tabela>
+  );
+  if (!muitas) return tabela;
+
+  const botaoAba = (valor: "resumo" | "notas", rotulo: string) => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={aba === valor}
+      onClick={() => setAba(valor)}
+      className={`-mb-px border-b-2 px-3 py-1.5 text-sm ${aba === valor ? "border-brand font-medium text-brand" : "border-transparent text-text-muted hover:text-brand"}`}
+    >
+      {rotulo}
+    </button>
+  );
+  return (
+    <div className="space-y-3">
+      <div role="tablist" aria-label="Notas incluídas" className="flex gap-1 border-b border-surface">
+        {botaoAba("resumo", "Resumo")}
+        {botaoAba("notas", `Notas (${n(linhas.length)})`)}
+      </div>
+      {aba === "resumo" ? (
+        <Tabela cabecalho={["Anexo", "Parcela", "Itens", "Receita"]} numericas={[2, 3]}>
+          {[...resumo.values()]
+            .sort((a, b) => b.receita - a.receita)
+            .map((p) => (
+              <tr key={`${p.anexo}-${p.monofasico}-${p.st}-${p.iss_fora_do_das}`}>
+                <td className="px-2 py-1">{p.anexo}</td>
+                <td className="px-2 py-1">{rotuloParcela(p)}</td>
+                <td className="num px-2 py-1 text-right">{n(p.itens)}</td>
+                <td className="num px-2 py-1 text-right">{brl(p.receita)}</td>
+              </tr>
+            ))}
+          <tr className="font-medium">
+            <td className="px-2 py-1" colSpan={2}>
+              Total
+            </td>
+            <td className="num px-2 py-1 text-right">{n(linhas.length)}</td>
+            <td className="num px-2 py-1 text-right">{brl(total)}</td>
+          </tr>
+        </Tabela>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <input
+              aria-label="Buscar nota ou produto"
+              placeholder="Buscar por produto ou número da nota"
+              className="w-72 rounded border border-border bg-white px-2 py-1"
+              value={busca}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                setPagina(0);
+              }}
+            />
+            <select
+              aria-label="Filtrar notas"
+              className="rounded border border-border bg-white px-2 py-1"
+              value={filtro}
+              onChange={(e) => {
+                setFiltro(e.target.value as Filtro);
+                setPagina(0);
+              }}
+            >
+              {Object.entries(FILTROS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <span className="text-text-muted">
+              {n(visiveis.length)} {visiveis.length === 1 ? "item" : "itens"}
+            </span>
+          </div>
+          {tabela}
+          {paginas > 1 && (
+            <div className="flex items-center justify-end gap-2 text-sm">
+              <span className="text-text-muted">
+                {n(atual * POR_PAGINA + 1)}–{n(Math.min((atual + 1) * POR_PAGINA, visiveis.length))} de {n(visiveis.length)}
+              </span>
+              <Botao variante="secundario" disabled={atual === 0} onClick={() => setPagina(atual - 1)}>
+                Anterior
+              </Botao>
+              <Botao variante="secundario" disabled={atual >= paginas - 1} onClick={() => setPagina(atual + 1)}>
+                Próxima
+              </Botao>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
