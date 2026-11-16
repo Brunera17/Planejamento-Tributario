@@ -117,11 +117,21 @@ def _ler_arquivo(arquivo: str, nome: str) -> ExtratoPgdas | None:
 def do_planejamento(db: Session, p: Planejamento) -> ExtratoPgdas | None:
     """O extrato lido mais recente entre os enviados na aba Documentos (pelo período de apuração).
     Vem da leitura gravada no envio; o PDF só é aberto para documentos antigos ainda sem ela."""
+    return _mais_recente(db, Levantamento.planejamento_id == p.id)
+
+
+def da_empresa(db: Session, empresa_id: int) -> ExtratoPgdas | None:
+    """O extrato lido mais recente entre todos os planejamentos da empresa."""
+    return _mais_recente(db, Levantamento.planejamento_id.in_(
+        select(Planejamento.id).where(Planejamento.empresa_id == empresa_id)))
+
+
+def _mais_recente(db: Session, condicao) -> ExtratoPgdas | None:
     linhas = db.execute(
         select(Documento.arquivo, Documento.arquivo_nome, Documento.pgdas_extrato, Levantamento.competencia)
         .join(Levantamento, Levantamento.id == Documento.levantamento_id)
         .join(TipoDocumento, TipoDocumento.id == Documento.tipo_documento_id)
-        .where(Levantamento.planejamento_id == p.id, TIPO_PGDAS, Documento.arquivo.is_not(None))
+        .where(condicao, TIPO_PGDAS, Documento.arquivo.is_not(None))
     ).all()
     lidos = []
     for arquivo, nome, gravado, competencia in linhas:

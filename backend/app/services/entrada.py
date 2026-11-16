@@ -84,6 +84,16 @@ def _vigentes(db: Session, modelo, referencia: date):
     )).all()
 
 
+def faixas_vigentes(db: Session, referencia: date) -> dict[str, list[FaixaSimples]]:
+    """Faixas do Simples vigentes na data, por anexo."""
+    out: dict[str, list[FaixaSimples]] = {}
+    for f in _vigentes(db, SimplesFaixa, referencia):
+        out.setdefault(f.anexo, []).append(FaixaSimples(
+            f.faixa, f.rbt12_de, f.rbt12_ate, f.aliq_nominal, f.parcela_deduzir, f.p_irpj, f.p_csll, f.p_cofins,
+            f.p_pis, f.p_cpp, f.p_icms, f.p_ipi, f.p_iss))
+    return out
+
+
 def premissas_do_planejamento(db: Session, p: Planejamento, auto: premissas_auto.Automaticas | None = None) -> Premissas:
     """Informado pelo contador > tirado das notas > padrão do motor."""
     auto = auto or premissas_auto.derivar(db, p)
@@ -236,9 +246,7 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     if anexo not in ANEXOS_CALCULADOS:
         pendencias.append(f"O sistema ainda não calcula o Anexo {anexo} do Simples (serviços); o Simples saiu pelo Anexo I")
         anexo = "I"
-    faixas = [FaixaSimples(f.faixa, f.rbt12_de, f.rbt12_ate, f.aliq_nominal, f.parcela_deduzir, f.p_irpj, f.p_csll,
-                           f.p_cofins, f.p_pis, f.p_cpp, f.p_icms, f.p_ipi, f.p_iss)
-              for f in _vigentes(db, SimplesFaixa, referencia) if f.anexo == anexo]
+    faixas = faixas_vigentes(db, referencia).get(anexo, [])
     if not faixas:
         raise ValueError("Tabela do Simples Nacional vigente não cadastrada")
     parametros = tabelas.parametros({x.chave: x.valor for x in _vigentes(db, ParametroTributario, referencia)})

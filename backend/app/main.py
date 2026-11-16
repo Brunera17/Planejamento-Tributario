@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auditoria, auth, bens_documentos, dashboard, empresas, planejamentos, simulacoes, tabelas
+from app.api.routes import auditoria, auth, bens_documentos, calculadora, dashboard, empresas, planejamentos, simulacoes, tabelas
 from app.core.config import get_settings
 from app.core import redis as redis_cliente
 from app.core.contexto import MiddlewareAuditoria
@@ -23,7 +23,7 @@ def criar_app() -> FastAPI:
                        expose_headers=["Content-Disposition", "X-Proximo"])  # nome dos downloads; próxima página das listas
     app.add_middleware(MiddlewareAuditoria)
     registrar_handlers(app)
-    for r in (auth, auditoria, empresas, tabelas, planejamentos, bens_documentos, simulacoes, dashboard):
+    for r in (auth, auditoria, empresas, tabelas, planejamentos, bens_documentos, simulacoes, dashboard, calculadora):
         app.include_router(r.router, prefix="/api")
 
     @app.get("/api/saude", tags=["Infra"])
