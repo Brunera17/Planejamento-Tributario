@@ -92,9 +92,14 @@ def _raiz(conteudo: bytes):
     parser = etree.XMLParser(resolve_entities=False, no_network=True)
     try:
         return etree.fromstring(conteudo, parser=parser)
-    except etree.XMLSyntaxError as e:
-        if "UTF-8" not in str(e):
+    except etree.XMLSyntaxError:
+        # a mensagem do libxml2 muda de versão para versão ("not proper UTF-8", "Invalid bytes in character encoding"):
+        # quem decide são os bytes; se forem UTF-8 válido, o erro é outro e sobe como está
+        try:
+            conteudo.decode("utf-8")
             raise
+        except UnicodeDecodeError:
+            pass
     # há emissores que gravam os acentos em Windows-1252 num XML declarado UTF-8: os bytes inválidos são relidos nessa
     # codificação e o resto continua UTF-8; sem a declaração, o lxml lê o resultado como UTF-8
     texto = DECLARACAO.sub(b"", conteudo).decode("utf-8", errors="nfe_cp1252")
