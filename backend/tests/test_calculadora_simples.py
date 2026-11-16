@@ -192,3 +192,44 @@ def test_rota_recusa_fator_r_sem_folha(cliente, analista):
     r = cliente.post("/api/calculadora-simples", headers=analista,
                      json={"rbt12": 100000, "linhas": [{"valor": 100, "fator_r": True}]})
     assert r.status_code == 422 and "folha" in r.text
+
+
+def _nota_itens(n: int, itens: list[tuple[str, int, str]]) -> bytes:
+    """Venda modelo 55 da empresa com vários itens (NCM, CFOP, valor)."""
+    dets = "".join(
+        f'<det nItem="{k}"><prod><cProd>{k}</cProd><xProd>ITEM {k}</xProd><NCM>{ncm}</NCM><CFOP>{cfop}</CFOP><qCom>1</qCom>'
+        f"<vUnCom>{v}</vUnCom><vProd>{v}</vProd></prod><imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102>"
+        "</ICMS></imposto></det>" for k, (ncm, cfop, v) in enumerate(itens, start=1))
+    return (f'<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe35{n:042d}"><ide><nNF>{n}</nNF>'
+            f"<dhEmi>2026-11-10T10:00:00-03:00</dhEmi><tpNF>1</tpNF></ide>"
+            f"<emit><CNPJ>{CNPJ}</CNPJ><enderEmit><UF>SP</UF></enderEmit><CRT>1</CRT></emit>"
+            f"<dest><CPF>12345678909</CPF></dest>{dets}</infNFe></NFe></nfeProc>").encode()
+
+
+def test_nota_de_lancamento_de_cupom_fica_inteira_de_fora(cliente, analista, empresa):
+    # caso real: NF-e com CFOP 5929 (vendas já em NFC-e) e um item que saiu com 5102; o PGDAS não contou nenhum dos dois
+    lido = _ler(cliente, analista, empresa, [
+        _nota_itens(50, [("30049069", 5929, "2110.59"), ("30049069", 5102, "115.40")]),
+        _nota_itens(51, [("30049069", 5102, "100.00"), ("30049069", 5202, "40.00"), ("30049069", 5202, "10.00")]),
+    ])
+    assert [l["valor"] for l in lido["linhas"]] == [100]
+    avisos = " | ".join(lido["avisos"])
+    assert "NF 50: lançamento de vendas já registradas em NFC-e" in avisos and "R$ 115,40" in avisos
+    assert "NF 51: 2 itens com CFOP 5202 não geram receita" in avisos  # um aviso por nota, não por item
+
+
+def test_sem_compra_do_produto_o_st_segue_a_venda(cliente, analista, empresa):
+    lido = _ler(cliente, analista, empresa, [
+        _venda(60, "17049020", csosn="500"),                 # sem compra do produto: segue o CSOSN 500 da venda
+        _venda(61, "40141000", csosn="500"),                 # comprado sem ST: segue a compra
+        _compra(62, "40141000", com_st=False, cst_pis="01"),
+    ])
+    assert [l["st"] for l in lido["linhas"]] == [True, False]
+
+
+def test_xml_com_acento_em_windows_1252_e_lido(cliente, analista, empresa):
+    # fornecedor que declara UTF-8 mas grava "ç" e "ã" como bytes Windows-1252
+    xml = _venda(70, "30049069").replace(b"<xProd>PECA</xProd>", "<xProd>PEÇA DE REPOSIÇÃO</xProd>".encode("cp1252"))
+    xml = b'<?xml version="1.0" encoding="UTF-8"?>' + xml
+    lido = _ler(cliente, analista, empresa, [xml])
+    assert lido["erros"] == [] and lido["linhas"][0]["descricao"].endswith("PEÇA DE REPOSIÇÃO")
