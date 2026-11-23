@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, lerSessao, mensagemErro } from "../api/cliente";
 import { useLista } from "../api/lista";
 import type { Empresa, Planejamento } from "../api/tipos";
+import { EscolhaEmpresa } from "../components/EscolhaEmpresa";
 import { Badge, BarraProgresso, Botao, Cabecalho, CarregarMais, Card, Erro, LegendaObrigatorio, Modal, Obrigatorio, Tabela } from "../components/ui";
 import { competenciaExtenso, dataHora, formatarCnpj, REGIMES, STATUS } from "../lib/formato";
 
@@ -116,28 +117,28 @@ function NovoPlanejamento({ fechar }: { fechar: () => void }) {
           if (completo) criar.mutate();
         }}
       >
-        <label className="sm:col-span-2">
-          Empresa<Obrigatorio />
-          <input
+        <div className="sm:col-span-2">
+          <EscolhaEmpresa
             autoFocus
-            aria-label="Buscar empresa por razão social ou CNPJ"
-            placeholder="Buscar por razão social ou CNPJ"
-            className={campo}
-            value={buscaEmpresa}
-            onChange={(e) => {
-              setBuscaEmpresa(e.target.value);
-              setForm({ ...form, empresa_id: "" }); // a escolhida pode sumir do filtro
+            rotulo={
+              <>
+                Empresa
+                <Obrigatorio />
+              </>
+            }
+            busca={buscaEmpresa}
+            escolhida={!!form.empresa_id}
+            opcoes={empresas}
+            aoDigitar={(t) => {
+              setBuscaEmpresa(t);
+              setForm({ ...form, empresa_id: "" }); // digitar de novo desfaz a escolha
+            }}
+            aoEscolher={(e) => {
+              setBuscaEmpresa(e ? e.razao_social : "");
+              setForm({ ...form, empresa_id: e ? String(e.id) : "" });
             }}
           />
-          <select aria-label="Empresa" className={campo} value={form.empresa_id} onChange={(e) => setForm({ ...form, empresa_id: e.target.value })}>
-            <option value="">Selecione</option>
-            {empresas.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.razao_social}
-              </option>
-            ))}
-          </select>
-        </label>
+        </div>
         <label>
           Primeiro mês<Obrigatorio />
           <input type="month" className={campo} value={form.competencia_inicial} onChange={(e) => setForm({ ...form, competencia_inicial: e.target.value })} />
