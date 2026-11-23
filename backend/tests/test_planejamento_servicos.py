@@ -176,6 +176,40 @@ def test_rota_competencia_repetida_no_envio_vale_a_ultima(cliente, contador):
     assert float(servicos["2026-02"]) == 2
 
 
+def test_rota_recusa_edicao_atrasada_que_apagaria_valor_mais_novo(cliente, contador):
+    pid = _pid_servico(cliente, contador)
+    url = f"/api/planejamentos/{pid}/servicos"
+
+    def gravado() -> float:
+        return float(cliente.get(f"/api/planejamentos/{pid}/coleta", headers=contador).json()["servicos"]["2026-03"])
+
+    assert cliente.put(url, headers=contador, json=[{"competencia": "2026-03", "valor": 100}]).status_code == 204
+    # a aba A viu 100 e grava 200
+    assert cliente.put(url, headers=contador, json=[{"competencia": "2026-03", "valor": 200, "anterior": 100}]).status_code == 204
+    # a aba B ainda via 100: a gravação atrasada dela é recusada e o 200 fica
+    r = cliente.put(url, headers=contador, json=[{"competencia": "2026-03", "valor": 300, "anterior": 100}])
+    assert r.status_code == 409 and "outra tela" in r.json()["erro"] and "R$ 200,00" in r.json()["erro"]
+    assert gravado() == 200
+    # quem via o mês vazio também não sobrescreve um valor que já existe
+    r = cliente.put(url, headers=contador, json=[{"competencia": "2026-03", "valor": 400, "anterior": None}])
+    assert r.status_code == 409 and gravado() == 200
+
+
+def test_simulacao_segura_a_trava_do_planejamento(cliente, contador, monkeypatch):
+    """Quem grava durante o cálculo espera a simulação terminar e então a marca como desatualizada."""
+    from app.api.routes import simulacoes
+    pedidos = []
+    original = simulacoes.obter_planejamento
+
+    def espiao(db, pid, **kw):
+        pedidos.append(kw)
+        return original(db, pid, **kw)
+
+    monkeypatch.setattr(simulacoes, "obter_planejamento", espiao)
+    assert cliente.post(f"/api/planejamentos/{_pid_servico(cliente, contador)}/simulacoes", headers=contador).status_code == 201
+    assert pedidos == [{"travar": True}]
+
+
 def test_crescimento_recalcula_o_fator_r_em_cada_faixa():
     # folha de R$ 20 mil: (21.600 + 3.000) × 12 = 295.200 → 30,75% com RBT12 de 960 mil (Anexo III),
     # mas só 7,0% com RBT12 de 4,2 milhões: aí o serviço vai para o Anexo V

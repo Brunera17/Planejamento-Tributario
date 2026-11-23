@@ -50,7 +50,8 @@ def _simulacao(db, sid: int) -> Simulacao:
 
 @router.post("/planejamentos/{pid}/simulacoes", response_model=SimulacaoResumo, status_code=201)
 def executar(pid: int, db: DB, u: UsuarioAtual):
-    return servico.executar(db, obter_planejamento(db, pid), u.id)
+    # com a trava, uma gravação que chega no meio do cálculo espera e depois marca este resultado como desatualizado
+    return servico.executar(db, obter_planejamento(db, pid, travar=True), u.id)
 
 
 @router.get("/planejamentos/{pid}/simulacoes", response_model=list[SimulacaoResumo])

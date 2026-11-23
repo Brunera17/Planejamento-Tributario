@@ -101,6 +101,10 @@ def _alterou(db: Session, p: Planejamento) -> None:
     db.commit()
 
 
+def _brl(v: Decimal) -> str:
+    return f"R$ {v:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+
 def _competencia_valida(p: Planejamento, c: str) -> None:
     if c not in p.competencias():
         raise ErroNegocio(f"Competência {c} fora do período do planejamento", campos={"competencia": "fora do período"})
@@ -223,6 +227,13 @@ def _gravar_mensal(db: Session, p: Planejamento, modelo, valores: list[ValorComp
     for v in valores:
         _competencia_valida(p, v.competencia)
         m = db.scalar(select(modelo).where(modelo.planejamento_id == p.id, modelo.competencia == v.competencia))
+        atual = m.valor if m else None
+        if "anterior" in v.model_fields_set and atual != v.anterior:
+            # outra tela gravou depois que esta carregou: não apaga a mudança mais nova
+            db.rollback()
+            raise ErroNegocio(f"O valor de {v.competencia} foi alterado em outra tela"
+                              + (f" (agora {_brl(atual)})" if atual is not None else "")
+                              + ". A tela foi atualizada: confira e grave de novo.", 409, {"valor": "alterado em outra tela"})
         if m is None:
             db.add(modelo(planejamento_id=p.id, competencia=v.competencia, valor=v.valor))
         else:

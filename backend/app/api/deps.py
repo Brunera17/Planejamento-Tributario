@@ -74,11 +74,13 @@ SidAtual = Annotated[str | None, Depends(sid_atual)]
 ProtecaoCsrf = Depends(protecao_csrf)
 
 
-def obter_planejamento(db: Session, planejamento_id: int, alterar: bool = False) -> Planejamento:
-    """alterar=True: recusa gravar dados num planejamento aprovado (o relatório entregue deixaria de bater)."""
-    # alterar: trava a linha (Postgres) até o commit, e a aprovação simultânea espera e vê a simulação desatualizada
-    p = (db.get(Planejamento, planejamento_id, with_for_update={"of": Planejamento}, populate_existing=True) if alterar
-         else db.get(Planejamento, planejamento_id))
+def obter_planejamento(db: Session, planejamento_id: int, alterar: bool = False, travar: bool = False) -> Planejamento:
+    """alterar=True: recusa gravar dados num planejamento aprovado (o relatório entregue deixaria de bater).
+    travar=True: só a trava, para quem lê os dados e grava um resultado a partir deles (a simulação)."""
+    # trava a linha (Postgres) até o commit: gravações do mesmo planejamento entram em fila, a aprovação simultânea
+    # espera e vê a simulação desatualizada, e quem grava durante uma simulação espera ela terminar
+    p = (db.get(Planejamento, planejamento_id, with_for_update={"of": Planejamento}, populate_existing=True)
+         if alterar or travar else db.get(Planejamento, planejamento_id))
     if p is None:
         raise NaoEncontrado("Planejamento")
     if alterar and p.status == "APROVADO":

@@ -111,7 +111,10 @@ function Coleta({ pid }: { pid: number }) {
       setErro(null);
       atualizar();
     },
-    onError: (e) => setErro(mensagemErro(e)),
+    onError: (e) => {
+      setErro(mensagemErro(e));
+      atualizar(); // recusada por mudança em outra tela: mostra o valor que está gravado
+    },
   });
 
   const importar = useMutation({
@@ -167,7 +170,9 @@ function Coleta({ pid }: { pid: number }) {
   });
 
   if (!data) return <p>Carregando…</p>;
-  const mensal = (rota: string, c: string, v: number | null) => v != null && gravar.mutate({ rota, corpo: [{ competencia: c, valor: v }] });
+  // manda o valor que a tela mostrava: se outra aba gravou depois, a API recusa em vez de apagar a mudança mais nova
+  const mensal = (rota: "compras" | "devolucoes" | "servicos", c: string, v: number | null) =>
+    v != null && gravar.mutate({ rota, corpo: [{ competencia: c, valor: v, anterior: data[rota]?.[c] ?? null }] });
 
   return (
     <div className="space-y-4">
