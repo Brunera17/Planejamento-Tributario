@@ -63,8 +63,11 @@ export function EscolhaEmpresa({
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();
-              setAberta(true);
-              setAtiva((i) => Math.min(i + 1, lista.length - 1));
+              if (!mostrar) { // a primeira seta só abre a lista, já com a primeira empresa marcada
+                setAtiva(0);
+                return setAberta(true);
+              }
+              setAtiva((i) => Math.max(0, Math.min(i + 1, lista.length - 1)));
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
               setAtiva((i) => Math.max(i - 1, 0));
