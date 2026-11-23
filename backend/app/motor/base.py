@@ -31,6 +31,11 @@ class BaseCompetencia:
     remessas_sem_receita: Decimal = ZERO
     compras: Decimal = ZERO
     despesas: Decimal = ZERO
+    receita_servico: Decimal = ZERO  # prestação de serviços (NFS-e); já incluída na receita bruta e na líquida
+
+    @property
+    def receita_mercadoria(self) -> Decimal:
+        return self.receita_liquida - self.receita_servico
 
     @property
     def receita_nao_monofasica(self) -> Decimal:
@@ -38,9 +43,10 @@ class BaseCompetencia:
 
     @property
     def participacao_nao_monofasica(self) -> Decimal:
-        if self.receita_liquida == 0:
+        """Parte das vendas de mercadoria fora do monofásico: dá o crédito das compras no Lucro Real (o serviço não entra)."""
+        if self.receita_mercadoria == 0:
             return ZERO
-        return self.receita_nao_monofasica / self.receita_liquida
+        return (self.receita_mercadoria - self.receita_monofasica) / self.receita_mercadoria
 
 
 def dividir(a: Decimal, b: Decimal) -> Decimal:
@@ -81,8 +87,16 @@ def calcular_base(
         else:
             b.receita_interestadual += rl
 
+    # serviço entra depois do rateio das devoluções, que são de vendas de mercadoria
     for c, b in bases.items():
-        memoria.registrar("Base", "Faturamento bruto de vendas", "Σ valor dos itens com CFOP que gera receita", b.receita_bruta, c)
+        b.receita_servico = entrada.servicos.get(c, ZERO)
+        b.receita_bruta += b.receita_servico
+        b.receita_liquida += b.receita_servico
+
+    for c, b in bases.items():
+        if b.receita_servico:
+            memoria.registrar("Base", "Receita de serviços", "informada (NFS-e)", b.receita_servico, c)
+        memoria.registrar("Base", "Faturamento bruto", "Σ itens com CFOP que gera receita + serviços", b.receita_bruta, c)
         memoria.registrar("Base", "(−) Devoluções de vendas", "informado; rateado proporcionalmente nos itens", b.devolucoes, c,
                           "Lei 9.249/1995, art. 15; Lei 9.718/1998, art. 3º")
         memoria.registrar("Base", "(=) Receita líquida", "Σ valor × (1 − devoluções ÷ faturamento bruto)", b.receita_liquida, c)

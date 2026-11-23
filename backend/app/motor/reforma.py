@@ -32,6 +32,7 @@ def calcular_reforma(
     receita = sum((b.receita_liquida for b in bases.values()), ZERO)
     # reduções dos anexos da LC 214/2025: a receita de cada item entra com (1 − redução)
     receita_tributada = sum((i.receita_liquida * (1 - i.item.reducao_ibs_cbs) for i in itens if i.item.gera_receita), ZERO)
+    receita_tributada += sum((b.receita_servico for b in bases.values()), ZERO)  # serviço: alíquota cheia
     reducao_media = ZERO if receita == 0 else 1 - receita_tributada / receita
     if reducao_media > 0:
         memoria.registrar("Reforma", "Receita com CBS e IBS após as reduções dos anexos",
@@ -45,6 +46,8 @@ def calcular_reforma(
     irpj_csll_lr = real.detalhes["irpj_normal"] + real.detalhes["irpj_adicional"] + _tributo(real, "CSLL")
     inss_lp = _tributo(presumido, "INSS patronal")
     inss_lr = _tributo(real, "INSS patronal")
+    # o ISS some junto com o ICMS: os dois ficam com a mesma fração em cada ano da transição (EC 132/2023, art. 128 do ADCT)
+    iss_lp, iss_lr = presumido.municipal, real.municipal
 
     linhas: list[LinhaReforma] = []
     # 2026: regras atuais
@@ -59,14 +62,14 @@ def calcular_reforma(
         ibs_cbs = (a.cbs + a.ibs) * valor_agregado
         icms_mantido = icms.total_a_recolher * a.fator_icms
         cargas = {
-            # premissa: DAS com a mesma alíquota efetiva total, sem segregação de monofásicos (extintos em 2027)
-            Regime.SIMPLES_NACIONAL: receita * aliq_simples.efetiva,
-            Regime.LUCRO_PRESUMIDO: icms_mantido + ibs_cbs + irpj_csll_lp + inss_lp,
-            Regime.LUCRO_REAL: icms_mantido + ibs_cbs + irpj_csll_lr + inss_lr,
+            # premissa: DAS com a alíquota efetiva total de cada anexo, sem segregação de monofásicos (extintos em 2027)
+            Regime.SIMPLES_NACIONAL: simples.detalhes.get("das_sem_segregacao", receita * aliq_simples.efetiva),
+            Regime.LUCRO_PRESUMIDO: icms_mantido + iss_lp * a.fator_icms + ibs_cbs + irpj_csll_lp + inss_lp,
+            Regime.LUCRO_REAL: icms_mantido + iss_lr * a.fator_icms + ibs_cbs + irpj_csll_lr + inss_lr,
         }
         linhas.append(_linha(a.ano, a.cbs, a.ibs, a.fator_icms, cargas, receita, simples.elegivel))
         memoria.registrar("Reforma", f"Carga {a.ano} – Lucro Presumido",
-                          "ICMS × fator mantido + (CBS + IBS) × (receita após reduções − base de créditos) + IRPJ + CSLL",
+                          "(ICMS + ISS) × fator mantido + (CBS + IBS) × (receita após reduções − base de créditos) + IRPJ + CSLL",
                           cargas[Regime.LUCRO_PRESUMIDO])
     return linhas
 

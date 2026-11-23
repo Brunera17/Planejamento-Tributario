@@ -54,6 +54,7 @@ def _resumo_base(bases, icms, pc_lr) -> dict[str, dict[str, Decimal]]:
             "receita_bruta": b.receita_bruta,
             "devolucoes": b.devolucoes,
             "receita_liquida": b.receita_liquida,
+            "receita_servico": b.receita_servico,
             "receita_monofasica": b.receita_monofasica,
             "receita_nao_monofasica": b.receita_nao_monofasica,
             "receita_interna": b.receita_interna,

@@ -27,8 +27,8 @@ from app.services.serializacao import hash_entrada, para_json
 def executar(db: Session, p: Planejamento, usuario_id: int) -> Simulacao:
     montada = montar_entrada(db, p)
     entrada = montada.entrada
-    if not entrada.itens:
-        raise ErroNegocio("Importe as notas fiscais de saída antes de simular")
+    if not entrada.itens and not entrada.servicos:
+        raise ErroNegocio("Importe as notas fiscais de saída ou lance a receita de serviços antes de simular")
     try:
         r = simular(entrada)
     except ValueError as e:

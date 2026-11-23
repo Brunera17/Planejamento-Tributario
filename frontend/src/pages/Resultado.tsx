@@ -133,6 +133,7 @@ export function Resultado() {
         <Tabela cabecalho={["Item", ...Object.keys(r.base).map((c) => (c === "TOTAL" ? "Período" : competenciaExtenso(c)))]} numericas={Object.keys(r.base).map((_, i) => i + 1)}>
           {[
             ["receita_bruta", "Faturamento bruto"],
+            ...(r.base.TOTAL?.receita_servico ? [["receita_servico", "  dos quais serviços (NFS-e)"]] : []),
             ["devolucoes", "(−) Devoluções"],
             ["receita_liquida", "(=) Receita líquida"],
             ["receita_monofasica", "Receita monofásica"],
@@ -231,6 +232,7 @@ export function Resultado() {
 }
 
 const ANEXOS: Record<number, string> = { 1: "Anexo I (comércio)", 2: "Anexo II (indústria)" };
+const ROMANO: Record<number, string> = { 3: "III", 4: "IV", 5: "V" };
 const anexoSimples = (s: ResultadoRegime) => ANEXOS[s.detalhes.anexo ?? 1] ?? `Anexo ${s.detalhes.anexo}`;
 
 /** Onde a empresa se encaixa no Simples: anexo, faixa do RBT12 e alíquota efetiva do DAS. */
@@ -239,10 +241,19 @@ function enquadramentoSimples(s: ResultadoRegime, receita: number) {
   const faixa = `${d.faixa}ª faixa`;
   const rbt12 = `RBT12 de ${brl(d.rbt12)}${d.rbt12_estimado ? ", estimado pela média do período" : ""}`;
   if (!s.elegivel) return `No Simples: acima do teto de R$ 4,8 milhões (${rbt12}), a empresa não pode optar.`;
-  const sublimite = d.acima_sublimite ? "; acima do sublimite, o ICMS é pago fora do DAS" : "";
+  const sublimite = d.acima_sublimite ? `; acima do sublimite, o ICMS${d.receita_servico ? " e o ISS são pagos" : " é pago"} fora do DAS` : "";
   // o monofásico e a ST saem do DAS: a carga sobre a receita fica abaixo da alíquota da tabela
-  const segregacao = !d.acima_sublimite && s.total < receita * d.aliquota_efetiva_das - 0.01 ? "; a carga fica menor porque o monofásico e a ST saem do DAS" : "";
-  return `No Simples: ${anexoSimples(s)}, ${faixa} (${rbt12}), alíquota efetiva de ${percentual(d.aliquota_efetiva_das)} no DAS${sublimite}${segregacao}.`;
+  const semSegregacao = d.das_sem_segregacao ?? receita * d.aliquota_efetiva_das;
+  const segregacao = !d.acima_sublimite && s.total < semSegregacao - 0.01 ? "; a carga fica menor porque o monofásico e a ST saem do DAS" : "";
+  const servico = d.receita_servico
+    ? `; os serviços vão para o Anexo ${ROMANO[d.anexo_servico] ?? d.anexo_servico}${d.fator_r != null ? ` (Fator R de ${percentual(d.fator_r)})` : ""}, ${d.faixa_servico}ª faixa, efetiva de ${percentual(d.aliquota_efetiva_servico)}`
+    : "";
+  if (d.receita_servico && d.receita_servico >= receita - 0.01) {
+    // só serviço: a faixa e a efetiva que valem são as do anexo do serviço
+    const fr = d.fator_r != null ? ` pelo Fator R de ${percentual(d.fator_r)}` : "";
+    return `No Simples: Anexo ${ROMANO[d.anexo_servico] ?? d.anexo_servico}${fr}, ${d.faixa_servico}ª faixa (${rbt12}), alíquota efetiva de ${percentual(d.aliquota_efetiva_servico)} no DAS${sublimite}.`;
+  }
+  return `No Simples: ${anexoSimples(s)}, ${faixa} (${rbt12}), alíquota efetiva de ${percentual(d.aliquota_efetiva_das)} no DAS${servico}${sublimite}${segregacao}.`;
 }
 
 function DetalheRegime({ reg, receita }: { reg: ResultadoRegime; receita: number }) {
@@ -353,11 +364,17 @@ function MemoriaCalculo({ sid }: { sid: number }) {
 }
 
 const GRUPOS = [
-  { nome: "ICMS", tributos: ["ICMS", "IPI"], cor: "bg-t-icms" },  // IPI só no DAS da indústria (Anexo II)
+  { nome: "ICMS e ISS", tributos: ["ICMS", "IPI", "ISS"], cor: "bg-t-icms" },  // IPI só no DAS da indústria (Anexo II)
   { nome: "PIS e COFINS", tributos: ["PIS", "COFINS", "PIS/COFINS"], cor: "bg-t-piscofins" },
   { nome: "IRPJ e CSLL", tributos: ["IRPJ", "CSLL"], cor: "bg-t-irpjcsll" },
   { nome: "CPP e INSS", tributos: ["CPP", "INSS patronal"], cor: "bg-t-cpp" },
 ];
+
+/** Nome do grupo dos impostos sobre o consumo com o que de fato aparece: ICMS, mais IPI (indústria) e ISS (serviço). */
+function nomeConsumo(r: TResultado) {
+  const tem = (nome: string) => [r.simples, r.presumido, r.real].some((reg) => reg.tributos.some((t) => t.tributo === nome && t.valor));
+  return ["ICMS", ...(tem("IPI") ? ["IPI"] : []), ...(tem("ISS") ? ["ISS"] : [])].join(" e ");
+}
 
 /** Composição da carga de cada regime por grupo de tributo, na mesma escala, para mostrar de onde vem a diferença. */
 function Composicao({ r, receita, atual }: { r: TResultado; receita: number; atual?: string }) {
@@ -414,7 +431,7 @@ function Composicao({ r, receita, atual }: { r: TResultado; receita: number; atu
         {GRUPOS.map((g) => (
           <li key={g.nome} className="flex items-center gap-1.5">
             <span aria-hidden className={`inline-block h-2.5 w-2.5 rounded-sm ${g.cor}`} />
-            {g.nome === "ICMS" && r.simples.tributos.some((t) => t.tributo === "IPI") ? "ICMS e IPI" : g.nome}
+            {g.nome === "ICMS e ISS" ? nomeConsumo(r) : g.nome}
           </li>
         ))}
         <li>Percentuais sobre a receita líquida de {brl(receita)}</li>

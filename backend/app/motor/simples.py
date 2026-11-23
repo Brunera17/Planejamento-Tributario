@@ -81,6 +81,35 @@ def reparticao(aliq: AliquotaSimples) -> dict[str, Decimal]:
     return out
 
 
+RAT_REFERENCIA = Decimal("0.02")
+
+
+def aliq_iss(entrada: EntradaSimulacao) -> Decimal:
+    """ISS do município; sem ele, o teto (5%), para não subestimar o LP e o LR."""
+    return entrada.premissas.aliq_iss if entrada.premissas.aliq_iss is not None else entrada.parametros.aliq_iss_padrao
+
+
+def anexo_do_servico(entrada: EntradaSimulacao, rbt12: Decimal) -> tuple[str, Decimal | None]:
+    """(anexo, Fator R). Com "R", a folha dos 12 meses (salários + FGTS + pró-labore, anualizados) ÷ RBT12 decide o anexo."""
+    if entrada.anexo_servico != "R":
+        return entrada.anexo_servico, None
+    p, n = entrada.parametros, len(entrada.competencias)
+    folha = sum((entrada.folha.get(c, ZERO) * (1 + p.fgts) + entrada.pro_labore.get(c, ZERO) for c in entrada.competencias), ZERO)
+    fr = fator_r(folha / n * 12, rbt12)
+    return anexo_pelo_fator_r(fr), fr
+
+
+def cpp_fora_do_das(entrada: EntradaSimulacao, participacao: Decimal) -> Decimal:
+    """Anexo IV: a CPP não está no DAS e é paga sobre a folha (20% + RAT × FAP; 20% do pró-labore), sem terceiros
+    (LC 123/2006, art. 13, § 3º, e art. 18, § 5º-C). Com mais de uma atividade, na proporção da receita do Anexo IV."""
+    pr, p = entrada.premissas, entrada.parametros
+    rat = RAT_REFERENCIA if pr.rat is None else pr.rat
+    fap = Decimal(1) if pr.fap is None else pr.fap
+    folha = sum((entrada.folha.get(c, ZERO) * (p.cpp_patronal + rat * fap) + entrada.pro_labore.get(c, ZERO) * p.inss_pro_labore
+                 for c in entrada.competencias), ZERO)
+    return folha * participacao
+
+
 def calcular_rbt12(entrada: EntradaSimulacao, bases: dict[str, BaseCompetencia]) -> tuple[Decimal, bool]:
     """Retorna (RBT12, estimado?)."""
     if entrada.premissas.rbt12_informado:
@@ -119,10 +148,52 @@ def calcular_simples(
             cofins += rl * aliq.parcela(f.p_cofins)
 
     receita = sum((b.receita_liquida for b in bases.values()), ZERO)
-    irpj = receita * aliq.parcela(f.p_irpj)
-    csll = receita * aliq.parcela(f.p_csll)
-    cpp = receita * aliq.parcela(f.p_cpp)
-    ipi = receita * aliq.parcela(f.p_ipi)  # Anexo II: o IPI da indústria vai no DAS
+    mercadoria = sum((b.receita_mercadoria for b in bases.values()), ZERO)
+    irpj = mercadoria * aliq.parcela(f.p_irpj)
+    csll = mercadoria * aliq.parcela(f.p_csll)
+    cpp = mercadoria * aliq.parcela(f.p_cpp)
+    ipi = mercadoria * aliq.parcela(f.p_ipi)  # Anexo II: o IPI da indústria vai no DAS
+
+    # serviço: no anexo dele, com a mesma RBT12 da empresa inteira
+    servico = sum((b.receita_servico for b in bases.values()), ZERO)
+    iss = iss_fora_das = cpp_fora = ZERO
+    detalhes_servico: dict[str, Decimal] = {}
+    das_sem_segregacao = mercadoria * aliq.efetiva
+    if servico:
+        anexo_s, fr = anexo_do_servico(entrada, rbt12)
+        aliq_s = aliquota_efetiva(rbt12, entrada.faixas_servico[anexo_s])
+        partes = {k: servico * v for k, v in reparticao(aliq_s).items()}
+        pis += partes.get("PIS", ZERO)
+        cofins += partes.get("COFINS", ZERO)
+        irpj += partes.get("IRPJ", ZERO)
+        csll += partes.get("CSLL", ZERO)
+        cpp += partes.get("CPP", ZERO)
+        iss = partes.get("ISS", ZERO)
+        if fr is not None:
+            memoria.registrar("Simples", "Fator R", "(folha + FGTS + pró-labore, anualizados) ÷ RBT12", fr,
+                              fundamento="LC 123/2006, art. 18, §§ 5º-J e 24")
+        memoria.registrar("Simples", f"Serviços: faixa {aliq_s.faixa.faixa} do Anexo {anexo_s}", "maior faixa com RBT12 inicial ≤ RBT12",
+                          Decimal(aliq_s.faixa.faixa))
+        memoria.registrar("Simples", "Serviços: alíquota efetiva", "(RBT12 × alíquota nominal − parcela a deduzir) ÷ RBT12",
+                          aliq_s.efetiva, fundamento="LC 123/2006, art. 18 e Anexos III, IV e V")
+        memoria.registrar("Simples", "ISS no DAS", "receita de serviços × alíquota efetiva × %ISS (até 5%)", iss)
+        if acima_sublimite:
+            iss_fora_das = servico * aliq_iss(entrada)
+            memoria.registrar("Simples", "ISS fora do DAS (RBT12 acima do sublimite)", "receita de serviços × ISS do município",
+                              iss_fora_das, fundamento="LC 123/2006, art. 13-A")
+        if anexo_s == "IV":
+            cpp_fora = cpp_fora_do_das(entrada, servico / receita)
+            memoria.registrar("Simples", "CPP fora do DAS (Anexo IV)", "folha × (20% + RAT × FAP) + pró-labore × 20%, "
+                              "na proporção da receita do Anexo IV", cpp_fora, fundamento="LC 123/2006, art. 13, § 3º")
+        das_sem_segregacao += servico * aliq_s.efetiva
+        detalhes_servico = {
+            "receita_servico": servico,
+            "anexo_servico": Decimal(ROMANOS[anexo_s]),
+            "faixa_servico": Decimal(aliq_s.faixa.faixa),
+            "aliquota_efetiva_servico": aliq_s.efetiva,
+            **({"fator_r": fr} if fr is not None else {}),
+        }
+    das_sem_segregacao += iss_fora_das + cpp_fora
 
     icms_fora_das = ZERO
     if acima_sublimite:
@@ -136,15 +207,16 @@ def calcular_simples(
         ("ICMS no DAS", icms, "Σ receita × alíquota efetiva × %ICMS (zero nos itens com ST)"),
         ("PIS no DAS", pis, "Σ receita não monofásica × alíquota efetiva × %PIS"),
         ("COFINS no DAS", cofins, "Σ receita não monofásica × alíquota efetiva × %COFINS"),
-        ("IRPJ no DAS", irpj, "receita × alíquota efetiva × %IRPJ"),
-        ("CSLL no DAS", csll, "receita × alíquota efetiva × %CSLL"),
-        ("CPP no DAS", cpp, "receita × alíquota efetiva × %CPP"),
+        ("IRPJ no DAS", irpj, "receita de cada anexo × alíquota efetiva × %IRPJ"),
+        ("CSLL no DAS", csll, "receita de cada anexo × alíquota efetiva × %CSLL"),
+        ("CPP no DAS", cpp, "receita de cada anexo × alíquota efetiva × %CPP"),
         *([("IPI no DAS", ipi, "receita × alíquota efetiva × %IPI")] if ipi else []),
     ]:
         memoria.registrar("Simples", nome, formula, valor)
 
     estadual = icms + icms_fora_das
-    federal = pis + cofins + irpj + csll + cpp + ipi
+    federal = pis + cofins + irpj + csll + cpp + ipi + cpp_fora
+    municipal = iss + iss_fora_das
     tributos = [
         TributoValor("ICMS", estadual),
         TributoValor("PIS", pis),
@@ -153,6 +225,8 @@ def calcular_simples(
         TributoValor("CSLL", csll),
         TributoValor("CPP", cpp),
         *([TributoValor("IPI", ipi)] if ipi else []),
+        *([TributoValor("ISS", municipal)] if municipal else []),
+        *([TributoValor("INSS patronal", cpp_fora)] if cpp_fora else []),
     ]
     detalhes = {
         "anexo": Decimal(ROMANOS[entrada.anexo_simples]),
@@ -163,5 +237,8 @@ def calcular_simples(
         "parcela_deduzir": f.parcela_deduzir,
         "aliquota_efetiva_das": aliq.efetiva,
         "acima_sublimite": Decimal(int(acima_sublimite)),
+        # o DAS sem separar monofásico e ST, cada receita na efetiva do seu anexo (base da projeção da Reforma)
+        "das_sem_segregacao": das_sem_segregacao,
+        **detalhes_servico,
     }
-    return ResultadoRegime(Regime.SIMPLES_NACIONAL, estadual, federal, tributos, detalhes, elegivel), aliq
+    return ResultadoRegime(Regime.SIMPLES_NACIONAL, estadual, federal, tributos, detalhes, elegivel, municipal), aliq

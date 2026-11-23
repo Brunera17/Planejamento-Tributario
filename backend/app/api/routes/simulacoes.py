@@ -50,7 +50,8 @@ def _simulacao(db, sid: int) -> Simulacao:
 
 @router.post("/planejamentos/{pid}/simulacoes", response_model=SimulacaoResumo, status_code=201)
 def executar(pid: int, db: DB, u: UsuarioAtual):
-    return servico.executar(db, obter_planejamento(db, pid), u.id)
+    # com a trava, uma gravação que chega no meio do cálculo espera e depois marca este resultado como desatualizado
+    return servico.executar(db, obter_planejamento(db, pid, travar=True), u.id)
 
 
 @router.get("/planejamentos/{pid}/simulacoes", response_model=list[SimulacaoResumo])
@@ -84,7 +85,7 @@ def crescimento(sid: int, db: DB, _: UsuarioAtual, rbt12: list[Decimal] = Query(
     if not rbt12:
         return json.loads(s.resultado_json)["crescimento"]
     entrada = montar_entrada(db, db.get(Planejamento, s.planejamento_id)).entrada
-    if not entrada.itens:  # notas apagadas na aprovação: sem elas o recálculo daria receita zero
+    if not entrada.itens and not entrada.servicos:  # notas apagadas na aprovação: sem elas o recálculo daria receita zero
         raise ErroNegocio("As notas fiscais deste planejamento foram apagadas na aprovação; "
                           "a simulação de crescimento mostra só os valores calculados")
     return para_json(engine.crescimento(entrada, sorted(rbt12)))

@@ -26,6 +26,7 @@ from app.models import (
     ParametroTributario,
     Planejamento,
     PremissaPlanejamento,
+    ReceitaServicoMensal,
     ReformaCronograma,
     SimplesFaixa,
 )
@@ -68,7 +69,11 @@ PREMISSAS = {
     "rat": Decimal,
     "fap": Decimal,
     "terceiros": Decimal,
+    "anexo_servico": str,  # III, IV, V ou R (Fator R decide entre III e V)
+    "aliq_iss": Decimal,  # alíquota do ISS do município (2% a 5%)
+    "presuncao_servico": Decimal,  # presunção do IRPJ do serviço no Lucro Presumido (32%, 16% ou 8%)
 }
+ANEXOS_SERVICO = ("III", "IV", "V", "R")
 
 
 @dataclass
@@ -107,7 +112,7 @@ def premissas_do_planejamento(db: Session, p: Planejamento, auto: premissas_auto
         bruto = json.loads(pr.valor)
         if bruto is None:
             continue
-        valores[pr.chave] = Decimal(str(bruto)) if tipo is Decimal else bool(bruto)
+        valores[pr.chave] = Decimal(str(bruto)) if tipo is Decimal else str(bruto) if tipo is str else bool(bruto)
     origens = db.scalars(select(CompraOrigem).where(CompraOrigem.planejamento_id == p.id)).all()
     if origens:
         valores["composicao_compras"] = {o.aliquota: o.percentual for o in origens}
@@ -181,12 +186,13 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     pendentes = [x for x in produtos if x.pendente]
     if pendentes:
         pendencias.append(f"{len(pendentes)} produto(s) aguardando revisão do contador")
-    sem_saidas = [c for c in comps if not any(i.competencia == c for i in cls.itens)]
-    if sem_saidas:
-        pendencias.append("Competências sem notas de saída: " + ", ".join(sem_saidas))
-
     def mensal(modelo) -> dict[str, Decimal]:
         return {m.competencia: m.valor for m in db.scalars(select(modelo).where(modelo.planejamento_id == p.id))}
+
+    servicos = {c: v for c, v in mensal(ReceitaServicoMensal).items() if c in comps and v}
+    sem_saidas = [c for c in comps if c not in servicos and not any(i.competencia == c for i in cls.itens)]
+    if sem_saidas:
+        pendencias.append("Competências sem notas de saída nem receita de serviço: " + ", ".join(sem_saidas))
 
     compras = mensal(CompraMensal)
     faltam_compras = [c for c in comps if c not in compras]
@@ -243,16 +249,29 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
     if extrato and extrato.anexos and anexo not in extrato.anexos:
         declarados = " e ".join(f"Anexo {a}" for a in sorted(extrato.anexos, key=ROMANOS.get))
         pendencias.append(f"O extrato do PGDAS-D declara {declarados}, mas o cálculo usa o Anexo {anexo}: confira o cadastro da empresa")
+    premissas = premissas_do_planejamento(db, p, auto := premissas_auto.derivar(db, p))
+    # o serviço vai para o anexo da premissa; sem ela, para o do cadastro (empresa de serviço) ou para o III
+    anexo_servico = premissas.anexo_servico or (anexo if anexo in ("III", "IV", "V") else "III")
     if anexo not in ANEXOS_CALCULADOS:
-        pendencias.append(f"O sistema ainda não calcula o Anexo {anexo} do Simples (serviços); o Simples saiu pelo Anexo I")
-        anexo = "I"
-    faixas = faixas_vigentes(db, referencia).get(anexo, [])
+        if not servicos:
+            pendencias.append(f"Empresa no Anexo {anexo} (serviços) sem receita de serviço informada: lance a receita de "
+                              "serviços por mês na coleta")
+        anexo = "I"  # mercadoria, se houver, vai para o Anexo I
+    if servicos and anexo_servico == "R" and len(comps) < 12:
+        pendencias.append(f"Fator R estimado: a folha dos {len(comps)} meses do planejamento foi anualizada; com folha bem "
+                          "diferente nos meses anteriores, confira o anexo no PGDAS-D")
+    if servicos and premissas.aliq_iss is None:
+        pendencias.append("Alíquota de ISS do município não informada nas premissas: o cálculo usou 5% no LP e no LR")
+    todas_faixas = faixas_vigentes(db, referencia)
+    faixas = todas_faixas.get(anexo, [])
     if not faixas:
         raise ValueError("Tabela do Simples Nacional vigente não cadastrada")
+    faixas_servico = {a: todas_faixas[a] for a in ("III", "IV", "V") if a in todas_faixas} if servicos else {}
+    if servicos and not faixas_servico:
+        raise ValueError("Tabelas dos Anexos III, IV e V do Simples não cadastradas: rode a carga das tabelas")
     parametros = tabelas.parametros({x.chave: x.valor for x in _vigentes(db, ParametroTributario, referencia)})
     reforma = [AnoReforma(r.ano, r.cbs, r.ibs, r.fator_icms) for r in db.scalars(select(ReformaCronograma))]
 
-    auto = premissas_auto.derivar(db, p)
     entrada = EntradaSimulacao(
         competencias=comps,
         itens=cls.itens,
@@ -264,7 +283,7 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         faixas_simples=faixas,
         reforma=reforma,
         parametros=parametros,
-        premissas=premissas_do_planejamento(db, p, auto),
+        premissas=premissas,
         folha_informada=folha_informada,
         despesas_nao_informadas=nao_informadas,
         despesas_estimadas=estimadas,
@@ -275,6 +294,9 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         ncm_info=_info_ncm(produtos, reducoes),
         estoque_st=_credito_estoque_st(db, p),
         anexo_simples=anexo,
+        servicos=servicos,
+        anexo_servico=anexo_servico,
+        faixas_servico=faixas_servico,
     )
     return EntradaMontada(entrada, pendencias)
 

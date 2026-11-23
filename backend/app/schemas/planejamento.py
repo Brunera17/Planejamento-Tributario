@@ -42,6 +42,8 @@ class StatusEntrada(Esquema):
 class ValorCompetencia(Esquema):
     competencia: CompetenciaStr
     valor: ValorMonetario
+    # o valor que a tela mostrava (null = vazio); enviado, a gravação só vale se o banco ainda tiver esse valor
+    anterior: ValorMonetario | None = None
 
 
 class FolhaCompetencia(Esquema):

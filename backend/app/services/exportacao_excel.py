@@ -51,14 +51,14 @@ def gerar(sim: Simulacao, p: Planejamento) -> bytes:
     ws = wb.active
     ws.title = "Comparativo 3 Regimes"
     lin = _cabecalho(ws, "COMPARATIVO DOS 3 REGIMES", emp, p,
-                     ["Regime", "Tributos estaduais (ICMS)", "Tributos federais", "Carga total", "Alíquota efetiva",
-                      "Diferença vs. melhor", "Posição"])
+                     ["Regime", "Tributos estaduais (ICMS)", "Tributos federais", "Tributos municipais (ISS)", "Carga total",
+                      "Alíquota efetiva", "Diferença vs. melhor", "Posição"])
     inicio = lin
     for c in sorted(r["comparativo"], key=lambda x: x["posicao"]):
-        ws.append([NOMES[c["regime"]], c["estadual"], c["federal"], None, None, None, f'{c["posicao"]}º'])
-        ws.cell(row=lin, column=4, value=f"=B{lin}+C{lin}")
-        ws.cell(row=lin, column=5, value=f"=D{lin}/{receita}")
-        ws.cell(row=lin, column=6, value=f"=D{lin}-MIN($D${inicio}:$D${inicio + 2})")
+        ws.append([NOMES[c["regime"]], c["estadual"], c["federal"], c.get("municipal", 0), None, None, None, f'{c["posicao"]}º'])
+        ws.cell(row=lin, column=5, value=f"=B{lin}+C{lin}+D{lin}")
+        ws.cell(row=lin, column=6, value=f"=E{lin}/{receita}")
+        ws.cell(row=lin, column=7, value=f"=E{lin}-MIN($E${inicio}:$E${inicio + 2})")
         lin += 1
     ws.cell(row=lin + 1, column=1, value="REGIME MAIS VANTAJOSO").font = Font(bold=True)
     ws.cell(row=lin + 1, column=2, value=NOMES[r["melhor_regime"]]).font = Font(bold=True, color="155E75")

@@ -25,6 +25,7 @@ from app.models import (
     NotaFiscal,
     PesoProgresso,
     Planejamento,
+    ReceitaServicoMensal,
     TipoDocumento,
 )
 from app.services import premissas_auto, revisao_produtos
@@ -74,6 +75,9 @@ def calcular(db: Session, p: Planejamento) -> tuple[int, list[Bloco]]:
 
     comps_saida = set(db.scalars(select(NotaFiscal.competencia).where(
         NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA").distinct()))
+    # o mês só com serviço (NFS-e lançada à mão) também tem o faturamento informado
+    comps_saida |= set(db.scalars(select(ReceitaServicoMensal.competencia).where(
+        ReceitaServicoMensal.planejamento_id == p.id, ReceitaServicoMensal.valor > 0)))
     aprovado = p.status == "APROVADO"  # as notas foram apagadas na aprovação, mas estavam completas
     for c in comps:
         b["SAIDAS"].ok() if aprovado or c in comps_saida else b["SAIDAS"].falta(c, "Notas fiscais de saída")
