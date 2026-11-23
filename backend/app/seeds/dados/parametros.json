@@ -9,6 +9,8 @@
  {"chave": "csll", "valor": "0.09", "descricao": "CSLL", "fundamento": "Lei 7.689/1988"},
  {"chave": "presuncao_irpj", "valor": "0.08", "descricao": "Presunção IRPJ – revenda de mercadorias", "fundamento": "Lei 9.249/1995, art. 15"},
  {"chave": "presuncao_csll", "valor": "0.12", "descricao": "Presunção CSLL – revenda de mercadorias", "fundamento": "Lei 9.249/1995, art. 20"},
+ {"chave": "presuncao_servico", "valor": "0.32", "descricao": "Presunção IRPJ e CSLL – prestação de serviços em geral", "fundamento": "Lei 9.249/1995, art. 15, § 1º, III, e art. 20"},
+ {"chave": "aliq_iss_padrao", "valor": "0.05", "descricao": "ISS usado quando o município não é informado (teto)", "fundamento": "LC 116/2003, art. 8º"},
  {"chave": "acrescimo_presuncao", "valor": "0.10", "descricao": "Acréscimo da presunção sobre a receita excedente", "fundamento": "LC 224/2025"},
  {"chave": "limite_receita_anual_presuncao", "valor": "5000000", "descricao": "Receita anual sem acréscimo de presunção", "fundamento": "LC 224/2025; IN RFB 2.305/2025"},
  {"chave": "compensacao_prejuizo_limite", "valor": "0.30", "descricao": "Limite de compensação de prejuízo fiscal", "fundamento": "Lei 9.065/1995, art. 15"},

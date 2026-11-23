@@ -5,17 +5,18 @@ from decimal import Decimal
 
 from .base import BaseCompetencia, ItemCalculado
 from .icms import ResultadoIcms
+from .simples import aliq_iss
 from .tipos import ZERO, EntradaSimulacao, Memoria, Parametros, Regime, ResultadoRegime, TributoValor
 
 
 def base_pis_cofins(
     entrada: EntradaSimulacao, itens: list[ItemCalculado], icms: ResultadoIcms
 ) -> dict[str, Decimal]:
-    """Base de PIS/COFINS por competência: receita dos itens CST 01 (não monofásicos).
+    """Base de PIS/COFINS por competência: receita dos itens CST 01 (não monofásicos) e a receita de serviços.
 
     Com a premissa do Tema 69/STF, o ICMS destacado do item sai da base.
     """
-    base = {c: ZERO for c in entrada.competencias}
+    base = {c: entrada.servicos.get(c, ZERO) for c in entrada.competencias}
     excluir = entrada.premissas.excluir_icms_base_pis_cofins
     for i, it in enumerate(itens):
         if not it.tributado_pis_cofins:
@@ -80,24 +81,36 @@ def calcular_presumido(
     memoria.registrar("Lucro Presumido", "COFINS cumulativa", "base CST 01 × 3%", cofins, fundamento="Lei 9.718/1998")
 
     receita = sum((b.receita_liquida for b in bases.values()), ZERO)
+    servico = sum((b.receita_servico for b in bases.values()), ZERO)
     limite = p.limite_receita_anual_presuncao / 12 * n
     ate_limite = min(receita, limite)
     excedente = max(ZERO, receita - limite)
     fator = 1 + p.acrescimo_presuncao
-    base_ir = ate_limite * p.presuncao_irpj + excedente * p.presuncao_irpj * fator
-    base_cs = ate_limite * p.presuncao_csll + excedente * p.presuncao_csll * fator
+    # cada atividade com a sua presunção; o que passa do limite da LC 224/2025 se divide na proporção das receitas
+    pres_ir_serv = entrada.premissas.presuncao_servico or p.presuncao_servico
+    pres_cs_serv = p.presuncao_servico if pres_ir_serv == p.presuncao_servico else p.presuncao_csll  # Lei 9.249, art. 20
+    base_ir = base_cs = ZERO
+    for valor, pres_ir, pres_cs in ((receita - servico, p.presuncao_irpj, p.presuncao_csll), (servico, pres_ir_serv, pres_cs_serv)):
+        parte = ZERO if receita == 0 else valor / receita
+        base_ir += parte * (ate_limite * pres_ir + excedente * pres_ir * fator)
+        base_cs += parte * (ate_limite * pres_cs + excedente * pres_cs * fator)
     irpj, adicional = irpj_devido(base_ir, n, p)
     csll = base_cs * p.csll
+    iss = servico * aliq_iss(entrada)
 
     memoria.registrar("Lucro Presumido", "Limite sem acréscimo de presunção", "R$ 5 mi ÷ 12 × meses", limite,
                       fundamento="LC 224/2025")
-    memoria.registrar("Lucro Presumido", "Base do IRPJ", "até o limite × 8% + excedente × 8,8%", base_ir,
-                      fundamento="Lei 9.249/1995, art. 15")
+    memoria.registrar("Lucro Presumido", "Base do IRPJ", "mercadoria × 8% + serviços × presunção do serviço "
+                      "(o que passa do limite, com acréscimo de 10%)" if servico else "até o limite × 8% + excedente × 8,8%",
+                      base_ir, fundamento="Lei 9.249/1995, art. 15")
     memoria.registrar("Lucro Presumido", "IRPJ 15%", "base × 15%", irpj)
     memoria.registrar("Lucro Presumido", "Adicional de IRPJ", "max(0, base − R$ 20 mil × meses) × 10%", adicional,
                       fundamento="Lei 9.430/1996, art. 3º")
-    memoria.registrar("Lucro Presumido", "Base da CSLL", "até o limite × 12% + excedente × 13,2%", base_cs,
+    memoria.registrar("Lucro Presumido", "Base da CSLL", "mercadoria × 12% + serviços × 32% (o que passa do limite, com "
+                      "acréscimo de 10%)" if servico else "até o limite × 12% + excedente × 13,2%", base_cs,
                       fundamento="Lei 9.249/1995, art. 20")
+    if servico:
+        memoria.registrar("Lucro Presumido", "ISS", "receita de serviços × ISS do município", iss, fundamento="LC 116/2003")
     memoria.registrar("Lucro Presumido", "CSLL 9%", "base × 9%", csll)
 
     inss = inss_patronal(entrada)
@@ -114,11 +127,14 @@ def calcular_presumido(
         TributoValor("IRPJ", irpj + adicional),
         TributoValor("CSLL", csll),
         TributoValor("INSS patronal", inss),
+        *([TributoValor("ISS", iss)] if iss else []),
     ]
     for c in entrada.competencias:
         tributos.append(TributoValor("ICMS", icms.a_recolher[c], c))
         tributos.append(TributoValor("PIS", base_pc[c] * p.pis_cumulativo, c))
         tributos.append(TributoValor("COFINS", base_pc[c] * p.cofins_cumulativo, c))
+        if iss:
+            tributos.append(TributoValor("ISS", entrada.servicos.get(c, ZERO) * aliq_iss(entrada), c))
     detalhes = {
         "base_pis_cofins": total_base_pc,
         "base_irpj": base_ir,
@@ -126,5 +142,6 @@ def calcular_presumido(
         "irpj_normal": irpj,
         "irpj_adicional": adicional,
         "receita_excedente_limite": excedente,
+        **({"iss": iss} if iss else {}),
     }
-    return ResultadoRegime(Regime.LUCRO_PRESUMIDO, icms.total_a_recolher, federal, tributos, detalhes)
+    return ResultadoRegime(Regime.LUCRO_PRESUMIDO, icms.total_a_recolher, federal, tributos, detalhes, municipal=iss)

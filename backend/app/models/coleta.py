@@ -105,6 +105,17 @@ class DevolucaoMensal(Base, ValorMensal):
     valor: Mapped[Valor]
 
 
+class ReceitaServicoMensal(Base, ValorMensal):
+    """Receita de prestação de serviços do mês (NFS-e): entra no anexo do serviço no Simples, na presunção do serviço no LP
+    e paga ISS no LP e no LR."""
+
+    __tablename__ = "receita_servico_mensal"
+    __table_args__ = (UniqueConstraint("planejamento_id", "competencia", name="uq_receita_servico_mensal"),
+                      CheckConstraint("valor >= 0", name="ck_receita_servico_valor"))
+    planejamento_id: Mapped[int] = mapped_column(ForeignKey("planejamento.id", ondelete="CASCADE"))
+    valor: Mapped[Valor]
+
+
 class FolhaMensal(Base, ValorMensal):
     __tablename__ = "folha_mensal"
     __table_args__ = (UniqueConstraint("planejamento_id", "competencia", name="uq_folha_mensal"),)

@@ -80,6 +80,7 @@ type ColetaDados = {
   competencias: string[];
   compras: Record<string, number>;
   devolucoes: Record<string, number>;
+  servicos: Record<string, number>;
   folha: Record<string, { folha: number | null; pro_labore: number | null }>;
   saidas: { competencia: string; notas: number; itens: number; valor: number }[];
 };
@@ -182,9 +183,13 @@ function Coleta({ pid }: { pid: number }) {
         }
         semPadding
       >
-        <Tabela cabecalho={["Competência", "Faturamento (notas de saída)", "Compras", "Devoluções", "Folha", "Pró-labore"]} numericas={[1, 2, 3, 4, 5]}>
+        <Tabela
+          cabecalho={["Competência", "Faturamento (notas de saída)", "Serviços (NFS-e)", "Compras", "Devoluções", "Folha", "Pró-labore"]}
+          numericas={[1, 2, 3, 4, 5, 6]}
+        >
           {data.competencias.map((c) => {
             const s = data.saidas.find((x) => x.competencia === c);
+            const servico = Number(data.servicos?.[c] ?? 0) > 0;
             return (
               <tr key={c}>
                 <td className="px-4 py-1.5">{competenciaExtenso(c)}</td>
@@ -196,9 +201,14 @@ function Coleta({ pid }: { pid: number }) {
                         {s.notas} {s.notas === 1 ? "nota" : "notas"}
                       </span>
                     </>
+                  ) : servico ? (
+                    <span className="text-text-muted">sem notas</span>
                   ) : (
                     <span className="text-alert">pendente</span>
                   )}
+                </td>
+                <td className="px-2 py-1 text-right">
+                  <CampoMoeda rotulo={`Serviços ${c}`} valor={data.servicos?.[c]} onChange={(v) => mensal("servicos", c, v)} />
                 </td>
                 <td className="px-2 py-1 text-right">
                   <CampoMoeda rotulo={`Compras ${c}`} valor={data.compras[c]} onChange={(v) => mensal("compras", c, v)} />

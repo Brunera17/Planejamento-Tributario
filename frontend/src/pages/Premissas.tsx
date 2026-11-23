@@ -15,8 +15,9 @@ type Coleta = {
   composicao_auto: { linhas: { aliquota: number; percentual: number }[]; fonte: string } | null;
   indicio_st: string | null;
   compras: Record<string, number>;
+  servicos?: Record<string, number>;
 };
-type Parametro = { chave: string; valor: number };
+type Parametro ={ chave: string; valor: number };
 type Marca = "notas" | "pgdas" | "lei" | "pendente" | null;
 
 const MOEDAS = {
@@ -145,6 +146,9 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
     fap: valor("fap") != null ? Number(valor("fap")).toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : "",
     terceiros: valor("terceiros") != null ? editarMoeda(Number(valor("terceiros")) * 100) : "",
     refeicao: valor("aliq_icms_refeicao") != null ? editarMoeda(Number(valor("aliq_icms_refeicao")) * 100) : "",
+    anexoServico: (valor("anexo_servico") as string | undefined) ?? "",
+    iss: valor("aliq_iss") != null ? editarMoeda(Number(valor("aliq_iss")) * 100) : "",
+    presuncaoServico: valor("presuncao_servico") != null ? String(Math.round(Number(valor("presuncao_servico")) * 100)) : "",
     comp: Object.fromEntries(
       origens.map((l) => {
         const o = compBase.find((x) => Math.abs(Number(x.aliquota) - l.aliquota) < 0.0001);
@@ -178,6 +182,7 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
   const folhaInformada = Boolean(f.rat || f.fap || f.terceiros);
   const encargos = 20 + (f.rat ? Number(f.rat) : 2) * (lerMoeda(f.fap) ?? 1) + (lerMoeda(f.terceiros) ?? 5.8);
   const comprasTotal = Object.values(coleta.compras).reduce((s, v) => s + Number(v), 0);
+  const servicoInformado = Object.values(coleta.servicos ?? {}).some((v) => Number(v) > 0);
   const creditoSt = st?.taxa != null && lerMoeda(f.estoqueSt) != null ? lerMoeda(f.estoqueSt)! * st.taxa : null;
 
   // o RBT12 automático vem do extrato do PGDAS-D enviado em Documentos; o Tema 69, da decisão do STF; o resto, das notas
@@ -205,6 +210,10 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
         corpo.terceiros = terceiros == null ? null : terceiros / 100;
         const refeicao = lerMoeda(f.refeicao);
         corpo.aliq_icms_refeicao = refeicao == null ? null : refeicao / 100;
+        corpo.anexo_servico = f.anexoServico || null;
+        const iss = lerMoeda(f.iss);
+        corpo.aliq_iss = iss == null ? null : iss / 100;
+        corpo.presuncao_servico = f.presuncaoServico ? Number(f.presuncaoServico) / 100 : null;
         // valor igual ao das notas, sem nada informado antes: continua seguindo as notas
         for (const k of Object.keys(corpo)) if (!informado(k) && auto[k] && mesmo(corpo[k], auto[k].valor)) corpo[k] = null;
         await api.put(`/planejamentos/${pid}/premissas`, corpo);
@@ -363,6 +372,46 @@ function FormPremissas({ pid, coleta, interna, st }: { pid: number; coleta: Cole
                   onChange={(e) => mudar({ refeicao: soNumero(e.target.value) })}
                 />
                 <span className="text-text-muted">%</span>
+              </div>
+            </Caixa>
+          </Bloco>
+          <Bloco titulo="Prestação de serviços">
+            <Caixa
+              rotulo="Anexo, ISS e presunção do serviço"
+              marca={servicoInformado && !f.iss ? "pendente" : null}
+              ajuda="Valem para a receita de serviços lançada no movimento mensal. Anexo do Simples: em branco, o do cadastro da empresa (ou o III). Com “Fator R”, a folha dos 12 meses ÷ RBT12 decide entre III (28% ou mais) e V. ISS: a alíquota do município, usada no Lucro Presumido e no Real e no Simples acima do sublimite; em branco, 5%. Presunção do IRPJ no Lucro Presumido: 32% para serviços em geral (CSLL também 32%); 16% ou 8% para as exceções da Lei 9.249/1995 (CSLL 12%)."
+            >
+              <div className="grid grid-cols-3 gap-1.5">
+                <label className="text-xs text-text-muted">
+                  Anexo do Simples
+                  <select disabled={!contador} className={entrada} value={f.anexoServico} onChange={(e) => mudar({ anexoServico: e.target.value })}>
+                    <option value="">do cadastro</option>
+                    <option value="III">III</option>
+                    <option value="IV">IV</option>
+                    <option value="V">V</option>
+                    <option value="R">Fator R (III ou V)</option>
+                  </select>
+                </label>
+                <label className="text-xs text-text-muted">
+                  ISS %
+                  <input
+                    aria-label="Alíquota do ISS do município (%)"
+                    inputMode="decimal"
+                    disabled={!contador}
+                    className={entrada}
+                    placeholder="5,00"
+                    value={f.iss}
+                    onChange={(e) => mudar({ iss: soNumero(e.target.value) })}
+                  />
+                </label>
+                <label className="text-xs text-text-muted">
+                  Presunção (LP)
+                  <select disabled={!contador} className={entrada} value={f.presuncaoServico} onChange={(e) => mudar({ presuncaoServico: e.target.value })}>
+                    <option value="">32% (geral)</option>
+                    <option value="16">16%</option>
+                    <option value="8">8%</option>
+                  </select>
+                </label>
               </div>
             </Caixa>
           </Bloco>

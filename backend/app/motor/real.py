@@ -7,6 +7,7 @@ from decimal import Decimal
 from .base import BaseCompetencia, ItemCalculado
 from .icms import ResultadoIcms
 from .presumido import base_pis_cofins, encargos_folha, inss_patronal, irpj_devido
+from .simples import aliq_iss
 from .tipos import ZERO, EntradaSimulacao, Memoria, Parametros, Regime, ResultadoRegime, TributoValor
 
 
@@ -55,7 +56,7 @@ def calcular_pis_cofins_nc(
         apurado = debito[c] - credito[c] - saldo
         recolher[c] = max(ZERO, apurado)
         saldo = max(ZERO, -apurado)
-        memoria.registrar("Lucro Real", "Débitos de PIS + COFINS", "base CST 01 × 9,25%", debito[c], c)
+        memoria.registrar("Lucro Real", "Débitos de PIS + COFINS", "(base CST 01 + serviços) × 9,25%", debito[c], c)
         memoria.registrar("Lucro Real", "Créditos de PIS + COFINS",
                           "(compras × participação não monofásica + fretes/armazenagem) × 9,25%", credito[c], c,
                           "Lei 10.833/2003, art. 3º, I e IX")
@@ -97,7 +98,9 @@ def calcular_real(
          for c in entrada.competencias),
         ZERO,
     )
-    lair = receita - icms.total_a_recolher - pc.total_a_recolher - cmv - despesas - pessoal
+    servico = sum((b.receita_servico for b in bases.values()), ZERO)
+    iss = servico * aliq_iss(entrada)
+    lair = receita - icms.total_a_recolher - pc.total_a_recolher - iss - cmv - despesas - pessoal
     ajustado = lair + pr.adicoes_lr - pr.exclusoes_lr
     compensacao = ZERO
     if ajustado > 0 and pr.prejuizo_fiscal_compensar > 0:
@@ -106,9 +109,11 @@ def calcular_real(
     irpj, adicional, csll = irpj_csll_lucro_real(lucro_real, n, p)
 
     S = "Lucro Real"
-    memoria.registrar(S, "Receita líquida de vendas", "faturamento − devoluções", receita)
+    memoria.registrar(S, "Receita líquida", "faturamento − devoluções + serviços", receita)
     memoria.registrar(S, "(−) ICMS a recolher", "seção ICMS", icms.total_a_recolher)
     memoria.registrar(S, "(−) PIS/COFINS a recolher", "débitos − créditos", pc.total_a_recolher)
+    if iss:
+        memoria.registrar(S, "(−) ISS", "receita de serviços × ISS do município", iss, fundamento="LC 116/2003")
     memoria.registrar(S, "(−) CMV", formula_cmv, cmv)
     memoria.registrar(S, "(−) Despesas operacionais dedutíveis", "Σ despesas marcadas como dedutíveis", despesas,
                       fundamento="RIR/2018, art. 311")
@@ -129,10 +134,13 @@ def calcular_real(
         TributoValor("IRPJ", irpj + adicional),
         TributoValor("CSLL", csll),
         TributoValor("INSS patronal", inss),
+        *([TributoValor("ISS", iss)] if iss else []),
     ]
     for c in entrada.competencias:
         tributos.append(TributoValor("ICMS", icms.a_recolher[c], c))
         tributos.append(TributoValor("PIS/COFINS", pc.a_recolher[c], c))
+        if iss:
+            tributos.append(TributoValor("ISS", entrada.servicos.get(c, ZERO) * aliq_iss(entrada), c))
     detalhes = {
         "pis_cofins_debito": pc.total_debito,
         "pis_cofins_credito": pc.total_credito,
@@ -145,5 +153,6 @@ def calcular_real(
         "irpj_normal": irpj,
         "irpj_adicional": adicional,
         "margem_lair": ZERO if receita == 0 else lair / receita,
+        **({"iss": iss} if iss else {}),
     }
-    return ResultadoRegime(Regime.LUCRO_REAL, icms.total_a_recolher, federal, tributos, detalhes), pc
+    return ResultadoRegime(Regime.LUCRO_REAL, icms.total_a_recolher, federal, tributos, detalhes, municipal=iss), pc

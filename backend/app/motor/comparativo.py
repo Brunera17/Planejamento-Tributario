@@ -6,7 +6,7 @@ from decimal import Decimal
 from .base import BaseCompetencia, ItemCalculado
 from .icms import ResultadoIcms
 from .real import irpj_csll_lucro_real
-from .simples import aliquota_efetiva
+from .simples import aliq_iss, aliquota_efetiva, anexo_do_servico, cpp_fora_do_das
 from .tipos import (
     ZERO,
     EntradaSimulacao,
@@ -39,6 +39,7 @@ def montar_comparativo(
             regime=r.regime,
             estadual=r.estadual,
             federal=r.federal,
+            municipal=r.municipal,
             total=r.total,
             aliquota_efetiva=ZERO if receita == 0 else r.total / receita,
             diferenca_melhor=r.total - menor,
@@ -102,9 +103,14 @@ def simular_crescimento(
     receita = sum((b.receita_liquida for b in bases.values()), ZERO)
     if receita == 0:
         return []
-    mono = sum((b.receita_monofasica for b in bases.values()), ZERO) / receita
-    st = sum((i.receita_liquida for i in itens if i.st_interna), ZERO) / receita
+    mercadoria = sum((b.receita_mercadoria for b in bases.values()), ZERO)
+    servico = receita - mercadoria
+    # monofásico e ST como parte das vendas de mercadoria; o serviço entra no seu anexo
+    mono = sum((b.receita_monofasica for b in bases.values()), ZERO) / mercadoria if mercadoria else ZERO
+    st = sum((i.receita_liquida for i in itens if i.st_interna), ZERO) / mercadoria if mercadoria else ZERO
     icms_normal = (icms.total_a_recolher - icms.total_difal) / receita  # o Simples acima do sublimite não recolhe DIFAL
+    anexo_s = anexo_do_servico(entrada, rbt12_atual)[0] if servico else None
+    cpp_fora = cpp_fora_do_das(entrada, servico / receita) / receita if anexo_s == "IV" else ZERO
     aliq_lp = presumido.total / receita
     aliq_lr = real.total / receita
     if valores is None:
@@ -119,11 +125,13 @@ def simular_crescimento(
             aliq_sn, obs = None, "Acima do teto: Simples inelegível"
         else:
             parcela = f.p_irpj + f.p_csll + f.p_cpp + f.p_ipi + f.p_icms * (1 - st) + (f.p_pis + f.p_cofins) * (1 - mono)
-            aliq_sn = a.efetiva * parcela
+            aliq_sn = a.efetiva * parcela * mercadoria / receita
+            if anexo_s:
+                aliq_sn += aliquota_efetiva(rbt12, entrada.faixas_servico[anexo_s]).efetiva * servico / receita + cpp_fora
             obs = f"Faixa {f.faixa}"
             if rbt12 > p.sublimite_simples:
-                aliq_sn += icms_normal
-                obs += " – ICMS fora do DAS (regime normal)"
+                aliq_sn += icms_normal + (aliq_iss(entrada) * servico / receita if anexo_s else ZERO)
+                obs += " – ICMS e ISS fora do DAS (regime normal)" if anexo_s else " – ICMS fora do DAS (regime normal)"
             if rbt12 == rbt12_atual:
                 obs = "Situação atual – " + obs
         cargas = {Regime.LUCRO_PRESUMIDO: aliq_lp, Regime.LUCRO_REAL: aliq_lr}

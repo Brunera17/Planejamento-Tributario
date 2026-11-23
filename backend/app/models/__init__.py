@@ -6,6 +6,7 @@ from .coleta import (
     CompraMensal,
     CompraOrigem,
     DevolucaoMensal,
+    ReceitaServicoMensal,
     Documento,
     FolhaMensal,
     GrupoDespesa,
@@ -24,7 +25,7 @@ from .tabelas import (AliquotaUf, CfopRegra, MarcaImplantacao, NcmRegra, Norma, 
                       SimplesFaixa)
 
 __all__ = [
-    "AliquotaUf", "AuditoriaCheckpoint", "EventoAuditoria", "Bem", "CfopRegra", "CompraMensal", "CompraOrigem", "DevolucaoMensal", "Documento", "Empresa", "FolhaMensal",
+    "AliquotaUf", "AuditoriaCheckpoint", "EventoAuditoria", "Bem", "CfopRegra", "CompraMensal", "CompraOrigem", "DevolucaoMensal", "ReceitaServicoMensal", "Documento", "Empresa", "FolhaMensal",
     "GrupoDespesa", "HistoricoStatus", "ImportacaoEmpresa", "ImportacaoNfe", "ItemDespesa", "Levantamento",
     "LevantamentoGrupo", "LevantamentoItem", "MarcaImplantacao", "MemoriaCalculo", "NcmRegra", "NotaFiscal", "NotaItem",
     "OportunidadeRegistro", "OutraDespesa", "ParametroTributario", "PesoProgresso", "Planejamento",

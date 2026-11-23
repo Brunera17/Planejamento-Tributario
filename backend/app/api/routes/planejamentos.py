@@ -28,6 +28,7 @@ from app.models import (
     OutraDespesa,
     Planejamento,
     PremissaPlanejamento,
+    ReceitaServicoMensal,
     RevisaoProduto,
     Usuario,
 )
@@ -45,7 +46,7 @@ from app.services import despesas_referencia, estoque_st, nfe_canceladas, planil
 from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
-from app.services.entrada import PREMISSAS
+from app.services.entrada import ANEXOS_SERVICO, PREMISSAS
 from app.services.auditoria import auditar, auditar_uma_vez
 from app.services.nfe_xml import ler_arquivos
 from app.services.simulacao import marcar_desatualizada
@@ -204,6 +205,7 @@ def ver_coleta(pid: int, db: DB, _: UsuarioAtual):
         "competencias": p.competencias(),
         "compras": mensal(CompraMensal),
         "devolucoes": mensal(DevolucaoMensal),
+        "servicos": mensal(ReceitaServicoMensal),
         "folha": {f.competencia: {"folha": f.folha, "pro_labore": f.pro_labore}
                   for f in db.scalars(select(FolhaMensal).where(FolhaMensal.planejamento_id == pid))},
         "composicao_compras": [{"origem": o.origem, "aliquota": o.aliquota, "percentual": o.percentual}
@@ -236,6 +238,14 @@ def gravar_compras(pid: int, valores: list[ValorCompetencia], db: DB, _: Usuario
 def gravar_devolucoes(pid: int, valores: list[ValorCompetencia], db: DB, _: UsuarioAtual):
     p = obter_planejamento(db, pid, alterar=True)
     _gravar_mensal(db, p, DevolucaoMensal, valores)
+    _alterou(db, p)
+
+
+@router.put("/{pid}/servicos", status_code=204)
+def gravar_servicos(pid: int, valores: list[ValorCompetencia], db: DB, _: UsuarioAtual):
+    """Receita de prestação de serviços por mês (NFS-e), separada das vendas de mercadoria das NF-e."""
+    p = obter_planejamento(db, pid, alterar=True)
+    _gravar_mensal(db, p, ReceitaServicoMensal, valores)
     _alterou(db, p)
 
 
@@ -325,6 +335,10 @@ def _validar_premissa(chave: str, valor) -> str:
         if not isinstance(valor, bool):
             raise ErroNegocio("Valor inválido", campos={chave: "use verdadeiro ou falso"})
         return json.dumps(valor)
+    if chave == "anexo_servico":
+        if valor not in ANEXOS_SERVICO:
+            raise ErroNegocio("Valor inválido", campos={chave: "use III, IV, V ou R (Fator R)"})
+        return json.dumps(valor)
     try:
         numero = Decimal(str(valor))
     except InvalidOperation as e:
@@ -339,6 +353,10 @@ def _validar_premissa(chave: str, valor) -> str:
         raise ErroNegocio("Valor inválido", campos={chave: "o RAT é 1%, 2% ou 3%"})
     if chave == "fap" and not Decimal("0.5") <= numero <= Decimal("2"):
         raise ErroNegocio("Valor inválido", campos={chave: "o FAP vai de 0,5000 a 2,0000"})
+    if chave == "aliq_iss" and numero > Decimal("0.05"):
+        raise ErroNegocio("Valor inválido", campos={chave: "o ISS vai até 5% (LC 116/2003, art. 8º)"})
+    if chave == "presuncao_servico" and numero > Decimal("0.32"):
+        raise ErroNegocio("Valor inválido", campos={chave: "a presunção de serviço vai até 32% (Lei 9.249/1995, art. 15)"})
     if chave == "terceiros" and numero > Decimal("0.1"):
         raise ErroNegocio("Valor inválido", campos={chave: "terceiros acima de 10%: confira o FPAS"})
     return json.dumps(str(numero))

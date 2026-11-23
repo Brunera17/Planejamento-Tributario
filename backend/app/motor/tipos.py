@@ -123,6 +123,9 @@ class Parametros:
     inss_pro_labore: Decimal = Decimal("0.20")
     aliq_icms_interna: Decimal = Decimal("0.18")
     aliq_icms_interestadual: Decimal = Decimal("0.12")
+    presuncao_servico: Decimal = Decimal("0.32")  # Lei 9.249/1995, art. 15, § 1º, III, e art. 20
+    aliq_iss_padrao: Decimal = Decimal("0.05")  # sem a alíquota do município: o teto da LC 116/2003, art. 8º
+    fgts: Decimal = Decimal("0.08")  # entra na folha do Fator R (LC 123/2006, art. 18, § 24)
 
 
 @dataclass(frozen=True)
@@ -152,6 +155,10 @@ class Premissas:
     rat: Decimal | None = None  # 1%, 2% ou 3% pelo risco da atividade preponderante
     fap: Decimal | None = None  # Fator Acidentário de Prevenção: 0,5 a 2,0
     terceiros: Decimal | None = None  # outras entidades pelo FPAS (5,8% no comércio em geral)
+    # empresa com serviço: anexo do Simples (III, IV, V ou R = pelo Fator R), ISS do município e presunção do IRPJ no LP
+    anexo_servico: str | None = None
+    aliq_iss: Decimal | None = None
+    presuncao_servico: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -203,6 +210,10 @@ class EntradaSimulacao:
     composicao_informada: bool = False  # False = origem das compras assumida (100% internas)
     estoque_st: CreditoEstoqueSt | None = None
     anexo_simples: str = "I"  # anexo das faixas_simples (LC 123/2006)
+    # receita de prestação de serviços por competência (NFS-e), fora dos itens de mercadoria
+    servicos: dict[str, Decimal] = field(default_factory=dict)
+    anexo_servico: str = "III"  # III, IV, V ou R (o Fator R decide entre III e V)
+    faixas_servico: dict[str, list[FaixaSimples]] = field(default_factory=dict)  # Anexos III, IV e V
 
 
 # ------------------------------------------------------------------ saídas
@@ -250,10 +261,11 @@ class ResultadoRegime:
     tributos: list[TributoValor]
     detalhes: dict[str, Decimal] = field(default_factory=dict)
     elegivel: bool = True
+    municipal: Decimal = ZERO  # ISS
 
     @property
     def total(self) -> Decimal:
-        return self.estadual + self.federal
+        return self.estadual + self.federal + self.municipal
 
 
 @dataclass
@@ -265,6 +277,7 @@ class LinhaComparativo:
     aliquota_efetiva: Decimal
     diferenca_melhor: Decimal
     posicao: int
+    municipal: Decimal = ZERO
 
 
 @dataclass
