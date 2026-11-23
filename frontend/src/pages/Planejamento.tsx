@@ -208,7 +208,7 @@ function Coleta({ pid }: { pid: number }) {
                   )}
                 </td>
                 <td className="px-2 py-1 text-right">
-                  <CampoMoeda rotulo={`Serviços ${c}`} valor={data.servicos?.[c]} onChange={(v) => mensal("servicos", c, v)} />
+                  <CampoMoeda rotulo={`Serviços ${c}`} valor={data.servicos?.[c]} onChange={(v) => mensal("servicos", c, v ?? 0)} />
                 </td>
                 <td className="px-2 py-1 text-right">
                   <CampoMoeda rotulo={`Compras ${c}`} valor={data.compras[c]} onChange={(v) => mensal("compras", c, v)} />

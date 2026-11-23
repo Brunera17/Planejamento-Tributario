@@ -257,6 +257,9 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
             pendencias.append(f"Empresa no Anexo {anexo} (serviços) sem receita de serviço informada: lance a receita de "
                               "serviços por mês na coleta")
         anexo = "I"  # mercadoria, se houver, vai para o Anexo I
+    if servicos and anexo_servico == "R" and len(comps) < 12:
+        pendencias.append(f"Fator R estimado: a folha dos {len(comps)} meses do planejamento foi anualizada; com folha bem "
+                          "diferente nos meses anteriores, confira o anexo no PGDAS-D")
     if servicos and premissas.aliq_iss is None:
         pendencias.append("Alíquota de ISS do município não informada nas premissas: o cálculo usou 5% no LP e no LR")
     todas_faixas = faixas_vigentes(db, referencia)

@@ -43,7 +43,8 @@ def avaliar_oportunidades(
     ops: list[Oportunidade] = []
 
     if no_simples:
-        cpp = next(t.valor for t in simples.tributos if t.tributo == "CPP")
+        # no Anexo IV, parte da CPP é paga fora do DAS (tributo "INSS patronal" do Simples)
+        cpp = sum((t.valor for t in simples.tributos if t.tributo in ("CPP", "INSS patronal") and t.competencia is None), ZERO)
         ops.append(Oportunidade(
             "CPP_DAS", "CPP (INSS patronal) embutida no DAS", cpp - inss_patronal(entrada), "ALTA",
             f"No Anexo {entrada.anexo_simples}, {_pct(f.p_cpp, 0)} do DAS é CPP, paga sobre o faturamento, haja ou não empregados. "

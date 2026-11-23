@@ -88,7 +88,7 @@ COR = {
     "aviso_texto": colors.HexColor("#744210"),
 }
 GRUPOS = [
-    ("ICMS", ("ICMS", "IPI"), colors.HexColor("#155E75")),  # IPI só no DAS da indústria (Anexo II)
+    ("ICMS", ("ICMS", "IPI", "ISS"), colors.HexColor("#155E75")),  # IPI só no DAS da indústria; ISS do serviço
     ("PIS e COFINS", ("PIS", "COFINS", "PIS/COFINS"), colors.HexColor("#4F8FA4")),
     ("IRPJ e CSLL", ("IRPJ", "CSLL"), colors.HexColor("#9EC5D3")),
     ("CPP e INSS", ("CPP", "INSS patronal"), colors.HexColor("#52606D")),
@@ -216,12 +216,24 @@ def enquadramento_simples(simples: dict, receita: float | None = None) -> str:
     d = simples["detalhes"]
     anexo = {1: "Anexo I (comércio)", 2: "Anexo II (indústria)"}.get(int(d.get("anexo", 1)), f"Anexo {int(d['anexo'])}")
     # o monofásico e a ST saem do DAS: a carga sobre a receita fica abaixo da alíquota da tabela
-    menor = bool(receita) and float(simples["estadual"]) + float(simples["federal"]) < float(receita) * float(d["aliquota_efetiva_das"]) - 0.01
+    carga = float(simples["estadual"]) + float(simples["federal"]) + float(simples.get("municipal", 0))
+    sem_segregacao = float(d["das_sem_segregacao"]) if "das_sem_segregacao" in d else float(receita or 0) * float(d["aliquota_efetiva_das"])
+    menor = bool(receita) and carga < sem_segregacao - 0.01
     segregacao = "; a carga fica menor porque o monofásico e a ST saem do DAS" if menor and not d.get("acima_sublimite") else ""
     rbt12 = f"RBT12 de {brl(d['rbt12'])}" + (", estimado pela média do período" if d.get("rbt12_estimado") else "")
     if not simples.get("elegivel", True):
         return f"No Simples: acima do teto de R$ 4,8 milhões ({rbt12}), a empresa não pode optar."
-    sublimite = "; acima do sublimite, o ICMS é pago fora do DAS" if d.get("acima_sublimite") else ""
+    servico = d.get("receita_servico")
+    sublimite = (f"; acima do sublimite, o ICMS{' e o ISS são pagos' if servico else ' é pago'} fora do DAS"
+                 if d.get("acima_sublimite") else "")
+    if servico:
+        romano = {3: "III", 4: "IV", 5: "V"}.get(int(d["anexo_servico"]), str(int(d["anexo_servico"])))
+        fr = f" (Fator R de {pct(d['fator_r'])})" if d.get("fator_r") is not None else ""
+        if receita and float(servico) >= float(receita) - 0.01:  # só serviço
+            return (f"No Simples: Anexo {romano}{fr}, {int(d['faixa_servico'])}ª faixa ({rbt12}), alíquota efetiva de "
+                    f"{pct(d['aliquota_efetiva_servico'])} no DAS{sublimite}.")
+        segregacao = (f"; os serviços vão para o Anexo {romano}{fr}, {int(d['faixa_servico'])}ª faixa, efetiva de "
+                      f"{pct(d['aliquota_efetiva_servico'])}") + segregacao
     return (f"No Simples: {anexo}, {int(d['faixa'])}ª faixa ({rbt12}), alíquota efetiva de "
             f"{pct(d['aliquota_efetiva_das'])} no DAS{sublimite}{segregacao}.")
 
@@ -423,7 +435,9 @@ class BarrasComposicao(Flowable):
         # legenda
         x = 0
         c.setFont(FONTE, 7.5)
+        tem_iss = any(t["tributo"] == "ISS" and t["valor"] for reg in detalhe.values() for t in reg["tributos"])
         for nome, _, cor in GRUPOS:
+            nome = "ICMS e ISS" if nome == "ICMS" and tem_iss else nome
             c.setFillColor(cor)
             c.rect(x, 1.2 * mm, 2.4 * mm, 2.4 * mm, stroke=0, fill=1)
             c.setFillColor(COR["apoio"])

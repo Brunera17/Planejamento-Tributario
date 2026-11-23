@@ -38,7 +38,7 @@ CLARO = RGBColor(0xD4, 0xD4, 0xD8)  # texto de apoio sobre o fundo escuro
 APAGADO = RGBColor(0xA1, 0xA1, 0xAA)  # rótulos sobre o fundo escuro
 
 GRUPOS = [  # grupo de tributo, tributos do resultado, cor
-    ("ICMS", ("ICMS", "IPI"), RGBColor(0x27, 0x27, 0x2A)),  # IPI só no DAS da indústria (Anexo II)
+    ("ICMS", ("ICMS", "IPI", "ISS"), RGBColor(0x27, 0x27, 0x2A)),  # IPI só no DAS da indústria; ISS do serviço
     ("PIS e COFINS", ("PIS", "COFINS", "PIS/COFINS"), RGBColor(0x71, 0x71, 0x7A)),
     ("IRPJ e CSLL", ("IRPJ", "CSLL"), RGBColor(0xA1, 0xA1, 0xAA)),
     ("INSS patronal", ("CPP", "INSS patronal"), RGBColor(0xD4, 0xD4, 0xD8)),

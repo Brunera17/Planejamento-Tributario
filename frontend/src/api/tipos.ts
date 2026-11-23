@@ -54,6 +54,7 @@ export type ResultadoRegime = {
   regime: string;
   estadual: number;
   federal: number;
+  municipal?: number; // ISS
   total: number;
   tributos: Tributo[];
   detalhes: Record<string, number>;
@@ -69,6 +70,7 @@ export type Resultado = {
     regime: string;
     estadual: number;
     federal: number;
+    municipal?: number;
     total: number;
     aliquota_efetiva: number;
     diferenca_melhor: number;

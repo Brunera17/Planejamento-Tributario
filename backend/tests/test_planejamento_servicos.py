@@ -156,13 +156,59 @@ def test_rota_empresa_de_servico_do_lancamento_ao_resultado(cliente, contador):
     ({"anexo_servico": "VI"}, "anexo_servico"),
     ({"aliq_iss": 0.06}, "aliq_iss"),
     ({"presuncao_servico": 0.4}, "presuncao_servico"),
+    ({"presuncao_servico": 0.2}, "presuncao_servico"),  # só 8%, 16% ou 32%
 ])
 def test_rota_recusa_premissa_de_servico_invalida(cliente, contador, corpo, campo):
-    emp = cliente.get("/api/empresas", headers=contador, params={"busca": CNPJ}).json()
-    pid = cliente.get("/api/planejamentos", headers=contador).json()
-    pid = next(p["id"] for p in pid if p["empresa_id"] == emp[0]["id"])
-    r = cliente.put(f"/api/planejamentos/{pid}/premissas", headers=contador, json=corpo)
+    r = cliente.put(f"/api/planejamentos/{_pid_servico(cliente, contador)}/premissas", headers=contador, json=corpo)
     assert r.status_code == 422 and campo in r.json()["campos"]
+
+
+def _pid_servico(cliente, contador) -> int:
+    emp = cliente.get("/api/empresas", headers=contador, params={"busca": CNPJ}).json()
+    return next(p["id"] for p in cliente.get("/api/planejamentos", headers=contador).json() if p["empresa_id"] == emp[0]["id"])
+
+
+def test_rota_competencia_repetida_no_envio_vale_a_ultima(cliente, contador):
+    pid = _pid_servico(cliente, contador)
+    corpo = [{"competencia": "2026-02", "valor": 1}, {"competencia": "2026-02", "valor": 2}]
+    assert cliente.put(f"/api/planejamentos/{pid}/servicos", headers=contador, json=corpo).status_code == 204
+    servicos = cliente.get(f"/api/planejamentos/{pid}/coleta", headers=contador).json()["servicos"]
+    assert float(servicos["2026-02"]) == 2
+
+
+def test_crescimento_recalcula_o_fator_r_em_cada_faixa():
+    # folha de R$ 20 mil: (21.600 + 3.000) × 12 = 295.200 → 30,75% com RBT12 de 960 mil (Anexo III),
+    # mas só 7,0% com RBT12 de 4,2 milhões: aí o serviço vai para o Anexo V
+    e = replace(entrada(anexo_servico="R"), folha={m: D("20000") for m in COMPS})
+    linhas = {l.rbt12: l for l in engine.crescimento(e, [D("960000"), D("1800000")])}
+    receita = D("240000")
+    efetiva_i = lambda rbt12, f: (rbt12 * f[0] - f[1]) / rbt12  # noqa: E731
+    # 960 mil: Anexo I 4ª faixa e Anexo III 4ª faixa
+    esperado_960 = efetiva_i(D("960000"), (D("0.107"), D("22500"))) * D("150000") / receita \
+        + efetiva_i(D("960000"), (D("0.16"), D("35640"))) * D("90000") / receita
+    assert c(linhas[D("960000")].aliquota_simples * 10000) == c(esperado_960 * 10000)
+    # 1,8 milhão: Fator R = 295.200 ÷ 1.800.000 = 16,4% → Anexo V, 4ª faixa (20,5%; 17.100)
+    esperado_18 = efetiva_i(D("1800000"), (D("0.107"), D("22500"))) * D("150000") / receita \
+        + efetiva_i(D("1800000"), (D("0.205"), D("17100"))) * D("90000") / receita
+    assert c(linhas[D("1800000")].aliquota_simples * 10000) == c(esperado_18 * 10000)
+
+
+def test_oportunidade_de_cpp_inclui_a_cpp_fora_do_das_no_anexo_iv():
+    s = engine.simular(entrada(anexo_servico="IV"))
+    cpp_das = tributo(s.simples, "CPP")
+    op = next(o for o in s.oportunidades if o.codigo == "CPP_DAS")
+    inss_lp = tributo(s.presumido, "INSS patronal")
+    assert c(op.impacto) == c(cpp_das + D("3150") - inss_lp)  # 3.150 = CPP do Anexo IV paga fora do DAS
+
+
+def test_relatorios_mostram_o_servico_e_o_iss():
+    from app.services.relatorio_pdf import enquadramento_simples
+    from app.services.serializacao import para_json
+    s = para_json(engine.simular(entrada()))
+    texto = enquadramento_simples(s["simples"], 240000)
+    assert "os serviços vão para o Anexo III" in texto and "12,29%" in texto
+    so = para_json(engine.simular(replace(entrada(), itens=[], compras={})))
+    assert enquadramento_simples(so["simples"], 90000).startswith("No Simples: Anexo III, 4ª faixa")
 
 
 def test_so_servico_sem_nota_de_mercadoria():

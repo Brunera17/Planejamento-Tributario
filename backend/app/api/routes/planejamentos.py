@@ -218,6 +218,8 @@ def ver_coleta(pid: int, db: DB, _: UsuarioAtual):
 
 
 def _gravar_mensal(db: Session, p: Planejamento, modelo, valores: list[ValorCompetencia]) -> None:
+    # a mesma competência duas vezes no envio vale a última (sem duas linhas novas para a mesma chave única)
+    valores = list({v.competencia: v for v in valores}.values())
     for v in valores:
         _competencia_valida(p, v.competencia)
         m = db.scalar(select(modelo).where(modelo.planejamento_id == p.id, modelo.competencia == v.competencia))
@@ -355,8 +357,8 @@ def _validar_premissa(chave: str, valor) -> str:
         raise ErroNegocio("Valor inválido", campos={chave: "o FAP vai de 0,5000 a 2,0000"})
     if chave == "aliq_iss" and numero > Decimal("0.05"):
         raise ErroNegocio("Valor inválido", campos={chave: "o ISS vai até 5% (LC 116/2003, art. 8º)"})
-    if chave == "presuncao_servico" and numero > Decimal("0.32"):
-        raise ErroNegocio("Valor inválido", campos={chave: "a presunção de serviço vai até 32% (Lei 9.249/1995, art. 15)"})
+    if chave == "presuncao_servico" and numero not in (Decimal("0.08"), Decimal("0.16"), Decimal("0.32")):
+        raise ErroNegocio("Valor inválido", campos={chave: "a presunção de serviço é 8%, 16% ou 32% (Lei 9.249/1995, art. 15)"})
     if chave == "terceiros" and numero > Decimal("0.1"):
         raise ErroNegocio("Valor inválido", campos={chave: "terceiros acima de 10%: confira o FPAS"})
     return json.dumps(str(numero))

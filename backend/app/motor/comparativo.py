@@ -109,8 +109,7 @@ def simular_crescimento(
     mono = sum((b.receita_monofasica for b in bases.values()), ZERO) / mercadoria if mercadoria else ZERO
     st = sum((i.receita_liquida for i in itens if i.st_interna), ZERO) / mercadoria if mercadoria else ZERO
     icms_normal = (icms.total_a_recolher - icms.total_difal) / receita  # o Simples acima do sublimite não recolhe DIFAL
-    anexo_s = anexo_do_servico(entrada, rbt12_atual)[0] if servico else None
-    cpp_fora = cpp_fora_do_das(entrada, servico / receita) / receita if anexo_s == "IV" else ZERO
+    cpp_fora_iv = cpp_fora_do_das(entrada, servico / receita) / receita if servico else ZERO
     aliq_lp = presumido.total / receita
     aliq_lr = real.total / receita
     if valores is None:
@@ -126,6 +125,9 @@ def simular_crescimento(
         else:
             parcela = f.p_irpj + f.p_csll + f.p_cpp + f.p_ipi + f.p_icms * (1 - st) + (f.p_pis + f.p_cofins) * (1 - mono)
             aliq_sn = a.efetiva * parcela * mercadoria / receita
+            # com Fator R, a mesma folha sobre outra RBT12 pode trocar o anexo do serviço
+            anexo_s = anexo_do_servico(entrada, rbt12)[0] if servico else None
+            cpp_fora = cpp_fora_iv if anexo_s == "IV" else ZERO
             if anexo_s:
                 aliq_sn += aliquota_efetiva(rbt12, entrada.faixas_servico[anexo_s]).efetiva * servico / receita + cpp_fora
             obs = f"Faixa {f.faixa}"
