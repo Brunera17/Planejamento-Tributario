@@ -124,7 +124,11 @@ export function FormEmpresa({ empresa, fechar }: { empresa: Empresa | null; fech
         </label>
         <div className="space-y-2 md:col-span-6">
           {(f.atividade === "SERVICO" || ["III", "IV", "V"].includes(f.anexo_simples)) && (
-            <p className="text-warning-ink">O sistema ainda não calcula serviços (Anexos III a V do Simples, ISS e NFS-e): o Simples sairia pelo Anexo I.</p>
+            <p className="text-text-muted">
+              Serviços: lance a receita de serviços (NFS-e) por mês no movimento mensal do planejamento e informe o ISS do município nas premissas. O
+              serviço vai para o anexo deste cadastro{f.atividade !== "SERVICO" ? "; as vendas de mercadoria das NF-e continuam no Anexo I ou II" : ""}. A
+              importação de XML de NFS-e ainda não existe: o valor é digitado.
+            </p>
           )}
           {f.atividade === "INDUSTRIA" && <p className="text-warning-ink">Na indústria, o IPI entra no DAS (Anexo II), mas ainda não no Lucro Presumido e no Lucro Real.</p>}
           {muda && <p className="text-warning-ink">Mudar o regime, a UF ou o anexo deixa as simulações desta empresa desatualizadas.</p>}
