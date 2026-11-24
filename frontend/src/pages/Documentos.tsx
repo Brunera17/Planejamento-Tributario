@@ -302,9 +302,19 @@ type Sugestao = {
   competencia?: string | null;
   motivo?: string;
   competencias_no_arquivo?: string[];
+  cobre_tipos?: number[];
   erro?: string;
 };
-type ItemLote = { file: File; tipo: number | null; competencia: string | null; motivo: string; meses: string[]; erro?: string };
+type ItemLote = {
+  file: File;
+  tipo: number | null;
+  competencia: string | null;
+  motivo: string;
+  meses: string[];
+  erro?: string;
+  cobre: number[]; // planilha de despesas: documentos que o cliente responde nela
+  marcarCobertos: boolean;
+};
 
 /** Vários arquivos de uma vez: o servidor sugere tipo e mês de cada um, a pessoa confere e envia pela rota de sempre. */
 function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
@@ -325,7 +335,8 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
       return files.map((file, i): ItemLote => {
         const s = r[i];
         const comp = s.competencia && abertos.includes(s.competencia) ? s.competencia : null;
-        return { file, tipo: s.tipo_documento_id ?? null, competencia: comp, motivo: s.motivo ?? "", meses: s.competencias_no_arquivo ?? [], erro: s.erro };
+        const cobre = s.cobre_tipos ?? [];
+        return { file, tipo: s.tipo_documento_id ?? null, competencia: comp, motivo: s.motivo ?? "", meses: s.competencias_no_arquivo ?? [], erro: s.erro, cobre, marcarCobertos: cobre.length > 0 };
       });
     },
     onSuccess: (novos) => setItens((atuais) => [...atuais, ...novos]),
@@ -337,6 +348,29 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
   itens.forEach((i) => i.tipo && i.competencia && contagem.set(destino(i), (contagem.get(destino(i)) ?? 0) + 1));
   const repetido = (i: ItemLote) => (contagem.get(destino(i)) ?? 0) > 1;
   const prontos = itens.filter((i) => i.motivo && i.tipo && i.competencia && !repetido(i));
+  const vaoReceberArquivo = new Set(prontos.map(destino));
+  /** Pendências que a planilha de despesas resolve: os documentos que ela cobre, nos meses abertos que ela traz,
+   * fora a própria célula do arquivo, o que já foi resolvido e o que outro arquivo do lote vai preencher. */
+  const cobertos = (i: ItemLote) => {
+    const meses = i.meses.filter((m) => abertos.includes(m));
+    return (meses.length ? meses : i.competencia ? [i.competencia] : []).flatMap((competencia) =>
+      i.cobre
+        .filter((tipo) => !(competencia === i.competencia && tipo === i.tipo))
+        .filter((tipo) => !dados.documentos.some((d) => d.competencia === competencia && d.tipo_documento_id === tipo))
+        .filter((tipo) => !vaoReceberArquivo.has(`${competencia}|${tipo}`))
+        .map((tipo) => ({ competencia, tipo })),
+    );
+  };
+  const nomeTipo = (id: number) => dados.tipos.find((t) => t.id === id)?.nome ?? "";
+  const meses = (cs: { competencia: string }[]) => [...new Set(cs.map((c) => c.competencia))].map(competenciaExtenso).join(", ");
+  const textoCobertos = (cob: { competencia: string; tipo: number }[], tipoDoArquivo: number | null) => {
+    const outros = cob.filter((c) => c.tipo !== tipoDoArquivo);
+    const propria = cob.filter((c) => c.tipo === tipoDoArquivo);
+    const partes = [];
+    if (outros.length) partes.push(`${[...new Set(outros.map((c) => c.tipo))].map(nomeTipo).join("; ")} em ${meses(outros)}`);
+    if (propria.length) partes.push(`a própria planilha também em ${meses(propria)}`);
+    return `Marcar como não se aplica, informado na planilha: ${partes.join("; e ")}`;
+  };
 
   const enviar = useMutation({
     mutationFn: async () => {
@@ -346,6 +380,12 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
         fd.append("arquivo", i.file);
         try {
           await api.post(`/planejamentos/${pid}/documentos/${i.competencia}/${i.tipo}`, fd);
+          if (i.marcarCobertos)
+            for (const c of cobertos(i))
+              await api.put(`/planejamentos/${pid}/documentos/${c.competencia}/${c.tipo}/nao-se-aplica`, {
+                justificativa: `Informado na planilha de despesas (${i.file.name})`.slice(0, 500),
+                somente_pendente: true,
+              });
         } catch (e) {
           falhas.set(i.file, mensagemErro(e));
         }
@@ -384,7 +424,8 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
               <tbody>
                 {itens.map((i, idx) => {
                   const ja = i.tipo && i.competencia && dados.documentos.some((d) => d.competencia === i.competencia && d.tipo_documento_id === i.tipo);
-                  const outros = i.meses.filter((m) => m !== i.competencia);
+                  const outros = i.cobre.length ? [] : i.meses.filter((m) => m !== i.competencia);
+                  const cob = i.cobre.length ? cobertos(i) : [];
                   return (
                     <tr key={idx} className="border-b border-surface align-top last:border-0">
                       <td className="max-w-64 py-1.5 pr-3">
@@ -397,6 +438,12 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
                         {repetido(i) && <span className="block text-xs text-alert-ink">Outro arquivo vai para o mesmo documento e mês</span>}
                         {!repetido(i) && ja && <span className="block text-xs text-alert-ink">Substitui o que já foi enviado</span>}
                         {outros.length > 0 && <span className="block text-xs text-alert-ink">Também tem {outros.map(competenciaExtenso).join(", ")}</span>}
+                        {cob.length > 0 && (
+                          <label className="mt-1 flex items-start gap-1.5 text-xs">
+                            <input type="checkbox" className="mt-0.5" checked={i.marcarCobertos} onChange={(e) => mudar(idx, { marcarCobertos: e.target.checked })} />
+                            <span>{textoCobertos(cob, i.tipo)}</span>
+                          </label>
+                        )}
                       </td>
                       <td className="min-w-56 py-1.5 pr-3">
                         <select aria-label={`Documento de ${i.file.name}`} className={campo} disabled={!i.motivo} value={i.tipo ?? ""}

@@ -200,7 +200,8 @@ def classificar_documentos(pid: int, arquivos: list[UploadFile], db: DB, _: Usua
             continue
         s = classificacao_documentos.classificar(nome, conteudo, cnpj, competencias)
         saida.append({"arquivo": nome, "tipo_documento_id": tipos.get(s.tipo), "competencia": s.competencia,
-                      "motivo": s.motivo, "competencias_no_arquivo": s.competencias_no_arquivo})
+                      "motivo": s.motivo, "competencias_no_arquivo": s.competencias_no_arquivo,
+                      "cobre_tipos": [tipos[t] for t in s.cobre if t in tipos]})
     return saida
 
 

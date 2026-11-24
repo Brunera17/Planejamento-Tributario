@@ -106,7 +106,10 @@ def test_rota_classifica_sem_gravar(cliente, contador):
     ok, ruim = r.json()
     tipos = {t["nome"]: t["id"] for t in cliente.get(f"/api/planejamentos/{pid}/documentos", headers=contador).json()["tipos"]}
     assert ok["tipo_documento_id"] == tipos[SAIDAS] and ok["competencia"] == "2026-08"
-    assert "erro" in ruim
+    assert "erro" in ruim and ok["cobre_tipos"] == []
+    desp = cliente.post(f"/api/planejamentos/{pid}/documentos/classificar", headers=contador,
+                        files=[("arquivos", ("despesas.xlsx", _planilha_de_despesas()))]).json()[0]
+    assert desp["tipo_documento_id"] == tipos[FINANCEIRO] and tipos[EXTRATO] in desp["cobre_tipos"]
     assert cliente.get(f"/api/planejamentos/{pid}/documentos", headers=contador).json()["documentos"] == []
 
 
@@ -156,6 +159,29 @@ def test_zip_dentro_de_zip():
     assert (s.tipo, s.competencia) == (SAIDAS, "2026-09") and s.motivo.startswith("3 NF-e emitidas")
 
 
-def test_planilha_de_despesas_e_financeira():
-    xlsx = _planilha(["PLANEJAMENTO TRIBUTÁRIO PARA 2026"], ["DESPESAS COM VENDAS", "__/2026"], ["Fretes"])
-    assert classificar("planilha.xlsx", xlsx, CNPJ, COMPS).tipo == FINANCEIRO
+def _planilha_de_despesas() -> bytes:
+    """Como a do cliente: uma aba por período, a do ano atual não é a primeira, meses como data com horário."""
+    from datetime import datetime
+
+    wb = Workbook()
+    wb.active.title = "01_2023"
+    wb.active.append(["DESPESAS PLANEJAMENTO TRIBUTÁRIO PARA 2023"])
+    aba = wb.create_sheet("2026")
+    aba.append(["DESPESAS PLANEJAMENTO TRIBUTÁRIO PARA 2026"])
+    aba.append(["DESPESAS COM VENDAS", datetime(2026, 7, 1), datetime(2026, 8, 1), datetime(2026, 9, 1)])
+    aba.append(["Despesas Bancárias (taxas, tarifas)", 10, 12, 11])
+    aba.append(["DOCUMENTOS A SEREM DISPONIBILIZADOS"])
+    aba.append(["Extrato bancário", "Está em anexo"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_planilha_de_despesas_cobre_os_documentos_dos_meses_dela():
+    s = classificar("planilha.xlsx", _planilha_de_despesas(), CNPJ, COMPS)
+    assert (s.tipo, s.competencia, s.competencias_no_arquivo) == (FINANCEIRO, "2026-07", COMPS)
+    assert EXTRATO in s.cobre and MARKETPLACE in s.cobre and INVENTARIO in s.cobre
+    assert SAIDAS not in s.cobre and PGDAS not in s.cobre
+    # planilha financeira que não é de despesas não cobre nada
+    fluxo = _planilha(["Fluxo de caixa 08/2026"], ["Entradas", 10])
+    assert classificar("caixa.xlsx", fluxo, CNPJ, COMPS).cobre == []

@@ -11,6 +11,7 @@ import re
 import zipfile
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import date
 
 from pypdf import PdfReader
 
@@ -45,7 +46,9 @@ PALAVRAS = [
 ]
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 DATA = re.compile(r"\b\d{1,2}/(\d{1,2})/(\d{4})\b")
-MES_ANO = re.compile(r"(?<!\d)(\d{1,2})[-_./ ]?(20\d{2})(?!\d)|(?<!\d)(20\d{2})[-_./ ]?(\d{1,2})(?!\d)")
+# só meses 1–12: "00:00:00 2026-08" não pode virar "mês 00 de 2026" e engolir o ano de agosto
+MES = r"(0?[1-9]|1[0-2])"
+MES_ANO = re.compile(rf"(?<!\d){MES}[-_./ ]?(20\d{{2}})(?!\d)|(?<!\d)(20\d{{2}})[-_./ ]?{MES}(?!\d)")
 MES_NOME = re.compile(r"\b(" + "|".join(MESES) + r")[a-z]*[-_./ ]*(?:de )?(20\d{2})\b")
 
 
@@ -56,6 +59,14 @@ class Sugestao:
     competencia: str | None = None
     motivo: str = "Não reconhecido: escolha o tipo e o mês"
     competencias_no_arquivo: list[str] = field(default_factory=list)
+    # planilha de despesas: documentos que o cliente responde dentro dela (ver COBERTOS_PELA_PLANILHA)
+    cobre: list[str] = field(default_factory=list)
+
+
+# Quem manda a planilha de despesas não manda esses documentos: as informações vêm nela, por descrição
+# (tarifas bancárias, ADS do marketplace…), e a seção "Documentos a serem disponibilizados" é respondida
+# ali mesmo. A própria planilha também vale para os outros meses que ela cobre.
+COBERTOS_PELA_PLANILHA = [FINANCEIRO, EXTRATO, APLICACAO, INADIMPLENCIA, MARKETPLACE, INVENTARIO]
 
 
 def _normal(texto: str) -> str:
@@ -93,11 +104,20 @@ def _texto_pdf(conteudo: bytes) -> str:
 
 
 def _texto_planilha(nome: str, conteudo: bytes) -> str:
+    """Começo de cada aba: a planilha de despesas tem uma aba por período, e a do ano atual não é a primeira."""
     try:
-        linhas, _ = relatorio_contabil._ler_celulas(nome, conteudo)
+        if nome.lower().endswith(".xlsx"):
+            from openpyxl import load_workbook
+
+            livro = load_workbook(io.BytesIO(conteudo), read_only=True, data_only=True)
+            abas = [list(aba.iter_rows(max_row=40, values_only=True)) for aba in livro.worksheets[:24]]
+        else:
+            abas = [relatorio_contabil._ler_celulas(nome, conteudo)[0][:40]]
     except Exception:  # noqa: BLE001
         return ""
-    return "\n".join(" ".join(str(c) for c in r if c not in (None, "")) for r in linhas[:40])
+    # data sem o horário: "2026-07-01 00:00:00 2026-08-01" leria "00 2026" como mês e perderia agosto
+    cel = lambda c: f"{c:%d/%m/%Y}" if isinstance(c, date) else str(c)
+    return "\n".join(" ".join(cel(c) for c in r if c not in (None, "")) for linhas in abas for r in linhas)
 
 
 POR_PASTA = 50  # XMLs lidos de cada .zip (o de fora e cada um de dentro): basta uma amostra para classificar
@@ -197,6 +217,9 @@ def classificar(nome: str, conteudo: bytes, cnpj_empresa: str, competencias: lis
     _escolher_mes(s, _meses_do_texto(nome), competencias)
     if s.competencia is None:
         _escolher_mes(s, _meses_do_texto(texto), competencias)
+    if s.tipo == FINANCEIRO and "despesa" in _normal(nome + " " + texto[:5000]):
+        s.cobre = COBERTOS_PELA_PLANILHA
+        s.motivo = "Planilha de despesas: confira"
     if s.tipo is None and ext in ("pdf", "jpg", "jpeg", "png") and not texto:
         s.motivo = "Sem texto legível (imagem ou PDF escaneado): escolha o tipo e o mês"
     return s
