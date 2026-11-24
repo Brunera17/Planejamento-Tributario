@@ -17,7 +17,7 @@ from app.core.config import get_settings
 from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import Bem, Documento, Levantamento, Planejamento, TipoDocumento
 from app.schemas.comum import Esquema
-from app.services import cripto, documentos, pgdas, progresso
+from app.services import classificacao_documentos, cripto, documentos, pgdas, planilha_despesas, progresso
 from app.services.auditoria import auditar
 from app.utils.download import anexo
 from app.utils.upload import ler_limitado
@@ -176,6 +176,39 @@ def enviar_documento(pid: int, competencia: str, tipo_id: int, arquivo: UploadFi
             detalhes={"arquivo": nome, "bytes": len(conteudo), "sha256": hashlib.sha256(conteudo).hexdigest(),
                       "competencia": competencia, "tipo_documento_id": tipo_id, "substituiu": bool(anterior)})
     return {"id": doc.id, "arquivo": nome}
+
+
+MAX_ARQUIVOS_LOTE = 30
+
+
+@router.post("/{pid}/documentos/classificar")
+def classificar_documentos(pid: int, arquivos: list[UploadFile], db: DB, _: UsuarioAtual):
+    """Envio em lote: sugere tipo e mês de cada arquivo. Não grava nada; o envio de cada um é pela rota acima."""
+    p = obter_planejamento(db, pid, alterar=True)
+    if len(arquivos) > MAX_ARQUIVOS_LOTE:
+        raise ErroNegocio(f"Envie no máximo {MAX_ARQUIVOS_LOTE} arquivos por vez", 413)
+    tipos = {t.nome: t.id for t in db.scalars(select(TipoDocumento))}
+    cnpj, competencias = p.empresa.cnpj, p.competencias()
+    saida = []
+    for arquivo in arquivos:
+        nome = (arquivo.filename or "documento").replace("\\", "/").rsplit("/", 1)[-1][:200]
+        try:
+            conteudo = ler_limitado(arquivo, get_settings().upload_max_mb)
+            documentos.validar(nome, conteudo)
+        except ErroNegocio as e:
+            saida.append({"arquivo": nome, "erro": e.mensagem})
+            continue
+        s = classificacao_documentos.classificar(nome, conteudo, cnpj, competencias)
+        despesas = None
+        if s.cobre and nome.lower().endswith(".xlsx"):  # planilha de despesas: prévia da importação dos valores
+            try:
+                despesas = planilha_despesas.previa(db, p, planilha_despesas.ler(db, conteudo, competencias))
+            except planilha_despesas.PlanilhaInvalida:
+                pass
+        saida.append({"arquivo": nome, "tipo_documento_id": tipos.get(s.tipo), "competencia": s.competencia,
+                      "motivo": s.motivo, "competencias_no_arquivo": s.competencias_no_arquivo,
+                      "cobre_tipos": [tipos[t] for t in s.cobre if t in tipos], "despesas": despesas})
+    return saida
 
 
 @router.put("/{pid}/documentos/{competencia}/{tipo_id}/nao-se-aplica", status_code=204)

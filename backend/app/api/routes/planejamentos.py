@@ -42,7 +42,7 @@ from app.schemas.planejamento import (
     StatusEntrada,
     ValorCompetencia,
 )
-from app.services import despesas_referencia, estoque_st, nfe_canceladas, planilha_mensal, progresso, relatorio_contabil, retencao, revisao_produtos
+from app.services import despesas_referencia, estoque_st, nfe_canceladas, planilha_despesas, planilha_mensal, progresso, relatorio_contabil, retencao, revisao_produtos
 from app.motor.lei_monofasico import Enquadramento, avaliar
 from app.schemas.comum import Esquema
 from app.seeds import tabelas
@@ -322,6 +322,28 @@ def importar_planilha_mensal(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAt
     auditar("PLANILHA_MENSAL_IMPORTADA", usuario=u, planejamento=p, recurso_tipo="planejamento", recurso_id=pid,
             detalhes={"arquivo": arquivo.filename, "competencias": sorted(lidos)})
     return {"competencias": sorted(lidos), "valores": sum(len(v) for v in lidos.values())}
+
+
+@router.post("/{pid}/despesas/planilha")
+def importar_planilha_despesas(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual, previa: bool = False):
+    """Planilha de despesas do cliente: cada valor vai para o mês da data no título da coluna.
+    Com previa=true só conta o que seria gravado."""
+    p = obter_planejamento(db, pid, alterar=True)
+    _recusar_se_aprovado(db, p)
+    if not (arquivo.filename or "").lower().endswith(".xlsx"):
+        raise ErroNegocio("Envie a planilha de despesas em .xlsx", 415)
+    try:
+        lt = planilha_despesas.ler(db, ler_limitado(arquivo, get_settings().relatorio_contabil_max_mb), p.competencias())
+    except planilha_despesas.PlanilhaInvalida as e:
+        raise ErroNegocio(str(e), 422, {"arquivo": str(e)}) from e
+    if previa:
+        return planilha_despesas.previa(db, p, lt)
+    r = planilha_despesas.importar(db, p, lt, u.id)
+    _alterou(db, p)
+    auditar("PLANILHA_DESPESAS_IMPORTADA", usuario=u, planejamento=p, recurso_tipo="planejamento", recurso_id=pid,
+            detalhes={"arquivo": arquivo.filename, "meses": r["meses"], "valores": r["valores"], "outras": r["outras"],
+                      "total": str(r["total"]), "substituiu_digitados": r["substitui_digitados"]})
+    return r
 
 
 @router.delete("/{pid}/composicao-compras", status_code=204)

@@ -20,7 +20,8 @@ from app.services import cripto, documentos
 from app.services.memo import por_planejamento
 
 NUMERO = r"\d{1,3}(?:\.\d{3})*,\d{2}"
-PA = re.compile(r"Per[ií]odo\s+de\s+Apura[çc][ãa]o(?:\s*\(PA\))?\s*:?\s*(\d{2})/(\d{4})", re.I)
+# extrato: "PA: 06/2026"; declaração: "Período de Apuração: 01/08/2026 a 31/08/2026"
+PA = re.compile(r"Per[ií]odo\s+de\s+Apura[çc][ãa]o(?:\s*\(PA\))?\s*:?\s*(?:\d{2}/)?(\d{2})/(\d{4})", re.I)
 RBT12 = re.compile(r"\(RBT12\)((?:\s+" + NUMERO + r")+)", re.I)
 ANEXO = re.compile(r"\bAnexo\s+(I{1,3}|IV|V)\b")
 # atividades do PGDAS-D que já dizem o anexo

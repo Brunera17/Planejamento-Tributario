@@ -1,5 +1,6 @@
 """Limites de envio: ZIP de NF-e lido em fluxo (contra "zip bomb") e uploads lidos com teto."""
 import io
+import os
 import zipfile
 
 import pytest
@@ -90,3 +91,24 @@ def test_upload_de_relatorio_contabil_acima_do_limite_responde_413(cliente, cont
 def test_importacao_de_empresas_acima_de_10_mb_responde_413(cliente, contador):
     arq = {"arquivo": ("empresas.csv", b"a" * (10 * MB + 1), "text/csv")}
     assert cliente.post("/api/empresas/importacao/previa", headers=contador, files=arq).status_code == 413
+
+
+def test_zip_dentro_de_zip_como_o_portal_exporta(limites):
+    """O .zip do portal traz um .zip por lote de notas; .zip interno corrompido vira aviso, não derruba o lote."""
+    interno = _zip({"1.xml": NFE.encode(), "evento.xml": b"<a/>"})
+    notas, erros, _ = ler_arquivos("09_2026.zip", _zip({"09 2026/lote1.zip": interno, "09 2026/danfe.pdf": b"%PDF-1.4",
+                                                        "09 2026/ruim.zip": b"PK\x03\x04 quebrado"}))
+    assert len(notas) == 1
+    assert any("lote1.zip/evento.xml" in e for e in erros) and any("ruim.zip" in e for e in erros)
+    # a quantidade de XML soma os níveis
+    limites(nfe_zip_max_arquivos=2)
+    with pytest.raises(ErroNegocio) as e:
+        ler_arquivos("lote.zip", _zip({"a.xml": NFE.encode(), "b.zip": _zip({"1.xml": NFE.encode(), "2.xml": NFE.encode()})}))
+    assert e.value.status == 413
+
+
+def test_zip_interno_acima_do_limite_e_ignorado(limites):
+    limites(nfe_zip_max_mb=1)
+    grande = _zip({"1.xml": NFE.encode(), "lixo.bin": os.urandom(2 * MB)})  # dado aleatório não comprime
+    notas, erros, _ = ler_arquivos("lote.zip", _zip({"a.xml": NFE.encode(), "b.zip": grande}))
+    assert len(notas) == 1 and any("b.zip" in e and "acima de 1 MB" in e for e in erros)

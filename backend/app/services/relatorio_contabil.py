@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import re
+import struct
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
@@ -95,14 +96,50 @@ def _data(v, datemode: int | None) -> date:
     return date(int(a), int(m), int(d))
 
 
+def _abas_no_bof(conteudo: bytes) -> bytes | None:
+    """Fluxo BIFF do .xls com o endereço de cada aba apontando para o BOF dela.
+
+    O .xls exportado pela Domínio grava milhares de registros BLANK soltos entre a área global e a aba, e o
+    endereço da aba (BOUNDSHEET) aponta para eles: o Excel tolera, o xlrd recusa ("Expected BOF record").
+    Devolve None se não houver o que consertar."""
+    from xlrd import compdoc
+
+    try:
+        s = bytearray(compdoc.CompDoc(conteudo, logfile=io.StringIO()).get_named_stream("Workbook") or b"")
+    except Exception:  # noqa: BLE001 – não é um OLE legível: o erro original do xlrd vale
+        return None
+    pos, mudou = 0, False
+    while pos + 8 <= len(s):
+        tipo, tam = struct.unpack_from("<HH", s, pos)
+        if tipo == 0x000A:  # EOF da área global
+            break
+        if tipo == 0x0085:  # BOUNDSHEET: endereço da aba
+            p = struct.unpack_from("<I", s, pos + 4)[0]
+            while p + 4 <= len(s) and struct.unpack_from("<H", s, p)[0] != 0x0809:
+                p += 4 + struct.unpack_from("<H", s, p + 2)[0]
+            if p + 4 > len(s):
+                return None
+            if p != struct.unpack_from("<I", s, pos + 4)[0]:
+                struct.pack_into("<I", s, pos + 4, p)
+                mudou = True
+        pos += 4 + tam
+    return bytes(s) if mudou else None
+
+
 def _ler_celulas(nome: str, conteudo: bytes) -> tuple[list[list], int | None]:
     if nome.lower().endswith(".xls"):
         import xlrd
 
         try:
-            livro = xlrd.open_workbook(file_contents=conteudo)
+            livro = xlrd.open_workbook(file_contents=conteudo, logfile=io.StringIO())
         except xlrd.XLRDError as e:
-            raise RelatorioInvalido(f"Não foi possível ler o .xls: {e}") from e
+            consertado = _abas_no_bof(conteudo)
+            if consertado is None:
+                raise RelatorioInvalido(f"Não foi possível ler o .xls: {e}") from e
+            try:  # o xlrd aceita o fluxo BIFF direto, sem o envelope OLE
+                livro = xlrd.open_workbook(file_contents=consertado, logfile=io.StringIO())
+            except xlrd.XLRDError as e2:
+                raise RelatorioInvalido(f"Não foi possível ler o .xls: {e2}") from e2
         aba = livro.sheet_by_index(0)
         return [aba.row_values(r) for r in range(aba.nrows)], livro.datemode
     from openpyxl import load_workbook
