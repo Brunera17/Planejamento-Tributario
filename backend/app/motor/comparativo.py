@@ -6,7 +6,13 @@ from decimal import Decimal
 from .base import BaseCompetencia, ItemCalculado
 from .icms import ResultadoIcms
 from .real import irpj_csll_lucro_real
-from .simples import aliq_iss, aliquota_efetiva, anexo_do_servico, cpp_fora_do_das
+from .simples import (
+    aliq_iss,
+    aliquota_efetiva,
+    anexo_do_item,
+    anexo_do_servico,
+    cpp_fora_do_das,
+)
 from .tipos import (
     ZERO,
     EntradaSimulacao,
@@ -110,6 +116,10 @@ def simular_crescimento(
     st = sum((i.receita_liquida for i in itens if i.st_interna), ZERO) / mercadoria if mercadoria else ZERO
     icms_normal = (icms.total_a_recolher - icms.total_difal) / receita  # o Simples acima do sublimite não recolhe DIFAL
     cpp_fora_iv = cpp_fora_do_das(entrada, servico / receita) / receita if servico else ZERO
+    por_anexo: dict[str, Decimal] = {}  # revenda no Anexo I e produção própria no II, pelo CFOP
+    for i in itens:
+        anexo = anexo_do_item(i.item.cfop, entrada)
+        por_anexo[anexo] = por_anexo.get(anexo, ZERO) + i.receita_liquida
     aliq_lp = presumido.total / receita
     aliq_lr = real.total / receita
     if valores is None:
@@ -123,8 +133,12 @@ def simular_crescimento(
         if rbt12 > p.teto_simples:
             aliq_sn, obs = None, "Acima do teto: Simples inelegível"
         else:
-            parcela = f.p_irpj + f.p_csll + f.p_cpp + f.p_ipi + f.p_icms * (1 - st) + (f.p_pis + f.p_cofins) * (1 - mono)
-            aliq_sn = a.efetiva * parcela * mercadoria / receita
+            aliq_sn = ZERO
+            for anexo, valor in por_anexo.items():
+                am = aliquota_efetiva(rbt12, entrada.faixas_mercadoria.get(anexo, entrada.faixas_simples))
+                fm = am.faixa
+                parcela = fm.p_irpj + fm.p_csll + fm.p_cpp + fm.p_ipi + fm.p_icms * (1 - st) + (fm.p_pis + fm.p_cofins) * (1 - mono)
+                aliq_sn += am.efetiva * parcela * valor / receita
             # com Fator R, a mesma folha sobre outra RBT12 pode trocar o anexo do serviço
             anexo_s = anexo_do_servico(entrada, rbt12)[0] if servico else None
             cpp_fora = cpp_fora_iv if anexo_s == "IV" else ZERO

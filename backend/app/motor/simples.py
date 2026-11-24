@@ -50,6 +50,17 @@ def aliquota_efetiva(rbt12: Decimal, faixas: list[FaixaSimples]) -> AliquotaSimp
     return AliquotaSimples(rbt12, f, efetiva)
 
 
+# CFOP (sem o 1º dígito) de venda de produção do próprio estabelecimento: Anexo II; o resto da mercadoria é revenda, Anexo I
+PRODUCAO_PROPRIA = {101, 103, 105, 109, 111, 113, 116, 118, 122, 124, 125, 401, 402}
+
+
+def anexo_do_item(cfop: int, entrada: EntradaSimulacao) -> str:
+    """Revenda no Anexo I e produção própria no II (LC 123/2006, art. 18, § 4º, I e II), pelo CFOP do item; sem as
+    tabelas dos dois anexos, o anexo do cadastro."""
+    anexo = "II" if cfop % 1000 in PRODUCAO_PROPRIA else "I"
+    return anexo if anexo in entrada.faixas_mercadoria else entrada.anexo_simples
+
+
 FATOR_R_MINIMO = Decimal("0.28")  # LC 123/2006, art. 18, §5º-J e §5º-M
 TETO_ISS = Decimal("0.05")  # LC 123/2006, Anexos III e IV, nota da 5ª faixa
 
@@ -118,6 +129,34 @@ def calcular_rbt12(entrada: EntradaSimulacao, bases: dict[str, BaseCompetencia])
     return total / len(bases) * 12, True
 
 
+def _meses_anteriores(competencia: str, n: int = 12) -> list[str]:
+    ano, mes = map(int, competencia.split("-"))
+    out = []
+    for _ in range(n):
+        ano, mes = (ano - 1, 12) if mes == 1 else (ano, mes - 1)
+        out.append(f"{ano:04d}-{mes:02d}")
+    return out
+
+
+def rbt12_por_mes(entrada: EntradaSimulacao, bases: dict[str, BaseCompetencia]) -> dict[str, Decimal] | None:
+    """RBT12 de cada mês: a receita dos 12 meses anteriores, a declarada no PGDAS-D e, no mês do planejamento ainda sem
+    declaração, a das notas. Sem a receita de algum dos 12 meses, None (vale a RBT12 única)."""
+    if not entrada.receitas_declaradas:
+        return None
+    out = {}
+    for c in entrada.competencias:
+        total = ZERO
+        for m in _meses_anteriores(c):
+            if m in entrada.receitas_declaradas:
+                total += entrada.receitas_declaradas[m]
+            elif m in bases:
+                total += bases[m].receita_liquida
+            else:
+                return None
+        out[c] = total
+    return out
+
+
 def calcular_simples(
     entrada: EntradaSimulacao,
     bases: dict[str, BaseCompetencia],
@@ -127,10 +166,19 @@ def calcular_simples(
 ) -> tuple[ResultadoRegime, AliquotaSimples]:
     p = entrada.parametros
     rbt12, estimado = calcular_rbt12(entrada, bases)
+    mensal = rbt12_por_mes(entrada, bases)
+    if mensal:
+        # cada mês na RBT12 dele; o resumo (faixa, sublimite, teto) fica com a do último mês
+        rbt12, estimado = mensal[entrada.competencias[-1]], False
+        for c, v in mensal.items():
+            memoria.registrar("Simples", "RBT12 do mês", "Σ receita dos 12 meses anteriores (PGDAS-D e notas)", v, c,
+                              fundamento="LC 123/2006, art. 18, § 1º")
+    else:
+        memoria.registrar("Simples", "RBT12 " + ("estimado (média do período × 12)" if estimado else "informado (PGDAS-D)"),
+                          "Σ receita líquida ÷ nº de meses × 12" if estimado else "premissa", rbt12, fundamento=FUNDAMENTO)
+    rbt12_mes = mensal or dict.fromkeys(entrada.competencias, rbt12)
     aliq = aliquota_efetiva(rbt12, entrada.faixas_simples)
     f = aliq.faixa
-    memoria.registrar("Simples", "RBT12 " + ("estimado (média do período × 12)" if estimado else "informado (PGDAS-D)"),
-                      "Σ receita líquida ÷ nº de meses × 12" if estimado else "premissa", rbt12, fundamento=FUNDAMENTO)
     memoria.registrar("Simples", f"Faixa {f.faixa} do Anexo {entrada.anexo_simples}", "maior faixa com RBT12 inicial ≤ RBT12", Decimal(f.faixa))
     memoria.registrar("Simples", "Alíquota efetiva do DAS", "(RBT12 × alíquota nominal − parcela a deduzir) ÷ RBT12",
                       aliq.efetiva, fundamento=FUNDAMENTO)
@@ -138,31 +186,58 @@ def calcular_simples(
     acima_sublimite = rbt12 > p.sublimite_simples
     elegivel = rbt12 <= p.teto_simples
 
-    icms = pis = cofins = ZERO
+    # cada item na alíquota do anexo do seu CFOP, com a RBT12 do seu mês (a da empresa inteira)
+    faixas_mercadoria = {**entrada.faixas_mercadoria, entrada.anexo_simples: entrada.faixas_simples}
+    aliqs = {a: aliquota_efetiva(rbt12, fx) for a, fx in faixas_mercadoria.items()}  # do último mês, para a memória
+    do_mes: dict[tuple[str, str], AliquotaSimples] = {}
+    por_anexo: dict[str, Decimal] = {}
+    icms = pis = cofins = irpj = csll = cpp = ipi = das_mercadoria = ZERO
     for it in itens:
         rl = it.receita_liquida
+        anexo = anexo_do_item(it.item.cfop, entrada)
+        chave = (it.item.competencia, anexo)
+        if chave not in do_mes:
+            do_mes[chave] = aliquota_efetiva(rbt12_mes[it.item.competencia], faixas_mercadoria[anexo])
+        a, fx = do_mes[chave], do_mes[chave].faixa
+        por_anexo[anexo] = por_anexo.get(anexo, ZERO) + rl
         if not it.st_interna:
-            icms += rl * aliq.parcela(f.p_icms)
+            icms += rl * a.parcela(fx.p_icms)
         if not it.item.monofasico:
-            pis += rl * aliq.parcela(f.p_pis)
-            cofins += rl * aliq.parcela(f.p_cofins)
+            pis += rl * a.parcela(fx.p_pis)
+            cofins += rl * a.parcela(fx.p_cofins)
+        irpj += rl * a.parcela(fx.p_irpj)
+        csll += rl * a.parcela(fx.p_csll)
+        cpp += rl * a.parcela(fx.p_cpp)
+        ipi += rl * a.parcela(fx.p_ipi)  # Anexo II: o IPI da indústria vai no DAS
+        das_mercadoria += rl * a.efetiva
+    for anexo, valor in sorted(por_anexo.items()):
+        if anexo != entrada.anexo_simples and valor:
+            memoria.registrar("Simples", f"Receita no Anexo {anexo} (pelo CFOP)", "Σ itens de " + (
+                "produção própria" if anexo == "II" else "revenda"), valor, fundamento="LC 123/2006, art. 18, § 4º")
+            memoria.registrar("Simples", f"Faixa {aliqs[anexo].faixa.faixa} do Anexo {anexo}", "maior faixa com RBT12 inicial ≤ RBT12",
+                              Decimal(aliqs[anexo].faixa.faixa))
+            memoria.registrar("Simples", f"Alíquota efetiva do Anexo {anexo}", "(RBT12 × alíquota nominal − parcela a deduzir) ÷ RBT12",
+                              aliqs[anexo].efetiva, fundamento=FUNDAMENTO)
 
     receita = sum((b.receita_liquida for b in bases.values()), ZERO)
-    mercadoria = sum((b.receita_mercadoria for b in bases.values()), ZERO)
-    irpj = mercadoria * aliq.parcela(f.p_irpj)
-    csll = mercadoria * aliq.parcela(f.p_csll)
-    cpp = mercadoria * aliq.parcela(f.p_cpp)
-    ipi = mercadoria * aliq.parcela(f.p_ipi)  # Anexo II: o IPI da indústria vai no DAS
 
-    # serviço: no anexo dele, com a mesma RBT12 da empresa inteira
+    # serviço: no anexo dele, com a RBT12 do seu mês (a da empresa inteira)
     servico = sum((b.receita_servico for b in bases.values()), ZERO)
     iss = iss_fora_das = cpp_fora = ZERO
     detalhes_servico: dict[str, Decimal] = {}
-    das_sem_segregacao = mercadoria * aliq.efetiva
+    das_sem_segregacao = das_mercadoria
     if servico:
         anexo_s, fr = anexo_do_servico(entrada, rbt12)
         aliq_s = aliquota_efetiva(rbt12, entrada.faixas_servico[anexo_s])
-        partes = {k: servico * v for k, v in reparticao(aliq_s).items()}
+        partes: dict[str, Decimal] = {}
+        das_servico = ZERO
+        for c, b in bases.items():
+            if not b.receita_servico:
+                continue
+            a_c = aliquota_efetiva(rbt12_mes[c], entrada.faixas_servico[anexo_do_servico(entrada, rbt12_mes[c])[0]])
+            for k, v in reparticao(a_c).items():
+                partes[k] = partes.get(k, ZERO) + b.receita_servico * v
+            das_servico += b.receita_servico * a_c.efetiva
         pis += partes.get("PIS", ZERO)
         cofins += partes.get("COFINS", ZERO)
         irpj += partes.get("IRPJ", ZERO)
@@ -185,7 +260,7 @@ def calcular_simples(
             cpp_fora = cpp_fora_do_das(entrada, servico / receita)
             memoria.registrar("Simples", "CPP fora do DAS (Anexo IV)", "folha × (20% + RAT × FAP) + pró-labore × 20%, "
                               "na proporção da receita do Anexo IV", cpp_fora, fundamento="LC 123/2006, art. 13, § 3º")
-        das_sem_segregacao += servico * aliq_s.efetiva
+        das_sem_segregacao += das_servico
         detalhes_servico = {
             "receita_servico": servico,
             "anexo_servico": Decimal(ROMANOS[anexo_s]),

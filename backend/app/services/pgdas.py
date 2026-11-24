@@ -30,6 +30,10 @@ ATIVIDADES = [
     (re.compile(r"mercadorias\s+industrializadas\s+pelo\s+contribuinte", re.I), "II"),
 ]
 SERVICO = re.compile(r"Presta[çc][ãa]o\s+de\s+Servi[çc]os", re.I)
+# quadro 2.2 da declaração: a receita de cada mês anterior ao PA (mercado interno e externo), até o quadro da folha
+ANTERIORES = re.compile(r"Receitas\s+Brutas\s+Anteriores(.*?)(?:2\.3\)|Folha\s+de\s+Sal|2\.8\)|$)", re.I | re.S)
+MES_VALOR = re.compile(r"(\d{2})/(\d{4})\s+(" + NUMERO + ")")
+RPA = re.compile(r"Receita\s+Bruta\s+do\s+PA\s+\(RPA\)[^\d\n]*((?:\s+" + NUMERO + r")+)", re.I)
 
 
 @dataclass
@@ -39,6 +43,7 @@ class ExtratoPgdas:
     rbt12: Decimal | None = None
     anexos: set[str] = field(default_factory=set)
     servicos: bool = False  # declarou serviço sem o anexo explícito (III, IV ou V)
+    receitas: dict[str, Decimal] = field(default_factory=dict)  # AAAA-MM -> receita bruta declarada (meses anteriores e o PA)
 
     @property
     def lido(self) -> bool:
@@ -66,19 +71,26 @@ def ler(conteudo: bytes, arquivo: str = "") -> ExtratoPgdas:
         if padrao.search(texto):
             e.anexos.add(anexo)
     e.servicos = bool(SERVICO.search(texto)) and not e.anexos & {"III", "IV", "V"}
+    if m := ANTERIORES.search(texto):
+        for mes, ano, valor in MES_VALOR.findall(m.group(1)):  # interno e externo somam no mesmo mês
+            chave = f"{ano}-{mes}"
+            e.receitas[chave] = e.receitas.get(chave, Decimal(0)) + _valor(valor)
+    if e.competencia and (m := RPA.search(texto)):
+        e.receitas[e.competencia] = _valor(re.findall(NUMERO, m.group(1))[-1])  # o total é o último da linha
     return e
 
 
 def para_json(e: ExtratoPgdas) -> dict:
     """Forma gravada em Documento.pgdas_extrato (Decimal como texto, para não perder centavos)."""
     return {"lido": e.lido, "competencia": e.competencia, "rbt12": str(e.rbt12) if e.rbt12 is not None else None,
-            "anexos": sorted(e.anexos), "servicos": e.servicos}
+            "anexos": sorted(e.anexos), "servicos": e.servicos, "receitas": {k: str(v) for k, v in e.receitas.items()}}
 
 
 def de_json(dados: dict, arquivo: str) -> ExtratoPgdas:
     return ExtratoPgdas(arquivo, competencia=dados.get("competencia"),
                         rbt12=Decimal(dados["rbt12"]) if dados.get("rbt12") else None,
-                        anexos=set(dados.get("anexos") or []), servicos=bool(dados.get("servicos")))
+                        anexos=set(dados.get("anexos") or []), servicos=bool(dados.get("servicos")),
+                        receitas={k: Decimal(v) for k, v in (dados.get("receitas") or {}).items()})
 
 
 # um só critério para "este tipo é o extrato do PGDAS-D", no envio, no cálculo e no preenchimento
@@ -127,7 +139,19 @@ def da_empresa(db: Session, empresa_id: int) -> ExtratoPgdas | None:
         select(Planejamento.id).where(Planejamento.empresa_id == empresa_id)))
 
 
+def receitas_do_planejamento(db: Session, p: Planejamento) -> dict[str, Decimal]:
+    """Receita mês a mês declarada nos PGDAS-D enviados; no mês que aparece em mais de um, vale o de PA mais recente."""
+    out: dict[str, Decimal] = {}
+    for e in sorted(_lidos(db, Levantamento.planejamento_id == p.id), key=lambda x: x.competencia or ""):
+        out.update(e.receitas)
+    return out
+
+
 def _mais_recente(db: Session, condicao) -> ExtratoPgdas | None:
+    return max(_lidos(db, condicao), key=lambda x: x.competencia or "", default=None)
+
+
+def _lidos(db: Session, condicao) -> list[ExtratoPgdas]:
     linhas = db.execute(
         select(Documento.arquivo, Documento.arquivo_nome, Documento.pgdas_extrato, Levantamento.competencia)
         .join(Levantamento, Levantamento.id == Documento.levantamento_id)
@@ -138,11 +162,13 @@ def _mais_recente(db: Session, condicao) -> ExtratoPgdas | None:
     for arquivo, nome, gravado, competencia in linhas:
         if not arquivo.lower().endswith(".pdf"):
             continue
-        e = de_json(gravado, nome or arquivo) if gravado is not None else _ler_arquivo(arquivo, nome or arquivo)
+        # lido antes de o sistema guardar a receita mês a mês: lê o arquivo de novo
+        atual = gravado is not None and ("receitas" in gravado or not gravado.get("lido"))
+        e = de_json(gravado, nome or arquivo) if atual else _ler_arquivo(arquivo, nome or arquivo)
         if e is not None and e.lido:
             e.competencia = e.competencia or competencia
             lidos.append(e)
-    return max(lidos, key=lambda x: x.competencia or "", default=None)
+    return lidos
 
 
 def preencher(db: Session) -> int:

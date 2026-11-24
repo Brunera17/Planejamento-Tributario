@@ -246,6 +246,8 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
 
     anexo, _ = anexo_da_empresa(p.empresa.anexo_simples, p.empresa.cnae, p.empresa.atividade)
     extrato = pgdas.do_planejamento(db, p)
+    rbt12_digitada = db.scalar(select(PremissaPlanejamento.id).where(
+        PremissaPlanejamento.planejamento_id == p.id, PremissaPlanejamento.chave == "rbt12_informado")) is not None
     if extrato and extrato.anexos and anexo not in extrato.anexos:
         declarados = " e ".join(f"Anexo {a}" for a in sorted(extrato.anexos, key=ROMANOS.get))
         pendencias.append(f"O extrato do PGDAS-D declara {declarados}, mas o cálculo usa o Anexo {anexo}: confira o cadastro da empresa")
@@ -297,6 +299,9 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         servicos=servicos,
         anexo_servico=anexo_servico,
         faixas_servico=faixas_servico,
+        faixas_mercadoria={a: todas_faixas[a] for a in ("I", "II") if a in todas_faixas},
+        # a RBT12 digitada pelo contador vale para o período todo; sem ela, cada mês tem a sua pelo PGDAS-D
+        receitas_declaradas={} if rbt12_digitada else pgdas.receitas_do_planejamento(db, p),
     )
     return EntradaMontada(entrada, pendencias)
 
