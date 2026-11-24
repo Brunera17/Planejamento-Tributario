@@ -297,6 +297,7 @@ def montar_entrada(db: Session, p: Planejamento) -> EntradaMontada:
         servicos=servicos,
         anexo_servico=anexo_servico,
         faixas_servico=faixas_servico,
+        faixas_mercadoria={a: todas_faixas[a] for a in ("I", "II") if a in todas_faixas},
     )
     return EntradaMontada(entrada, pendencias)
 
