@@ -208,42 +208,53 @@ function Coleta({ pid }: { pid: number }) {
         semPadding
       >
         <Tabela
-          cabecalho={["Competência", "Faturamento (notas de saída)", "Receita pelo CFOP", "Serviços (NFS-e)", "Compras", "Devoluções", "Folha", "Pró-labore"]}
+          cabecalho={["Competência", "Faturamento bruto", "Faturamento líquido", "Serviços (NFS-e)", "Compras", "Devoluções", "Folha", "Pró-labore"]}
           numericas={[1, 2, 3, 4, 5, 6, 7]}
         >
           {data.competencias.map((c) => {
             const s = data.saidas.find((x) => x.competencia === c);
-            const servico = Number(data.servicos?.[c] ?? 0) > 0;
+            // como o cálculo: bruto = itens com CFOP que gera receita + serviços; líquido = bruto − devoluções
+            const servicos = Number(data.servicos?.[c] ?? 0);
+            const devolucoes = Number(data.devolucoes[c] ?? 0);
+            const fora = (s?.fora ?? []).reduce((t, f) => t + Number(f.valor), 0);
+            const bruto = s ? (s.receita != null ? Number(s.receita) + servicos : null) : servicos > 0 ? servicos : null;
             return (
               <tr key={c}>
                 <td className="px-4 py-1.5">{competenciaExtenso(c)}</td>
                 <td className="num px-2 py-1.5">
-                  {s ? (
+                  {bruto != null ? (
                     <>
-                      {brl(s.valor)}
+                      {brl(bruto)}
                       <span className="block text-xs text-text-muted">
-                        {s.notas} {s.notas === 1 ? "nota" : "notas"}
+                        {s ? `${s.notas} ${s.notas === 1 ? "nota" : "notas"}` : "sem notas"}
+                        {!!fora && (
+                          // o detalhe por CFOP fica no title: a lista inteira alargava a tabela
+                          <span
+                            className="block cursor-help underline decoration-dotted underline-offset-2"
+                            title={
+                              `Total das notas de saída: ${brl(s!.valor)}\nFora do faturamento (remessa, lançamento de venda já em NFC-e…):\n` +
+                              s!.fora!.map((f) => `CFOP ${f.cfop}${f.sem_regra ? " (sem regra)" : ""}: ${brl(f.valor)}`).join("\n")
+                            }
+                          >
+                            {brl(fora)} fora (CFOP)
+                          </span>
+                        )}
                       </span>
                     </>
-                  ) : servico ? (
-                    <span className="text-text-muted">sem notas</span>
+                  ) : s ? (
+                    // retrato de planejamento aprovado antes da separação por CFOP: só o total das notas
+                    <span className="text-text-muted" title="Total de todas as notas de saída, sem separar por CFOP">
+                      {brl(s.valor)}
+                    </span>
                   ) : (
                     <span className="text-alert">pendente</span>
                   )}
                 </td>
                 <td className="num px-2 py-1.5">
-                  {s?.receita != null ? (
+                  {bruto != null ? (
                     <>
-                      {brl(s.receita)}
-                      {!!s.fora?.length && (
-                        // o detalhe por CFOP fica no title: a lista inteira alargava a tabela
-                        <span
-                          className="block cursor-help text-xs text-text-muted underline decoration-dotted underline-offset-2"
-                          title={"Fora da receita (remessa, lançamento de venda já em NFC-e…):\n" + s.fora.map((f) => `CFOP ${f.cfop}${f.sem_regra ? " (sem regra)" : ""}: ${brl(f.valor)}`).join("\n")}
-                        >
-                          {brl(s.fora.reduce((t, f) => t + Number(f.valor), 0))} fora
-                        </span>
-                      )}
+                      {brl(bruto - devolucoes)}
+                      {devolucoes > 0 && <span className="block text-xs text-text-muted">− {brl(devolucoes)} devoluções</span>}
                     </>
                   ) : (
                     <span className="text-text-muted">—</span>
