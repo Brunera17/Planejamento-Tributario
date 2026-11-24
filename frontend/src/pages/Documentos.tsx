@@ -229,7 +229,7 @@ function EnvioDocumento({ pid, celula, fechar, falhou }: { pid: number; celula: 
                 />
               </label>
             )}
-            <p className="text-xs text-text-muted">Até 10 MB por arquivo.</p>
+            <p className="text-xs text-text-muted">Até 30 MB por arquivo.</p>
             <Erro mensagem={erro} />
             <div className="flex justify-end gap-2 border-t border-surface pt-3">
               <Botao variante="secundario" onClick={fechar}>
@@ -315,9 +315,13 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
 
   const classificar = useMutation({
     mutationFn: async (files: File[]) => {
-      const fd = new FormData();
-      files.forEach((f) => fd.append("arquivos", f));
-      const r = (await api.post<Sugestao[]>(`/planejamentos/${pid}/documentos/classificar`, fd)).data;
+      // um arquivo por requisição: o lote inteiro numa só passaria de centenas de MB
+      const r: Sugestao[] = [];
+      for (const f of files) {
+        const fd = new FormData();
+        fd.append("arquivos", f);
+        r.push(...(await api.post<Sugestao[]>(`/planejamentos/${pid}/documentos/classificar`, fd)).data);
+      }
       return files.map((file, i): ItemLote => {
         const s = r[i];
         const comp = s.competencia && abertos.includes(s.competencia) ? s.competencia : null;
@@ -361,7 +365,7 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
   const campo = "w-full rounded border border-border bg-white px-1.5 py-1";
 
   return (
-    <Card titulo="Enviar vários arquivos" adendo="O sistema sugere o documento e o mês de cada arquivo; confira antes de enviar.">
+    <Card titulo="Enviar vários arquivos" adendo="O sistema sugere o documento e o mês de cada arquivo; confira antes de enviar. Até 30 MB por arquivo.">
       <div className="space-y-3 text-sm">
         <EnvioArquivo formatos={FORMATOS} multiplo arquivos={[]} aoEscolher={(fs) => { setErro(null); classificar.mutate(fs.slice(0, 30)); }} />
         {classificar.isPending && <p className="text-text-muted">Lendo os arquivos…</p>}

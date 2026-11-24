@@ -4,6 +4,7 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.models import Empresa, Planejamento
 from app.seeds.exemplo import CNPJ, carregar_exemplo
 from app.services import documentos
@@ -70,7 +71,7 @@ def enviar(cliente, h, pid, nome, conteudo, comp="2026-01", tipo=1):
     ("falso.pdf", b"nao sou pdf", 415),
     ("vazio.pdf", b"", 422),
     ("binario.csv", b"a\0b", 415),
-    ("grande.pdf", b"%PDF-" + b"0" * (10 * 1024 * 1024), 413),
+    ("grande.pdf", b"%PDF-" + b"0" * (get_settings().upload_max_mb * 1024 * 1024), 413),
 ])
 def test_arquivo_recusado(cliente, analista, pid, nome, conteudo, status):
     assert enviar(cliente, analista, pid, nome, conteudo).status_code == status

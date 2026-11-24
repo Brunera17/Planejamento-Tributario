@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     chaves_arquivos_antigas: str = ""  # "id:base64,id:base64" — só leitura, durante a rotação
     aceitar_arquivo_sem_cifra: bool = True  # false depois de rodar --cifrar-existentes
     escritorio_nome: str = "Planejador Tributário"  # aparece no cabeçalho do relatório PDF
-    upload_max_mb: int = 10
+    upload_max_mb: int = 30  # documentos; o .zip de XML do portal costuma passar de 10 MB
     # NF-e: o .zip é lido entrada por entrada; os limites barram "zip bomb" e envios que não cabem na memória
     nfe_zip_max_mb: int = 100  # arquivo enviado (compactado)
     nfe_xml_max_mb: int = 5  # cada XML, já descompactado
