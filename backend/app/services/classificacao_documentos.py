@@ -27,14 +27,16 @@ MARKETPLACE = "Relatório de tarifas do marketplace"
 PGDAS = "Extrato do PGDAS-D (RBT12)"
 INVENTARIO = "Inventário de estoque"
 
-# ordem importa: o mais específico primeiro ("extrato de aplicação" antes de "extrato")
+# vence a palavra que aparece primeiro (o título do documento); no empate, a ordem da lista
+# ("extrato de aplicação" casa com APLICACAO e EXTRATO na mesma posição)
 PALAVRAS = [
     (PGDAS, r"pgdas|simples nacional|rbt12"),
     (INADIMPLENCIA, r"inadimpl|vencid"),
     (INVENTARIO, r"inventario|estoque"),
-    (MARKETPLACE, r"marketplace|mercado ?livre|shopee|amazon|magalu|tarifa"),
-    (APLICACAO, r"aplicac|cdb|rendimento|investimento|fundo de"),
-    (EXTRATO, r"extrato|saldo anterior|conta corrente"),
+    # "tarifa" sozinha não: extrato de banco também cobra tarifa
+    (MARKETPLACE, r"marketplace|mercado ?livre|shopee|amazon|magalu|tarifas? de (venda|envio|armazenagem|armazenamento)"),
+    (APLICACAO, r"extrato (de )?(aplicac|investimento|cdb|fundo)|aplicac|cdb|rendimento|investimento|fundo de"),
+    (EXTRATO, r"extrato|saldo anterior|conta corrente|banco"),
     (FINANCEIRO, r"fluxo de caixa|financeir|caixa|contas a (pagar|receber)"),
     (ENTRADAS, r"entrada|compra"),
     (SAIDAS, r"saida|venda|faturamento"),
@@ -147,8 +149,9 @@ def classificar(nome: str, conteudo: bytes, cnpj_empresa: str, competencias: lis
 
     # nome do arquivo pesa mais que o conteúdo: é o que a pessoa escolheu chamar
     for fonte, origem in ((_normal(nome), "nome do arquivo"), (_normal(texto[:5000]), "conteúdo")):
-        tipo = next((t for t, padrao in PALAVRAS if re.search(padrao, fonte)), None)
-        if tipo:
+        achados = [(m.start(), i, t) for i, (t, padrao) in enumerate(PALAVRAS) if (m := re.search(padrao, fonte))]
+        if achados:
+            tipo = min(achados)[2]
             s.tipo, s.motivo = tipo, f"Pelo {origem}: confira"
             break
     _escolher_mes(s, _meses_do_texto(nome), competencias)

@@ -10,6 +10,7 @@ from app.services.classificacao_documentos import (
     ENTRADAS,
     EXTRATO,
     INVENTARIO,
+    MARKETPLACE,
     PGDAS,
     SAIDAS,
     classificar,
@@ -75,6 +76,12 @@ def test_relatorio_da_dominio():
     ("extrato_banco_07_2026.csv", b"data;valor\n", EXTRATO, "2026-07"),
     ("planilha.xlsx", _planilha(["Inventário de estoque em 31/08/2026"], ["Produto", "Qtde"]), INVENTARIO, "2026-08"),
     ("documento.csv", b"Saldo anterior;10\n05/09/2026;20\n", EXTRATO, "2026-09"),
+    # como no extrato do Banco do Brasil: título no topo; tarifa e aplicação automática no meio
+    ("documento.csv", "Extrato de Conta Corrente\n05/09/2026;Tarifa pacote de serviços\n06/09/2026;BB Rende Fácil\n"
+     "Total Aplicações Financeiras\n".encode(), EXTRATO, "2026-09"),
+    ("Banco_do_Brasil_09_2026.csv", b"x", EXTRATO, "2026-09"),
+    ("documento.csv", "Extrato de Aplicação Financeira\n30/09/2026;CDB\n".encode(), APLICACAO, "2026-09"),
+    ("documento.csv", b"Relatorio de tarifas de venda\n10/08/2026;Comissao\n", MARKETPLACE, "2026-08"),
 ])
 def test_palavras_chave_no_nome_ou_no_conteudo(nome, conteudo, tipo, comp):
     s = classificar(nome, conteudo, CNPJ, COMPS)
