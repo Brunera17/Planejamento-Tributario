@@ -76,6 +76,25 @@ def test_sem_as_tabelas_dos_dois_anexos_vale_o_do_cadastro():
     assert c(engine.simular(e).simples.total) == c(D("160000") * D("0.0835625") + D("11058.75"))
 
 
+def test_rbt12_de_cada_mes_pelo_pgdas():
+    # receita declarada de R$ 70 mil/mês nos 12 meses antes de jan/2026: RBT12 de jan = R$ 840 mil;
+    # fev e mar trocam o mês mais antigo pela receita das notas de jan e fev (R$ 80 mil)
+    declaradas = {f"{a}-{m:02d}": D("70000") for a, m in [(2025, m) for m in range(1, 13)]}
+    r = engine.simular(replace(entrada(), receitas_declaradas=declaradas))
+    s = r.simples
+    rbt = {"2026-01": D("840000"), "2026-02": D("850000"), "2026-03": D("860000")}
+    ef_i = {c: D("0.107") - D("22500") / v for c, v in rbt.items()}
+    ef_iii = {c: D("0.16") - D("35640") / v for c, v in rbt.items()}
+    assert c(s.total) == c(sum(D("50000") * ef_i[m] + D("30000") * ef_iii[m] for m in COMPS))
+    assert s.detalhes["rbt12"] == D("860000")  # o resumo fica com a do último mês
+    assert [p.valor for p in r.memoria.passos if p.descricao == "RBT12 do mês"] == list(rbt.values())
+
+
+def test_sem_os_12_meses_declarados_vale_a_rbt12_unica():
+    r = engine.simular(replace(entrada(), receitas_declaradas={"2025-12": D("70000")})).simples
+    assert r.detalhes["rbt12"] == D("960000")
+
+
 def test_presumido_com_presuncao_por_atividade_e_iss():
     r = engine.simular(entrada()).presumido
     assert c(tributo(r, "PIS") + tributo(r, "COFINS")) == D("8760.00")  # (150.000 + 90.000) × 3,65%
