@@ -204,36 +204,61 @@ def ler_arquivos(nome: str, conteudo: bytes) -> tuple[list[NotaLida], list[str],
     """Retorna (notas lidas, erros por arquivo, chaves das notas canceladas por evento).
 
     O .zip é lido entrada por entrada, com teto por XML, pela soma descompactada e pela quantidade de arquivos:
-    um "zip bomb" ou um lote grande demais é recusado sem estourar a memória do servidor.
+    um "zip bomb" ou um lote grande demais é recusado sem estourar a memória do servidor. O .zip exportado do
+    portal costuma trazer outros .zip dentro (um por lote de notas): eles são lidos até 2 níveis, e os limites
+    valem para a soma de todos os níveis.
     """
     notas, erros, cancelados = [], [], set()
     if nome.lower().endswith(".zip"):
-        s = get_settings()
-        max_xml, max_total = s.nfe_xml_max_mb * MB, s.nfe_zip_descompactado_max_mb * MB
-        try:
-            z = zipfile.ZipFile(io.BytesIO(conteudo))
-        except zipfile.BadZipFile as e:
-            raise ErroNegocio("O arquivo não é um .zip válido", 415, {"arquivo": "zip inválido"}) from e
-        with z:
-            xmls = [i for i in z.infolist() if not i.is_dir() and i.filename.lower().endswith(".xml")]
-            if len(xmls) > s.nfe_zip_max_arquivos:
-                raise ErroNegocio(f"O .zip tem {len(xmls)} XML; o limite é {s.nfe_zip_max_arquivos} por envio — divida em partes",
-                                  413, {"arquivo": "arquivos demais"})
-            total = 0
-            for info in xmls:
-                try:
-                    dados = _ler_entrada(z, info, max_xml)
-                except Exception as e:  # noqa: BLE001 – entrada corrompida vira linha do relatório
-                    erros.append(f"{info.filename}: {e}")
-                    continue
-                if dados is None:
-                    erros.append(f"{info.filename}: XML acima de {s.nfe_xml_max_mb} MB, ignorado")
-                    continue
-                total += len(dados)
-                if total > max_total:
-                    raise ErroNegocio(f"O conteúdo descompactado do .zip passa de {s.nfe_zip_descompactado_max_mb} MB — divida em partes",
-                                      413, {"arquivo": "conteúdo grande demais"})
-                _ler(info.filename, dados, notas, cancelados, erros)
+        _ler_zip(conteudo, "", notas, erros, cancelados, {"xmls": 0, "bytes": 0}, 0)
     else:
         _ler(nome, conteudo, notas, cancelados, erros)
     return notas, erros, cancelados
+
+
+ZIP_MAX_NIVEIS = 2  # .zip dentro de .zip dentro de .zip
+
+
+def _ler_zip(conteudo: bytes, prefixo: str, notas: list, erros: list, cancelados: set, conta: dict, nivel: int) -> None:
+    s = get_settings()
+    max_xml, max_total = s.nfe_xml_max_mb * MB, s.nfe_zip_descompactado_max_mb * MB
+    try:
+        z = zipfile.ZipFile(io.BytesIO(conteudo))
+    except zipfile.BadZipFile as e:
+        if nivel:  # .zip interno corrompido não derruba o lote
+            erros.append(f"{prefixo.rstrip('/')}: não é um .zip válido")
+            return
+        raise ErroNegocio("O arquivo não é um .zip válido", 415, {"arquivo": "zip inválido"}) from e
+    with z:
+        arquivos = [i for i in z.infolist() if not i.is_dir()]
+        xmls = [i for i in arquivos if i.filename.lower().endswith(".xml")]
+        conta["xmls"] += len(xmls)
+        if conta["xmls"] > s.nfe_zip_max_arquivos:
+            raise ErroNegocio(f"O .zip tem mais de {s.nfe_zip_max_arquivos} XML; divida em partes",
+                              413, {"arquivo": "arquivos demais"})
+        for info in xmls:
+            try:
+                dados = _ler_entrada(z, info, max_xml)
+            except Exception as e:  # noqa: BLE001 – entrada corrompida vira linha do relatório
+                erros.append(f"{prefixo}{info.filename}: {e}")
+                continue
+            if dados is None:
+                erros.append(f"{prefixo}{info.filename}: XML acima de {s.nfe_xml_max_mb} MB, ignorado")
+                continue
+            conta["bytes"] += len(dados)
+            if conta["bytes"] > max_total:
+                raise ErroNegocio(f"O conteúdo descompactado do .zip passa de {s.nfe_zip_descompactado_max_mb} MB — divida em partes",
+                                  413, {"arquivo": "conteúdo grande demais"})
+            _ler(prefixo + info.filename, dados, notas, cancelados, erros)
+        if nivel >= ZIP_MAX_NIVEIS:
+            return
+        for info in (i for i in arquivos if i.filename.lower().endswith(".zip")):
+            try:
+                dados = _ler_entrada(z, info, s.nfe_zip_max_mb * MB)
+            except Exception as e:  # noqa: BLE001
+                erros.append(f"{prefixo}{info.filename}: {e}")
+                continue
+            if dados is None:
+                erros.append(f"{prefixo}{info.filename}: .zip interno acima de {s.nfe_zip_max_mb} MB, ignorado")
+                continue
+            _ler_zip(dados, f"{prefixo}{info.filename}/", notas, erros, cancelados, conta, nivel + 1)
