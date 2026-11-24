@@ -1,6 +1,6 @@
 """Envio em lote na tela de Documentos: sugere o tipo e o mês de cada arquivo, sem gravar nada.
 
-Os formatos que o sistema já lê (XML/ZIP de NF-e, extrato do PGDAS-D, relatório de movimentação da Domínio) são
+Os formatos que o sistema já lê (XML/ZIP de NF-e e NFS-e, extrato do PGDAS-D, relatório de movimentação da Domínio) são
 reconhecidos pelo conteúdo. Os demais (planilhas e PDFs de banco, que variam de empresa para empresa) vão por
 palavras-chave no nome e no começo do texto; o que não for reconhecido volta em branco para o usuário escolher.
 """
@@ -17,6 +17,7 @@ from pypdf import PdfReader
 
 from app.core.config import get_settings
 from app.services import nfe_xml, pgdas, relatorio_contabil
+from app.services.nfse_xml import ServicoLido
 from app.utils.validacao import sem_acentos
 
 # nomes dos tipos como estão no cadastro (seeds/carga.py)
@@ -159,14 +160,16 @@ def _por_nfe(s: Sugestao, nome: str, conteudo: bytes, cnpj: str, competencias: l
             notas, _, _ = nfe_xml.ler_arquivos(nome, conteudo)
     except Exception:  # noqa: BLE001 – ZIP inválido: segue para as palavras-chave
         return False
-    notas = [n for n in notas if isinstance(n, nfe_xml.NotaLida)]
     if not notas:
         return False
-    emitidas = sum(n.cnpj_emitente == cnpj for n in notas)
+    # NFS-e prestada pela empresa é documento de saída, como a NF-e emitida; a tomada, de entrada (não há tipo próprio)
+    nfse = sum(isinstance(n, ServicoLido) for n in notas)
+    emitidas = sum((n.cnpj_prestador if isinstance(n, ServicoLido) else n.cnpj_emitente) == cnpj for n in notas)
     s.tipo = SAIDAS if emitidas * 2 >= len(notas) else ENTRADAS
     _escolher_mes(s, Counter(n.competencia for n in notas), competencias)
     acao = "emitida" if s.tipo == SAIDAS else "recebida"
-    s.motivo = f"{len(notas)} NF-e {acao}{'s' if len(notas) > 1 else ''} pela empresa"
+    tipos = " e ".join(t for t in (f"{len(notas) - nfse} NF-e" if nfse < len(notas) else "", f"{nfse} NFS-e" if nfse else "") if t)
+    s.motivo = f"{tipos} {acao}{'s' if len(notas) > 1 else ''} pela empresa"
     if emitidas and emitidas != len(notas):
         s.motivo += f" ({emitidas} emitidas e {len(notas) - emitidas} recebidas)"
     if nome.lower().endswith(".zip"):
