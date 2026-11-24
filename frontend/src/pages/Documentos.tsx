@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { api, baixarArquivo, mensagemErro } from "../api/cliente";
 import { Botao, Card, EnvioArquivo, Erro, Modal, Obrigatorio } from "../components/ui";
-import { competenciaExtenso } from "../lib/formato";
+import { brl, competenciaExtenso } from "../lib/formato";
 
 type Documento = {
   id: number;
@@ -303,7 +303,18 @@ type Sugestao = {
   motivo?: string;
   competencias_no_arquivo?: string[];
   cobre_tipos?: number[];
+  despesas?: PreviaDespesas | null;
   erro?: string;
+};
+/** O que a importação da planilha de despesas gravaria na aba Despesas. */
+type PreviaDespesas = {
+  meses: string[];
+  meses_fechados: string[];
+  valores: number;
+  outras: number;
+  total: number;
+  substitui_digitados: number;
+  avisos: string[];
 };
 type ItemLote = {
   file: File;
@@ -314,6 +325,8 @@ type ItemLote = {
   erro?: string;
   cobre: number[]; // planilha de despesas: documentos que o cliente responde nela
   marcarCobertos: boolean;
+  despesas: PreviaDespesas | null;
+  importarDespesas: boolean;
 };
 
 /** Vários arquivos de uma vez: o servidor sugere tipo e mês de cada um, a pessoa confere e envia pela rota de sempre. */
@@ -336,7 +349,12 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
         const s = r[i];
         const comp = s.competencia && abertos.includes(s.competencia) ? s.competencia : null;
         const cobre = s.cobre_tipos ?? [];
-        return { file, tipo: s.tipo_documento_id ?? null, competencia: comp, motivo: s.motivo ?? "", meses: s.competencias_no_arquivo ?? [], erro: s.erro, cobre, marcarCobertos: cobre.length > 0 };
+        const despesas = s.despesas ?? null;
+        const temValores = !!despesas && despesas.valores + despesas.outras > 0;
+        return {
+          file, tipo: s.tipo_documento_id ?? null, competencia: comp, motivo: s.motivo ?? "", meses: s.competencias_no_arquivo ?? [], erro: s.erro,
+          cobre, marcarCobertos: cobre.length > 0, despesas: temValores ? despesas : null, importarDespesas: temValores,
+        };
       });
     },
     onSuccess: (novos) => setItens((atuais) => [...atuais, ...novos]),
@@ -386,6 +404,11 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
                 justificativa: `Informado na planilha de despesas (${i.file.name})`.slice(0, 500),
                 somente_pendente: true,
               });
+          if (i.importarDespesas) {
+            const pl = new FormData();
+            pl.append("arquivo", i.file);
+            await api.post(`/planejamentos/${pid}/despesas/planilha`, pl);
+          }
         } catch (e) {
           falhas.set(i.file, mensagemErro(e));
         }
@@ -398,6 +421,7 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
       qc.invalidateQueries({ queryKey: ["documentos", pid] });
       qc.invalidateQueries({ queryKey: ["planejamento", String(pid)] });
       qc.invalidateQueries({ queryKey: ["progresso", pid] });
+      qc.invalidateQueries({ queryKey: ["levantamento", pid] });
     },
   });
 
@@ -442,6 +466,26 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
                           <label className="mt-1 flex items-start gap-1.5 text-xs">
                             <input type="checkbox" className="mt-0.5" checked={i.marcarCobertos} onChange={(e) => mudar(idx, { marcarCobertos: e.target.checked })} />
                             <span>{textoCobertos(cob, i.tipo)}</span>
+                          </label>
+                        )}
+                        {i.despesas && (
+                          <label className="mt-1 flex items-start gap-1.5 text-xs">
+                            <input type="checkbox" className="mt-0.5" checked={i.importarDespesas} onChange={(e) => mudar(idx, { importarDespesas: e.target.checked })} />
+                            <span>
+                              Importar os valores na aba Despesas: {i.despesas.valores + i.despesas.outras} valores em{" "}
+                              {i.despesas.meses.map(competenciaExtenso).join(", ")}, total {brl(i.despesas.total)}
+                              {i.despesas.substitui_digitados > 0 && (
+                                <span className="block text-alert-ink">Substitui {i.despesas.substitui_digitados} valores já informados com outro valor</span>
+                              )}
+                              {i.despesas.meses_fechados.length > 0 && (
+                                <span className="block text-alert-ink">
+                                  Fora: {i.despesas.meses_fechados.map(competenciaExtenso).join(", ")} (enviado para conferência)
+                                </span>
+                              )}
+                              {i.despesas.avisos.map((a) => (
+                                <span key={a} className="block text-text-muted">{a}</span>
+                              ))}
+                            </span>
                           </label>
                         )}
                       </td>

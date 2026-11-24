@@ -17,7 +17,7 @@ from app.core.config import get_settings
 from app.core.erros import ErroNegocio, NaoEncontrado
 from app.models import Bem, Documento, Levantamento, Planejamento, TipoDocumento
 from app.schemas.comum import Esquema
-from app.services import classificacao_documentos, cripto, documentos, pgdas, progresso
+from app.services import classificacao_documentos, cripto, documentos, pgdas, planilha_despesas, progresso
 from app.services.auditoria import auditar
 from app.utils.download import anexo
 from app.utils.upload import ler_limitado
@@ -199,9 +199,15 @@ def classificar_documentos(pid: int, arquivos: list[UploadFile], db: DB, _: Usua
             saida.append({"arquivo": nome, "erro": e.mensagem})
             continue
         s = classificacao_documentos.classificar(nome, conteudo, cnpj, competencias)
+        despesas = None
+        if s.cobre and nome.lower().endswith(".xlsx"):  # planilha de despesas: prévia da importação dos valores
+            try:
+                despesas = planilha_despesas.previa(db, p, planilha_despesas.ler(db, conteudo, competencias))
+            except planilha_despesas.PlanilhaInvalida:
+                pass
         saida.append({"arquivo": nome, "tipo_documento_id": tipos.get(s.tipo), "competencia": s.competencia,
                       "motivo": s.motivo, "competencias_no_arquivo": s.competencias_no_arquivo,
-                      "cobre_tipos": [tipos[t] for t in s.cobre if t in tipos]})
+                      "cobre_tipos": [tipos[t] for t in s.cobre if t in tipos], "despesas": despesas})
     return saida
 
 
