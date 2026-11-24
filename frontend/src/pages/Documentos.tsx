@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { api, baixarArquivo, mensagemErro } from "../api/cliente";
-import { Botao, Card, EnvioArquivo, Erro, Modal, Obrigatorio } from "../components/ui";
+import { Botao, Card, EnvioArquivo, Erro, Modal, Obrigatorio, Progresso, useProgresso } from "../components/ui";
 import { brl, competenciaExtenso } from "../lib/formato";
 
 type Documento = {
@@ -147,11 +147,12 @@ function EnvioDocumento({ pid, celula, fechar, falhou }: { pid: number; celula: 
     fechar();
   }
   const opcoes = { onSuccess: concluido, onError: (e: unknown) => setErro(mensagemErro(e)) };
+  const progresso = useProgresso();
   const enviar = useMutation({
     mutationFn: () => {
       const fd = new FormData();
       fd.append("arquivo", arquivos[0]);
-      return api.post(`/planejamentos/${pid}/documentos/${celula.competencia}/${celula.tipo}`, fd);
+      return progresso.enviar(0, 1, (cfg) => api.post(`/planejamentos/${pid}/documentos/${celula.competencia}/${celula.tipo}`, fd, cfg));
     },
     ...opcoes,
   });
@@ -214,7 +215,10 @@ function EnvioDocumento({ pid, celula, fechar, falhou }: { pid: number; celula: 
               </label>
             </fieldset>
             {modo === "arquivo" ? (
-              <EnvioArquivo formatos={FORMATOS} arquivos={arquivos} aoEscolher={(fs) => setArquivos(fs.slice(0, 1))} />
+              <>
+                <EnvioArquivo formatos={FORMATOS} arquivos={arquivos} aoEscolher={(fs) => setArquivos(fs.slice(0, 1))} />
+                {enviar.isPending && <Progresso pct={progresso.pct} acao="Enviando o arquivo" />}
+              </>
             ) : (
               <label className="block">
                 Por que este documento não se aplica?<Obrigatorio />
@@ -337,14 +341,16 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
   const [erro, setErro] = useState<string | null>(null);
   const abertos = dados.competencias.filter((c) => c.editavel).map((c) => c.competencia);
 
+  const leitura = useProgresso();
+  const envio = useProgresso();
   const classificar = useMutation({
     mutationFn: async (files: File[]) => {
       // um arquivo por requisição: o lote inteiro numa só passaria de centenas de MB
       const r: Sugestao[] = [];
-      for (const f of files) {
+      for (const [k, f] of files.entries()) {
         const fd = new FormData();
         fd.append("arquivos", f);
-        r.push(...(await api.post<Sugestao[]>(`/planejamentos/${pid}/documentos/classificar`, fd)).data);
+        r.push(...(await leitura.enviar(k, files.length, (cfg) => api.post<Sugestao[]>(`/planejamentos/${pid}/documentos/classificar`, fd, cfg))).data);
       }
       return files.map((file, i): ItemLote => {
         const s = r[i];
@@ -394,11 +400,11 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
   const enviar = useMutation({
     mutationFn: async () => {
       const falhas = new Map<File, string>();
-      for (const i of prontos) {
+      for (const [k, i] of prontos.entries()) {
         const fd = new FormData();
         fd.append("arquivo", i.file);
         try {
-          await api.post(`/planejamentos/${pid}/documentos/${i.competencia}/${i.tipo}`, fd);
+          await envio.enviar(k, prontos.length, (cfg) => api.post(`/planejamentos/${pid}/documentos/${i.competencia}/${i.tipo}`, fd, cfg));
           if (i.marcarCobertos)
             for (const c of cobertos(i))
               await api.put(`/planejamentos/${pid}/documentos/${c.competencia}/${c.tipo}/nao-se-aplica`, {
@@ -434,7 +440,8 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
     <Card titulo="Enviar vários arquivos" adendo="O sistema sugere o documento e o mês de cada arquivo; confira antes de enviar. Até 30 MB por arquivo.">
       <div className="space-y-3 text-sm">
         <EnvioArquivo formatos={FORMATOS} multiplo arquivos={[]} aoEscolher={(fs) => { setErro(null); classificar.mutate(fs.slice(0, 30)); }} />
-        {classificar.isPending && <p className="text-text-muted">Lendo os arquivos…</p>}
+        {classificar.isPending && <Progresso pct={leitura.pct} />}
+        {enviar.isPending && <Progresso pct={envio.pct} acao="Enviando os arquivos" />}
         <Erro mensagem={erro} />
         {itens.length > 0 && (
           <>

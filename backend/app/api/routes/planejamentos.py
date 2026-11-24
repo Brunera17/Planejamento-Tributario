@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from fastapi import APIRouter, UploadFile
 from fastapi.responses import Response
 from pydantic import Field
-from sqlalchemy import delete, insert, or_, select, update
+from sqlalchemy import delete, func, insert, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.api.deps import DB, Contador, UsuarioAtual, obter_planejamento
@@ -25,6 +25,7 @@ from app.models import (
     LevantamentoItem,
     NotaFiscal,
     NotaItem,
+    NotaServico,
     OutraDespesa,
     Planejamento,
     PremissaPlanejamento,
@@ -49,6 +50,7 @@ from app.seeds import tabelas
 from app.services.entrada import ANEXOS_SERVICO, PREMISSAS
 from app.services.auditoria import auditar, auditar_uma_vez
 from app.services.nfe_xml import ler_arquivos
+from app.services.nfse_xml import ServicoLido
 from app.services.simulacao import marcar_desatualizada
 from app.utils.paginacao import Deslocamento, Limite, pagina
 from app.utils.upload import ler_limitado
@@ -527,18 +529,20 @@ def simular_despesas(pid: int, db: DB, u: Contador, competencia: str | None = No
 
 @router.post("/{pid}/nfe")
 def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
-    """XML de NF-e avulso ou .zip com vários XML. Notas já importadas (mesma chave) são ignoradas."""
+    """XML de NF-e ou NFS-e avulso ou .zip com vários XML. Notas já importadas (mesma chave) são ignoradas."""
     p = obter_planejamento(db, pid)
     _recusar_se_aprovado(db, p)
     nome = arquivo.filename or "arquivo"
     if not nome.lower().endswith((".xml", ".zip")):
-        raise ErroNegocio("Envie um XML de NF-e ou um .zip com XMLs", 415)
+        raise ErroNegocio("Envie um XML de NF-e ou NFS-e, ou um .zip com XMLs", 415)
     s = get_settings()
     limite = s.nfe_zip_max_mb if nome.lower().endswith(".zip") else s.nfe_xml_max_mb
     notas, erros, novas_canceladas = ler_arquivos(nome, ler_limitado(arquivo, limite))
+    servicos = [n for n in notas if isinstance(n, ServicoLido)]
+    notas = [n for n in notas if not isinstance(n, ServicoLido)]
     cancelados = nfe_canceladas.canceladas(pid, novas_canceladas)  # inclui as canceladas em envios anteriores
-    imp = ImportacaoNfe(planejamento_id=pid, origem="XML", arquivo=nome, importado_por=u.id, lidos=len(notas),
-                        importados=0, ignorados=0)
+    imp = ImportacaoNfe(planejamento_id=pid, origem="XML", arquivo=nome, importado_por=u.id,
+                        lidos=len(notas) + len(servicos), importados=0, ignorados=0)
     db.add(imp)
     db.flush()
     comps = set(p.competencias())
@@ -625,6 +629,7 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
         # mês sem nota de entrada restante (a última foi cancelada) não aparece na soma: vale zero
         depois = {c: depois.get(c, (Decimal(0), Decimal(0))) for c in comps_entrada}
         avisos = relatorio_contabil.preencher_pelas_entradas(db, p, antes, depois)
+    avisos += _importar_servicos(db, p, imp, servicos, comps, log)
     imp.status = "CONCLUIDA"
     imp.log = "\n".join(log + avisos) or None
     _alterou(db, p)
@@ -634,6 +639,52 @@ def importar_nfe(pid: int, arquivo: UploadFile, db: DB, u: UsuarioAtual):
                       "erros": len(erros)})
     return {"id": imp.id, "lidos": imp.lidos, "importados": imp.importados, "ignorados": imp.ignorados, "log": log,
             "avisos": avisos}
+
+
+def _importar_servicos(db: Session, p: Planejamento, imp: ImportacaoNfe, servicos: list[ServicoLido], comps: set[str],
+                       log: list[str]) -> list[str]:
+    """NFS-e prestada pela empresa: guarda a nota (a reenviada é ignorada) e a receita de serviço do mês passa a ser a
+    soma das notas importadas. A cancelada sai da soma."""
+    if not servicos:
+        return []
+    existentes = {n.chave: n for n in db.scalars(select(NotaServico).where(
+        NotaServico.planejamento_id == p.id, NotaServico.chave.in_({s.chave[:60] for s in servicos})))}
+    meses = set()
+    for s in servicos:
+        chave = s.chave[:60]
+        if s.cancelada and chave in existentes:
+            meses.add(existentes[chave].competencia)
+            db.delete(existentes.pop(chave))
+            log.append(f"NFS-e {s.numero}: cancelada; removida do planejamento")
+            continue
+        motivo = ("cancelada, ignorada" if s.cancelada
+                  else f"competência {s.competencia} fora do período" if s.competencia not in comps
+                  else "serviço tomado (a empresa não é a prestadora), ignorada" if s.cnpj_prestador != p.empresa.cnpj
+                  else "já importada" if chave in existentes else None)
+        if motivo:
+            imp.ignorados += 1
+            log.append(f"NFS-e {s.numero}: {motivo}")
+            continue
+        existentes[chave] = NotaServico(planejamento_id=p.id, importacao_id=imp.id, chave=chave, numero=s.numero[:20],
+                                        competencia=s.competencia, valor=s.valor)
+        db.add(existentes[chave])
+        imp.importados += 1
+        meses.add(s.competencia)
+    db.flush()
+    somas = dict(db.execute(select(NotaServico.competencia, func.sum(NotaServico.valor))
+                            .where(NotaServico.planejamento_id == p.id, NotaServico.competencia.in_(meses))
+                            .group_by(NotaServico.competencia)).all())
+    avisos = []
+    for c in sorted(meses):
+        total = Decimal(str(somas.get(c, 0)))
+        m = db.scalar(select(ReceitaServicoMensal).where(ReceitaServicoMensal.planejamento_id == p.id,
+                                                         ReceitaServicoMensal.competencia == c))
+        if m is None:
+            db.add(ReceitaServicoMensal(planejamento_id=p.id, competencia=c, valor=total))
+        else:
+            m.valor = total
+        avisos.append(f"Serviços de {c[5:]}/{c[:4]}: {_brl(total)}, soma das NFS-e importadas")
+    return avisos
 
 
 LOTE_ITENS = 1000  # itens por INSERT na importação de NF-e

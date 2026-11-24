@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 
 import { api, baixarArquivo, lerSessao, mensagemErro } from "../api/cliente";
 import type { Bloco, Catalogo, Planejamento as TPlanejamento, SimulacaoResumo } from "../api/tipos";
-import { Badge, BarraProgresso, Botao, BotaoLink, Cabecalho, CampoMoeda, Card, EnvioArquivo, Erro, Ficha, Modal, Obrigatorio, Tabela, useConfirmacao } from "../components/ui";
+import { Badge, BarraProgresso, Botao, BotaoLink, Cabecalho, CampoMoeda, Card, EnvioArquivo, Erro, Ficha, Modal, Obrigatorio, Progresso, Tabela, useConfirmacao, useProgresso } from "../components/ui";
 import { brl, competenciaExtenso, dataHora, editarMoeda, formatarCnpj, lerMoeda, REGIMES } from "../lib/formato";
 import { Bens } from "./Bens";
 import { Documentos } from "./Documentos";
@@ -82,7 +82,7 @@ type ColetaDados = {
   devolucoes: Record<string, number>;
   servicos: Record<string, number>;
   folha: Record<string, { folha: number | null; pro_labore: number | null }>;
-  saidas: { competencia: string; notas: number; itens: number; valor: number }[];
+  saidas: { competencia: string; notas: number; itens: number; valor: number; receita?: number; fora?: { cfop: number; valor: number; sem_regra: boolean }[] }[];
 };
 
 function useAtualizar(pid: number) {
@@ -117,28 +117,46 @@ function Coleta({ pid }: { pid: number }) {
     },
   });
 
+  const progresso = useProgresso();
   const importar = useMutation({
-    mutationFn: (f: File) => {
-      const fd = new FormData();
-      fd.append("arquivo", f);
-      return api.post(`/planejamentos/${pid}/nfe`, fd);
+    // um arquivo por vez: a barra conta os arquivos, e o arquivo que falha não impede os outros
+    mutationFn: async (arquivos: File[]) => {
+      const total = { lidos: 0, importados: 0, ignorados: 0 };
+      const avisos: string[] = [];
+      const falhas: string[] = [];
+      for (const [k, f] of arquivos.entries()) {
+        const fd = new FormData();
+        fd.append("arquivo", f);
+        try {
+          const r = (await progresso.enviar(k, arquivos.length, (cfg) => api.post(`/planejamentos/${pid}/nfe`, fd, cfg))).data;
+          total.lidos += r.lidos;
+          total.importados += r.importados;
+          total.ignorados += r.ignorados;
+          avisos.push(...(r.avisos ?? []));
+        } catch (e) {
+          falhas.push(arquivos.length > 1 ? `${f.name}: ${mensagemErro(e)}` : mensagemErro(e));
+        }
+      }
+      return { total, avisos, falhas };
     },
-    onSuccess: (r) => {
+    onSuccess: ({ total, avisos, falhas }) => {
       setRelatorios(null);
-      const avisos: string[] = r.data.avisos ?? [];
-      setLog([`${r.data.lidos} notas lidas: ${r.data.importados} importadas e ${r.data.ignorados} ignoradas.`, ...avisos].join("\n"));
+      setErro(falhas.length ? falhas.join("\n") : null);
+      // cada arquivo devolve a soma do mês até ali ("Serviços de 07/2026: …"): fica só o último aviso de cada assunto
+      const ultimos = [...new Map(avisos.map((a) => [a.split(":")[0], a])).values()];
+      setLog([`${total.lidos} notas lidas: ${total.importados} importadas e ${total.ignorados} ignoradas.`, ...ultimos].join("\n"));
       atualizar();
     },
-    onError: (e) => setErro(mensagemErro(e)),
   });
 
   const importarRelatorio = useMutation({
     mutationFn: async (arquivos: File[]) => {
       const resumos: ResumoRelatorio[] = [];
-      for (const f of arquivos) {
+      for (const [k, f] of arquivos.entries()) {
         const fd = new FormData();
         fd.append("arquivo", f);
-        resumos.push({ ...(await api.post<ResumoRelatorio>(`/planejamentos/${pid}/relatorio-contabil`, fd)).data, arquivo: f.name });
+        const r = await progresso.enviar(k, arquivos.length, (cfg) => api.post<ResumoRelatorio>(`/planejamentos/${pid}/relatorio-contabil`, fd, cfg));
+        resumos.push({ ...r.data, arquivo: f.name });
       }
       return resumos;
     },
@@ -158,7 +176,7 @@ function Coleta({ pid }: { pid: number }) {
     mutationFn: (f: File) => {
       const fd = new FormData();
       fd.append("arquivo", f);
-      return api.post<{ competencias: string[]; valores: number }>(`/planejamentos/${pid}/planilha-mensal`, fd);
+      return progresso.enviar(0, 1, (cfg) => api.post<{ competencias: string[]; valores: number }>(`/planejamentos/${pid}/planilha-mensal`, fd, cfg));
     },
     onSuccess: (r) => {
       setErro(null);
@@ -176,6 +194,7 @@ function Coleta({ pid }: { pid: number }) {
 
   return (
     <div className="space-y-4">
+      {(importar.isPending || importarRelatorio.isPending || importarPlanilha.isPending) && <Progresso pct={progresso.pct} />}
       <Erro mensagem={erro} />
       {log && <p className="whitespace-pre-line text-sm">{log}</p>}
       {relatorios && <ResumoImportacao resumos={relatorios} fechar={() => setRelatorios(null)} />}
@@ -189,27 +208,56 @@ function Coleta({ pid }: { pid: number }) {
         semPadding
       >
         <Tabela
-          cabecalho={["Competência", "Faturamento (notas de saída)", "Serviços (NFS-e)", "Compras", "Devoluções", "Folha", "Pró-labore"]}
-          numericas={[1, 2, 3, 4, 5, 6]}
+          cabecalho={["Competência", "Faturamento bruto", "Faturamento líquido", "Serviços (NFS-e)", "Compras", "Devoluções", "Folha", "Pró-labore"]}
+          numericas={[1, 2, 3, 4, 5, 6, 7]}
         >
           {data.competencias.map((c) => {
             const s = data.saidas.find((x) => x.competencia === c);
-            const servico = Number(data.servicos?.[c] ?? 0) > 0;
+            // como o cálculo: bruto = itens com CFOP que gera receita + serviços; líquido = bruto − devoluções
+            const servicos = Number(data.servicos?.[c] ?? 0);
+            const devolucoes = Number(data.devolucoes[c] ?? 0);
+            const fora = (s?.fora ?? []).reduce((t, f) => t + Number(f.valor), 0);
+            const bruto = s ? (s.receita != null ? Number(s.receita) + servicos : null) : servicos > 0 ? servicos : null;
             return (
               <tr key={c}>
                 <td className="px-4 py-1.5">{competenciaExtenso(c)}</td>
                 <td className="num px-2 py-1.5">
-                  {s ? (
+                  {bruto != null ? (
                     <>
-                      {brl(s.valor)}
+                      {brl(bruto)}
                       <span className="block text-xs text-text-muted">
-                        {s.notas} {s.notas === 1 ? "nota" : "notas"}
+                        {s ? `${s.notas} ${s.notas === 1 ? "nota" : "notas"}` : "sem notas"}
+                        {!!fora && (
+                          // o detalhe por CFOP fica no title: a lista inteira alargava a tabela
+                          <span
+                            className="block cursor-help underline decoration-dotted underline-offset-2"
+                            title={
+                              `Total das notas de saída: ${brl(s!.valor)}\nFora do faturamento (remessa, lançamento de venda já em NFC-e…):\n` +
+                              s!.fora!.map((f) => `CFOP ${f.cfop}${f.sem_regra ? " (sem regra)" : ""}: ${brl(f.valor)}`).join("\n")
+                            }
+                          >
+                            {brl(fora)} fora (CFOP)
+                          </span>
+                        )}
                       </span>
                     </>
-                  ) : servico ? (
-                    <span className="text-text-muted">sem notas</span>
+                  ) : s ? (
+                    // retrato de planejamento aprovado antes da separação por CFOP: só o total das notas
+                    <span className="text-text-muted" title="Total de todas as notas de saída, sem separar por CFOP">
+                      {brl(s.valor)}
+                    </span>
                   ) : (
                     <span className="text-alert">pendente</span>
+                  )}
+                </td>
+                <td className="num px-2 py-1.5">
+                  {bruto != null ? (
+                    <>
+                      {brl(bruto - devolucoes)}
+                      {devolucoes > 0 && <span className="block text-xs text-text-muted">− {brl(devolucoes)} devoluções</span>}
+                    </>
+                  ) : (
+                    <span className="text-text-muted">—</span>
                   )}
                 </td>
                 <td className="px-2 py-1 text-right">
@@ -243,7 +291,7 @@ function Coleta({ pid }: { pid: number }) {
           setImportando(false);
           if (tipo === "relatorio") importarRelatorio.mutate(arquivos);
           else if (tipo === "planilha") importarPlanilha.mutate(arquivos[0]);
-          else arquivos.forEach((f) => importar.mutate(f));
+          else importar.mutate(arquivos);
         }}
         baixarModelo={() => baixarArquivo(`/planejamentos/${pid}/planilha-mensal`, "movimento-mensal.xlsx").catch((e) => setErro(mensagemErro(e)))}
       />
@@ -258,9 +306,9 @@ const TIPOS_IMPORTACAO = {
     formatos: [".xls", ".xlsx"],
   },
   xml: {
-    nome: "XML de NF-e",
+    nome: "XML de NF-e ou NFS-e",
     detalhe:
-      "Notas de saída, de entrada ou de devolução, avulsas ou num arquivo .zip. As de saída preenchem o faturamento e a lista de produtos para revisão; as de entrada, as compras para revenda e as devoluções de venda do mês (sem apagar valor digitado).",
+      "Notas de saída, de entrada ou de devolução, avulsas ou num arquivo .zip. As de saída preenchem o faturamento e a lista de produtos para revisão; as de entrada, as compras para revenda e as devoluções de venda do mês (sem apagar valor digitado). As NFS-e prestadas pela empresa (padrão nacional ou da prefeitura) somam os serviços do mês; as tomadas ficam de fora.",
     formatos: [".xml", ".zip"],
   },
   planilha: {
@@ -290,22 +338,27 @@ function ImportarDocumentos({
     <Modal aberto={aberto} fechar={fechar} titulo="Importar documentos" descricao="Os valores lidos entram no movimento mensal; notas já importadas não são duplicadas.">
       <div className="space-y-4 text-sm">
         <fieldset className="grid gap-2 sm:grid-cols-3">
-          <legend className="mb-1 font-medium">Tipo de documento</legend>
+          <legend className="mb-1.5 font-medium">Tipo de documento</legend>
           {(Object.keys(TIPOS_IMPORTACAO) as (keyof typeof TIPOS_IMPORTACAO)[]).map((k) => (
-            <label key={k} className={`flex cursor-pointer gap-2 rounded border px-3 py-2 ${tipo === k ? "border-brand bg-highlight" : "border-border"}`}>
+            <label
+              key={k}
+              className={`flex cursor-pointer flex-col justify-between gap-1 rounded border px-3 py-2.5 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand ${
+                tipo === k ? "border-brand bg-highlight shadow-[inset_3px_0_0_var(--color-brand)]" : "border-border bg-white hover:border-brand"
+              }`}
+            >
+              {/* a bolinha nativa fica só para o leitor de tela e o teclado; o cartão inteiro mostra a escolha */}
               <input
                 type="radio"
                 name="tipo-documento"
+                className="sr-only"
                 checked={tipo === k}
                 onChange={() => {
                   setTipo(k);
                   setArquivos([]);
                 }}
               />
-              <span>
-                <span className="block font-medium">{TIPOS_IMPORTACAO[k].nome}</span>
-                <span className="text-xs text-text-muted">{TIPOS_IMPORTACAO[k].formatos.join(", ")}</span>
-              </span>
+              <span className={`font-medium leading-snug ${tipo === k ? "text-brand" : ""}`}>{TIPOS_IMPORTACAO[k].nome}</span>
+              <span className="text-xs text-text-muted">{TIPOS_IMPORTACAO[k].formatos.join(", ")}</span>
             </label>
           ))}
         </fieldset>

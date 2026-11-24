@@ -5,7 +5,7 @@ import { api, mensagemErro } from "../api/cliente";
 import type { Empresa } from "../api/tipos";
 import { EscolhaEmpresa } from "../components/EscolhaEmpresa";
 import { PainelDas } from "../components/PainelDas";
-import { Botao, Cabecalho, Card, CampoMoeda, EnvioArquivo, Erro, Ficha, Paginacao, Tabela } from "../components/ui";
+import { Botao, Cabecalho, Card, CampoMoeda, EnvioArquivo, Erro, Ficha, Paginacao, Progresso, Tabela, useProgresso } from "../components/ui";
 import { brl, competenciaExtenso, lerMoeda, percentual } from "../lib/formato";
 
 type Linha = {
@@ -20,7 +20,7 @@ type Linha = {
   xml?: boolean; // veio dos XML enviados: é refeita quando o lote muda
 };
 
-type Leitura = { linhas: Linha[]; avisos: string[]; info: string[]; erros: string[]; vendas: number; compras: number };
+type Leitura = { linhas: Linha[]; avisos: string[]; info: string[]; erros: string[]; vendas: number; compras: number; servicos?: number };
 type Parcela = { anexo: string; monofasico: boolean; st: boolean; iss_fora_do_das: string | null; receita: number };
 
 type Resultado = {
@@ -94,18 +94,19 @@ export function CalculadoraSimples() {
   }
 
   // o lote inteiro vai de uma vez: as compras (opcionais) conferem o ST e o monofásico de todas as vendas
+  const progresso = useProgresso();
   const lerNfe = useMutation({
     mutationFn: async (lote: File[]) => {
       if (!lote.length) return null;
       const corpo = new FormData();
       lote.forEach((f) => corpo.append("arquivos", f));
       corpo.append("empresa_id", empresaId);
-      return (await api.post<Leitura>("/calculadora-simples/nfe", corpo)).data;
+      return (await progresso.enviar(0, 1, (cfg) => api.post<Leitura>("/calculadora-simples/nfe", corpo, cfg))).data;
     },
     onSuccess: (d) => {
       const digitadas = linhas.filter((l) => !l.xml);
       mudarLinhas([...(d?.linhas ?? []).map((l) => ({ ...l, xml: true })), ...digitadas]);
-      setLeitura(d && { avisos: d.avisos, info: d.info, erros: d.erros, vendas: d.vendas, compras: d.compras });
+      setLeitura(d && { avisos: d.avisos, info: d.info, erros: d.erros, vendas: d.vendas, compras: d.compras, servicos: d.servicos });
       setErro(null);
     },
     onError: (e) => setErro(mensagemErro(e)),
@@ -269,15 +270,15 @@ export function CalculadoraSimples() {
                   </span>
                 )}
               </div>
-              {lerNfe.isPending && <p role="status" className="mt-2 text-sm text-text-muted">Lendo os arquivos…</p>}
+              {lerNfe.isPending && <div className="mt-2"><Progresso pct={progresso.pct} /></div>}
             </div>
           ) : (
-            <p className="text-sm text-text-muted">Escolha a empresa para enviar XML de NF-e.</p>
+            <p className="text-sm text-text-muted">Escolha a empresa para enviar XML de NF-e ou NFS-e.</p>
           )}
           {leitura && !lerNfe.isPending && (
             <p className="text-sm">
-              {leitura.vendas} {leitura.vendas === 1 ? "nota de venda" : "notas de venda"} e {leitura.compras}{" "}
-              {leitura.compras === 1 ? "nota de compra" : "notas de compra"} lidas.
+              {leitura.vendas} {leitura.vendas === 1 ? "nota de venda" : "notas de venda"}, {leitura.compras}{" "}
+              {leitura.compras === 1 ? "nota de compra" : "notas de compra"} e {leitura.servicos ?? 0} NFS-e lidas.
             </p>
           )}
           {leitura?.info.map((t) => (

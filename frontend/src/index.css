@@ -89,11 +89,18 @@
   outline-offset: 2px;
 }
 
-input:focus,
+/* rádio e caixa de seleção ficam só com o contorno do teclado (:focus-visible): o fundo e o contorno de campo
+   desenhavam uma caixa em volta da bolinha ao clicar */
+input:not([type="radio"], [type="checkbox"]):focus,
 select:focus {
   outline: 2px solid var(--color-brand);
   outline-offset: 0;
   background: var(--color-highlight);
+}
+
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--color-brand);
 }
 
 .modal::backdrop {

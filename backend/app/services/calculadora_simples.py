@@ -19,6 +19,7 @@ from app.motor.calculadora_simples import LinhaNota
 from app.motor.lei_monofasico import avaliar
 from app.seeds import tabelas
 from app.services.nfe_xml import ItemLido, NotaLida
+from app.services.nfse_xml import ServicoLido
 from app.utils.simples import anexo_da_empresa
 
 # ICMS-ST retido pelo fornecedor (CST 10, 30, 70; CSOSN 201 a 203) ou cobrado em etapa anterior (CST 60; CSOSN 500)
@@ -39,12 +40,35 @@ class Leitura:
     info: list[str] = field(default_factory=list)
     vendas: int = 0
     compras: int = 0
+    servicos: int = 0
 
 
 def anexo_mercadorias(empresa: Empresa) -> str:
     """Nota de produto entra no anexo da empresa quando é I ou II; empresa de serviço vendendo mercadoria, no I."""
     anexo, _ = anexo_da_empresa(empresa.anexo_simples, empresa.cnae, empresa.atividade)
     return anexo if anexo in ("I", "II") else "I"
+
+
+def anexo_servicos(empresa: Empresa) -> str:
+    """NFS-e entra no anexo da empresa quando é III, IV ou V; senão, no III (o contador troca a linha se for outro)."""
+    anexo, _ = anexo_da_empresa(empresa.anexo_simples, empresa.cnae, empresa.atividade)
+    return anexo if anexo in ("III", "IV", "V") else "III"
+
+
+def linhas_da_nfse(empresa: Empresa, servicos: list[ServicoLido], out: Leitura) -> None:
+    """NFS-e prestadas pela empresa viram linhas no anexo do serviço; ISS retido pelo tomador sai do DAS."""
+    anexo = anexo_servicos(empresa)
+    prestadas = [s for s in servicos if s.cnpj_prestador == empresa.cnpj]
+    tomadas = len(servicos) - len(prestadas)
+    for s in prestadas:
+        out.linhas.append(LinhaNota(descricao=f"NFS-e {s.numero}: {s.descricao}".strip(" :")[:150], valor=s.valor, anexo=anexo,
+                                    competencia=s.competencia, iss_fora_do_das="RETIDO" if s.iss_retido else None))
+    out.servicos += len(prestadas)
+    if tomadas:
+        out.avisos.append(f"{tomadas} NFS-e de serviço tomado (a empresa não é a prestadora) ficaram fora do cálculo")
+    if prestadas:
+        out.info.append(f"As NFS-e entraram no Anexo {anexo}, pelo cadastro da empresa. Se a atividade for de outro anexo ou depender "
+                        "do Fator R, ajuste no cadastro e envie de novo.")
 
 
 def _brl(v: Decimal) -> str:

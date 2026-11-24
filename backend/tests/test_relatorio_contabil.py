@@ -127,7 +127,9 @@ def test_importa_saidas_e_ignora_reimportacao(cliente, analista, pid):
     assert (de_novo["notas_importadas"], de_novo["notas_ignoradas"]) == (0, 3)
 
     coleta = cliente.get(f"/api/planejamentos/{pid}/coleta", headers=analista).json()
-    assert coleta["saidas"][0] == {"competencia": "2026-07", "notas": 3, "itens": 4, "valor": pytest.approx(385.0)}
+    assert coleta["saidas"][0] == {"competencia": "2026-07", "notas": 3, "itens": 4, "valor": pytest.approx(385.0),
+                                   "receita": pytest.approx(355.0),  # a remessa (6949) não é receita
+                                   "fora": [{"cfop": 6949, "valor": pytest.approx(30.0), "sem_regra": False}]}
 
 
 def test_entradas_preenchem_devolucoes_e_avisam_compras(cliente, contador, pid):

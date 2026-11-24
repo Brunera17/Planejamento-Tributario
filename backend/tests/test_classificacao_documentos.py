@@ -59,6 +59,20 @@ def test_nfe_emitida_e_recebida():
     assert (s.tipo, s.competencia, s.competencias_no_arquivo) == (ENTRADAS, "2026-09", ["2026-07", "2026-09"])
 
 
+def _nfse(n: int, prestador: str, data: str = "2026-08-05") -> bytes:
+    return (f'<NFSe xmlns="http://www.sped.fazenda.gov.br/nfse"><infNFSe Id="NFS3550308{n:041d}"><nNFSe>{n}</nNFSe>'
+            f"<emit><CNPJ>{prestador}</CNPJ></emit><DPS><infDPS><dCompet>{data}</dCompet><valores><vServPrest>"
+            f"<vServ>100.00</vServ></vServPrest></valores></infDPS></DPS></infNFSe></NFSe>").encode()
+
+
+def test_nfse_prestada_e_saida_e_tomada_e_entrada():
+    s = classificar("80.xml", _nfse(80, CNPJ), CNPJ, COMPS)
+    assert (s.tipo, s.competencia, s.motivo) == (SAIDAS, "2026-08", "1 NFS-e emitida pela empresa")
+    s = classificar("servicos.zip", _zip(_nfse(1, CNPJ), _nfse(2, CNPJ), _nfe(3, CNPJ, OUTRO)), CNPJ, COMPS)
+    assert (s.tipo, s.motivo) == (SAIDAS, "1 NF-e e 2 NFS-e emitidas pela empresa")
+    assert classificar("tomada.xml", _nfse(9, OUTRO), CNPJ, COMPS).tipo == ENTRADAS
+
+
 def test_pgdas_pelo_periodo_de_apuracao():
     s = classificar("qualquer.pdf", _extrato("Revenda de mercadorias", pa="07/2026"), CNPJ, COMPS)
     assert (s.tipo, s.competencia) == (PGDAS, "2026-07")
