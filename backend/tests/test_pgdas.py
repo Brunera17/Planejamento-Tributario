@@ -35,6 +35,35 @@ def test_leitura_do_extrato():
     assert ler(b"nao e pdf").lido is False
 
 
+def _declaracao() -> bytes:
+    """Linhas da declaração do PGDAS-D: receita do PA e o quadro 2.2 com a receita de cada mês anterior."""
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    y = 800
+    for linha in ["Período de Apuração: 01/03/2026 a 31/03/2026",
+                  "Receita Bruta do PA (RPA) - Competência 7.000,00 500,00 7.500,00",
+                  "ao PA (RBT12) 66.000,00 0,00 66.000,00",
+                  "2.2) Receitas Brutas Anteriores (R$)", "2.2.1) Mercado Interno",
+                  "01/2025 1.000,00 02/2025 2.000,00 03/2025 3.000,00 04/2025 4.000,00",
+                  "05/2025 5.000,00 06/2025 6.000,00 07/2025 1.000,00 08/2025 2.000,00",
+                  "09/2025 3.000,00 10/2025 4.000,00 11/2025 5.000,00 12/2025 6.000,00",
+                  "01/2026 7.000,00 02/2026 8.000,00", "2.2.2) Mercado Externo", "02/2026 100,00",
+                  "2.3) Folha de Salários Anteriores (R$)", "01/2026 9.999,99"]:
+        c.drawString(40, y, linha)
+        y -= 18
+    c.save()
+    return buf.getvalue()
+
+
+def test_declaracao_traz_a_receita_de_cada_mes():
+    e = ler(_declaracao(), "declaracao.pdf")
+    assert e.competencia == "2026-03" and e.rbt12 == Decimal("66000.00")
+    assert e.receitas["2026-03"] == Decimal("7500.00")  # o total do PA, interno + externo
+    assert e.receitas["2026-02"] == Decimal("8100.00")  # mercado externo soma no mesmo mês
+    assert e.receitas["2026-01"] == Decimal("7000.00")  # a folha (quadro 2.3) fica de fora
+    assert len(e.receitas) == 15
+
+
 def test_extrato_preenche_o_rbt12_e_avisa_anexo_diferente(cliente, contador):
     emp = cliente.post("/api/empresas", headers=contador, json={
         "razao_social": "EXTRATO PGDAS LTDA", "cnpj": CNPJ, "regime_tributario": "SIMPLES_NACIONAL", "uf": "SP",
@@ -87,7 +116,8 @@ def test_leitura_gravada_no_envio_e_o_pdf_nao_e_relido(cliente, contador, fabric
     pid, doc_id, _ = _planejamento_com_extrato(cliente, contador, "81520477000108")
     with fabrica_sessao() as db:
         gravado = db.get(Documento, doc_id).pgdas_extrato
-    assert gravado == {"lido": True, "competencia": "2026-06", "rbt12": "2000000.00", "anexos": ["I"], "servicos": False}
+    assert gravado == {"lido": True, "competencia": "2026-06", "rbt12": "2000000.00", "anexos": ["I"], "servicos": False,
+                       "receitas": {}}
 
     def nao_releia(*_a, **_k):
         raise AssertionError("o PDF não deveria ser lido de novo")

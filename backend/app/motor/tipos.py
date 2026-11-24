@@ -216,6 +216,8 @@ class EntradaSimulacao:
     faixas_servico: dict[str, list[FaixaSimples]] = field(default_factory=dict)  # Anexos III, IV e V
     # Anexos I e II: com os dois, cada item vai para o anexo do seu CFOP (revenda ou produção própria); vazio = anexo_simples
     faixas_mercadoria: dict[str, list[FaixaSimples]] = field(default_factory=dict)
+    # receita bruta mês a mês declarada no PGDAS-D (AAAA-MM): dá a RBT12 de cada mês do planejamento
+    receitas_declaradas: dict[str, Decimal] = field(default_factory=dict)
 
 
 # ------------------------------------------------------------------ saídas
