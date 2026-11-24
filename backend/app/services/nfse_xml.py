@@ -19,6 +19,8 @@ class ServicoLido:
     cnpj_prestador: str
     cnpj_tomador: str | None
     cancelada: bool = False
+    descricao: str = ""
+    iss_retido: bool = False  # retido pelo tomador ou intermediário: sai do DAS
 
 
 def _no(raiz, *nomes: str):
@@ -70,7 +72,9 @@ def ler(raiz) -> list[ServicoLido]:
         notas.append(ServicoLido(
             chave=chave or f"{prest}-{numero}", numero=numero,
             competencia=_competencia(_txt(inf, "dCompet"), _txt(inf, "dhEmi"), _txt(inf, "dhProc")),
-            valor=_valor(_txt(inf, "vServ")), cnpj_prestador=prest, cnpj_tomador=_cnpj(inf, "toma")))
+            valor=_valor(_txt(inf, "vServ")), cnpj_prestador=prest, cnpj_tomador=_cnpj(inf, "toma"),
+            descricao=_txt(inf, "xDescServ") or _txt(inf, "xTribNac"),
+            iss_retido=_txt(inf, "tpRetISSQN") in ("2", "3")))  # 1 = não retido
     for inf in raiz.xpath(".//*[local-name()='InfNfse']"):  # ABRASF
         prest = _cnpj(inf, "PrestadorServico", "Prestador", "IdentificacaoPrestador")
         if not prest:
@@ -82,6 +86,7 @@ def ler(raiz) -> list[ServicoLido]:
             chave=f"{prest}-{numero}", numero=numero,
             competencia=_competencia(_txt(inf, "Competencia"), _txt(inf, "DataEmissao")),
             valor=_valor(_txt(inf, "ValorServicos")), cnpj_prestador=prest,
-            cnpj_tomador=_cnpj(inf, "TomadorServico", "Tomador"), cancelada=cancelada))
+            cnpj_tomador=_cnpj(inf, "TomadorServico", "Tomador"), cancelada=cancelada,
+            descricao=_txt(inf, "Discriminacao"), iss_retido=_txt(inf, "IssRetido") == "1"))  # 1 = sim, 2 = não
     return notas
 

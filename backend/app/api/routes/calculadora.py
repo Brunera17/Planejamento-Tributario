@@ -19,6 +19,7 @@ from app.services import calculadora_simples as servico
 from app.services import pgdas
 from app.services.entrada import _vigentes, faixas_vigentes
 from app.services.nfe_xml import NotaLida, ler_arquivos
+from app.services.nfse_xml import ServicoLido
 from app.services.serializacao import para_json
 from app.utils.simples import anexo_da_empresa
 from app.utils.upload import ler_limitado
@@ -86,28 +87,34 @@ def _ler_nfe(db, empresa_id: int, arquivos: list[StarletteUploadFile]) -> dict:
     e = _empresa(db, empresa_id)
     s = get_settings()
     notas: dict[str, object] = {}
+    servicos: dict[str, ServicoLido] = {}
     erros: list[str] = []
     canceladas: set[str] = set()
     for arquivo in arquivos:
         nome = arquivo.filename or "arquivo"
         if not nome.lower().endswith((".xml", ".zip")):
-            erros.append(f"{nome}: envie XML de NF-e ou .zip (RAR não é lido)")
+            erros.append(f"{nome}: envie XML de NF-e ou NFS-e, ou .zip (RAR não é lido)")
             continue
         limite = s.nfe_zip_max_mb if nome.lower().endswith(".zip") else s.nfe_xml_max_mb
         lidas, erros_arquivo, cancel = ler_arquivos(nome, ler_limitado(arquivo, limite))
-        # o mesmo XML repetido conta uma vez; NFS-e no envio fica de fora (a calculadora lê só NF-e)
+        # o mesmo XML repetido conta uma vez
         notas.update({n.chave_acesso: n for n in lidas if isinstance(n, NotaLida)})
+        servicos.update({n.chave: n for n in lidas if isinstance(n, ServicoLido)})
         erros += erros_arquivo
         canceladas |= cancel
     validas = [n for k, n in notas.items() if k not in canceladas]
     leitura = servico.linhas_da_nfe(db, e, validas)
+    canceladas_nfse = [n for n in servicos.values() if n.cancelada]
+    servico.linhas_da_nfse(e, [n for n in servicos.values() if not n.cancelada], leitura)
+    if canceladas_nfse:
+        leitura.avisos.append(f"{len(canceladas_nfse)} NFS-e cancelada(s) ficaram fora do cálculo")
     if len(validas) < len(notas):
         leitura.avisos.append(f"{len(notas) - len(validas)} nota(s) cancelada(s) ficaram fora do cálculo")
     elif leitura.vendas and not canceladas:
         # a nota cancelada é idêntica a uma válida: só o XML do evento de cancelamento diz que ela não vale
         leitura.info.append(servico.SEM_CANCELAMENTOS)
     return {"linhas": para_json(leitura.linhas), "avisos": leitura.avisos, "info": leitura.info, "erros": erros,
-            "vendas": leitura.vendas, "compras": leitura.compras}
+            "vendas": leitura.vendas, "compras": leitura.compras, "servicos": leitura.servicos}
 
 
 @router.post("")

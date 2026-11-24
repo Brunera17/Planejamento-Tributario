@@ -10,12 +10,13 @@ CNPJ = "73946182000161"
 TOMADOR = "51830276000138"
 
 
-def _nacional(n: int, prestador: str, valor: str, competencia: str = "2026-07-15") -> bytes:
+def _nacional(n: int, prestador: str, valor: str, competencia: str = "2026-07-15", ret_iss: str = "1") -> bytes:
     return (f'<?xml version="1.0" encoding="UTF-8"?><NFSe versao="1.00" xmlns="http://www.sped.fazenda.gov.br/nfse">'
             f'<infNFSe Id="NFS3550308{n:041d}"><nNFSe>{n}</nNFSe><emit><CNPJ>{prestador}</CNPJ></emit>'
             f"<valores><vLiq>{valor}</vLiq></valores><DPS><infDPS><dhEmi>{competencia}T10:00:00-03:00</dhEmi>"
             f"<dCompet>{competencia}</dCompet><prest><CNPJ>{prestador}</CNPJ></prest><toma><CNPJ>{TOMADOR}</CNPJ></toma>"
-            f"<valores><vServPrest><vServ>{valor}</vServ></vServPrest></valores></infDPS></DPS></infNFSe></NFSe>").encode()
+            f"<serv><cServ><xDescServ>Instalacao</xDescServ></cServ></serv><valores><vServPrest><vServ>{valor}</vServ></vServPrest>"
+            f"<trib><tribMun><tpRetISSQN>{ret_iss}</tpRetISSQN></tribMun></trib></valores></infDPS></DPS></infNFSe></NFSe>").encode()
 
 
 def _abrasf(n: int, valor: str, cancelada: bool = False) -> bytes:
@@ -85,3 +86,19 @@ def test_receita_pelo_cfop_deixa_5929_fora(cliente, contador, pid):
              if x["competencia"] == "2026-07")
     assert Decimal(str(s["valor"])) == 1000 and Decimal(str(s["receita"])) == 300
     assert [(f["cfop"], Decimal(str(f["valor"])), f["sem_regra"]) for f in s["fora"]] == [(5929, 700, False)]
+
+
+def test_calculadora_le_nfse_no_anexo_do_servico(cliente, contador):
+    cnpj = "60418735000161"
+    emp = cliente.post("/api/empresas", headers=contador, json={
+        "razao_social": "CALC SERVICOS LTDA", "cnpj": cnpj, "regime_tributario": "SIMPLES_NACIONAL", "uf": "SP",
+        "anexo_simples": "III"}).json()["id"]
+    r = cliente.post("/api/calculadora-simples/nfe", headers=contador, data={"empresa_id": emp}, files=[
+        ("arquivos", ("a.xml", _nacional(1, cnpj, "599.70", "2026-08-05"))),
+        ("arquivos", ("b.xml", _nacional(2, cnpj, "1000.00", "2026-08-06", ret_iss="2"))),
+        ("arquivos", ("c.xml", _nacional(3, TOMADOR, "50.00")))])
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["servicos"] == 2 and any("serviço tomado" in a for a in d["avisos"])
+    assert [(l["descricao"], l["anexo"], l["competencia"], l["iss_fora_do_das"]) for l in d["linhas"]] == [
+        ("NFS-e 1: Instalacao", "III", "2026-08", None), ("NFS-e 2: Instalacao", "III", "2026-08", "RETIDO")]

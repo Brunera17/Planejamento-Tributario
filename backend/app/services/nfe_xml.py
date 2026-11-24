@@ -5,6 +5,7 @@ import codecs
 import io
 import re
 import zipfile
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -189,10 +190,19 @@ def _ler_entrada(z: zipfile.ZipFile, info: zipfile.ZipInfo, limite: int) -> byte
     return None if len(dados) > limite else dados
 
 
-def _ler(nome: str, dados: bytes, notas: list, cancelados: set, erros: list) -> None:
+# documentos fiscais que vêm no mesmo .zip das notas e não entram no cálculo: contados num aviso só, não um erro por arquivo
+FORA_DO_CALCULO = {"cteProc": "CT-e", "CTe": "CT-e", "procInutNFe": "inutilização de numeração",
+                   "retInutNFe": "inutilização de numeração", "procEventoNFe": "evento sem efeito no cálculo (carta de correção…)"}
+
+
+def _ler(nome: str, dados: bytes, notas: list, cancelados: set, erros: list, ignorados: Counter | None = None) -> None:
     try:
         raiz = _raiz(dados)
         chave = cancelamento(raiz)
+        outro = None if chave else FORA_DO_CALCULO.get(etree.QName(raiz).localname)
+        if outro and ignorados is not None:
+            ignorados[outro] += 1
+            return
         servicos = [] if chave or raiz.find(".//n:infNFe", NS) is not None else nfse_xml.ler(raiz)
         if chave:
             cancelados.add(chave)
@@ -212,11 +222,14 @@ def ler_arquivos(nome: str, conteudo: bytes) -> tuple[list[NotaLida | nfse_xml.S
     portal costuma trazer outros .zip dentro (um por lote de notas): eles são lidos até 2 níveis, e os limites
     valem para a soma de todos os níveis.
     """
-    notas, erros, cancelados = [], [], set()
+    notas, erros, cancelados, ignorados = [], [], set(), Counter()
     if nome.lower().endswith(".zip"):
-        _ler_zip(conteudo, "", notas, erros, cancelados, {"xmls": 0, "bytes": 0}, 0)
+        _ler_zip(conteudo, "", notas, erros, cancelados, {"xmls": 0, "bytes": 0, "ignorados": ignorados}, 0)
     else:
-        _ler(nome, conteudo, notas, cancelados, erros)
+        _ler(nome, conteudo, notas, cancelados, erros, ignorados)
+    if ignorados:
+        erros.append(f"{nome}: fora do cálculo, " + ", ".join(f"{q} {tipo}" for tipo, q in ignorados.most_common())
+                     + " (o sistema lê NF-e e NFS-e)")
     return notas, erros, cancelados
 
 
@@ -253,7 +266,7 @@ def _ler_zip(conteudo: bytes, prefixo: str, notas: list, erros: list, cancelados
             if conta["bytes"] > max_total:
                 raise ErroNegocio(f"O conteúdo descompactado do .zip passa de {s.nfe_zip_descompactado_max_mb} MB — divida em partes",
                                   413, {"arquivo": "conteúdo grande demais"})
-            _ler(prefixo + info.filename, dados, notas, cancelados, erros)
+            _ler(prefixo + info.filename, dados, notas, cancelados, erros, conta["ignorados"])
         if nivel >= ZIP_MAX_NIVEIS:
             return
         for info in (i for i in arquivos if i.filename.lower().endswith(".zip")):
