@@ -60,6 +60,9 @@ def test_nfe_emitida_e_recebida():
 def test_pgdas_pelo_periodo_de_apuracao():
     s = classificar("qualquer.pdf", _extrato("Revenda de mercadorias", pa="07/2026"), CNPJ, COMPS)
     assert (s.tipo, s.competencia) == (PGDAS, "2026-07")
+    # declaração (não o extrato): o período vem com o dia, e o nome do arquivo não ajuda
+    s = classificar("doc.pdf", _extrato("Revenda de mercadorias", pa="01/08/2026 a 31/08/2026"), CNPJ, COMPS)
+    assert (s.tipo, s.competencia, s.competencias_no_arquivo) == (PGDAS, "2026-08", ["2026-08"])
 
 
 def test_relatorio_da_dominio():
