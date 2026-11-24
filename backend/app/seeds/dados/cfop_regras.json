@@ -12,6 +12,8 @@
  {"cfop": 6404, "natureza": "Venda de mercadoria sujeita a ST já retido (interestadual)", "gera_receita": true},
  {"cfop": 5905, "natureza": "Remessa para depósito fechado ou armazém geral (interna)", "gera_receita": false},
  {"cfop": 5949, "natureza": "Outras saídas / remessa – sem receita (interna)", "gera_receita": false},
+ {"cfop": 5929, "natureza": "Lançamento de operação já registrada em NFC-e ou cupom fiscal (interna)", "gera_receita": false},
  {"cfop": 6905, "natureza": "Remessa para depósito fechado ou armazém geral (interestadual)", "gera_receita": false},
- {"cfop": 6949, "natureza": "Outras saídas / remessa – sem receita (interestadual)", "gera_receita": false}
+ {"cfop": 6949, "natureza": "Outras saídas / remessa – sem receita (interestadual)", "gera_receita": false},
+ {"cfop": 6929, "natureza": "Lançamento de operação já registrada em NFC-e ou cupom fiscal (interestadual)", "gera_receita": false}
 ]

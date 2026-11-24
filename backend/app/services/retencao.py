@@ -8,15 +8,42 @@ de novo.
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.models import NotaFiscal, NotaItem, Planejamento, Simulacao
+from app.models import CfopRegra, NotaFiscal, NotaItem, Planejamento, Simulacao
 from app.services import estoque_st, premissas_auto
 from app.services.serializacao import para_json
 
 CHAVE = "das_notas"  # chave do retrato dentro de simulacao.entrada_json
+
+
+def _saidas(db: Session, p: Planejamento) -> list[dict]:
+    """Total das notas de saída por mês e a receita pelo CFOP, como o cálculo conta: CFOP sem regra ou que não gera
+    receita (remessa, 5929 de venda já em NFC-e…) fica fora e é listado em "fora"."""
+    gera = {r.cfop: r.gera_receita for r in db.scalars(select(CfopRegra))}
+    por_cfop: dict[str, dict[int, Decimal]] = {}
+    for c, cfop, v in db.execute(
+            select(NotaFiscal.competencia, NotaItem.cfop, func.sum(NotaItem.vl_total))
+            .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
+            .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA")
+            .group_by(NotaFiscal.competencia, NotaItem.cfop)):
+        por_cfop.setdefault(c, {})[cfop] = Decimal(str(v or 0))
+    saidas = []
+    for c, n, i, v in db.execute(
+            select(NotaFiscal.competencia, func.count(func.distinct(NotaFiscal.id)), func.count(NotaItem.id),
+                   func.sum(NotaItem.vl_total))
+            .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
+            .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA")
+            .group_by(NotaFiscal.competencia).order_by(NotaFiscal.competencia)):
+        cfops = por_cfop.get(c, {})
+        saidas.append({"competencia": c, "notas": n, "itens": i, "valor": v,
+                       "receita": sum((x for k, x in cfops.items() if gera.get(k)), Decimal(0)),
+                       "fora": [{"cfop": k, "valor": x, "sem_regra": k not in gera}
+                                for k, x in sorted(cfops.items()) if not gera.get(k)]})
+    return saidas
 
 
 def _coleta(db: Session, p: Planejamento) -> dict:
@@ -29,12 +56,7 @@ def _coleta(db: Session, p: Planejamento) -> dict:
             "fonte": auto.fonte_composicao,
         },
         "indicio_st": auto.indicio_st,
-        "saidas": [{"competencia": c, "notas": n, "itens": i, "valor": v} for c, n, i, v in db.execute(
-            select(NotaFiscal.competencia, func.count(func.distinct(NotaFiscal.id)), func.count(NotaItem.id),
-                   func.sum(NotaItem.vl_total))
-            .join(NotaItem, NotaItem.nota_fiscal_id == NotaFiscal.id)
-            .where(NotaFiscal.planejamento_id == p.id, NotaFiscal.tipo == "SAIDA")
-            .group_by(NotaFiscal.competencia).order_by(NotaFiscal.competencia))],
+        "saidas": _saidas(db, p),
     }
 
 

@@ -18,7 +18,7 @@ from app.seeds import tabelas
 from app.services import calculadora_simples as servico
 from app.services import pgdas
 from app.services.entrada import _vigentes, faixas_vigentes
-from app.services.nfe_xml import ler_arquivos
+from app.services.nfe_xml import NotaLida, ler_arquivos
 from app.services.serializacao import para_json
 from app.utils.simples import anexo_da_empresa
 from app.utils.upload import ler_limitado
@@ -95,7 +95,8 @@ def _ler_nfe(db, empresa_id: int, arquivos: list[StarletteUploadFile]) -> dict:
             continue
         limite = s.nfe_zip_max_mb if nome.lower().endswith(".zip") else s.nfe_xml_max_mb
         lidas, erros_arquivo, cancel = ler_arquivos(nome, ler_limitado(arquivo, limite))
-        notas.update({n.chave_acesso: n for n in lidas})  # o mesmo XML repetido conta uma vez
+        # o mesmo XML repetido conta uma vez; NFS-e no envio fica de fora (a calculadora lê só NF-e)
+        notas.update({n.chave_acesso: n for n in lidas if isinstance(n, NotaLida)})
         erros += erros_arquivo
         canceladas |= cancel
     validas = [n for k, n in notas.items() if k not in canceladas]

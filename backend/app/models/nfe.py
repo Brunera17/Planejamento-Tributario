@@ -74,3 +74,19 @@ class NotaItem(Base):
     aliq_icms: Mapped[Decimal | None] = mapped_column(Aliquota)
     bc_st: Mapped[Decimal | None] = mapped_column(Dinheiro)  # base da ST retida (vBCST ou vBCSTRet)
     vl_icms_st: Mapped[Decimal | None] = mapped_column(Dinheiro)
+
+
+class NotaServico(Base):
+    """NFS-e de serviço prestado pela empresa: só o necessário para somar a receita de serviço do mês sem contar duas vezes
+    a nota reenviada."""
+
+    __tablename__ = "nota_servico"
+    __table_args__ = (UniqueConstraint("planejamento_id", "chave", name="uq_nota_servico_chave"),)
+
+    id: Mapped[PK]
+    planejamento_id: Mapped[int] = mapped_column(ForeignKey("planejamento.id", ondelete="CASCADE"))
+    importacao_id: Mapped[int | None] = mapped_column(ForeignKey("importacao_nfe.id", ondelete="SET NULL"))
+    chave: Mapped[str] = mapped_column(String(60))  # chave de acesso da NFS-e nacional; no padrão municipal, CNPJ-número
+    numero: Mapped[str] = mapped_column(String(20))
+    competencia: Mapped[Competencia]
+    valor: Mapped[Valor]

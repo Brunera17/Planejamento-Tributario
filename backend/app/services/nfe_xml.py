@@ -1,4 +1,4 @@
-"""Leitura de XML de NF-e (layout 4.00), avulsos ou dentro de um .zip."""
+"""Leitura de XML de NF-e (layout 4.00), avulsos ou dentro de um .zip. XML de NFS-e no mesmo envio vai para nfse_xml."""
 from __future__ import annotations
 
 import codecs
@@ -13,6 +13,7 @@ from lxml import etree
 
 from app.core.config import get_settings
 from app.core.erros import ErroNegocio
+from app.services import nfse_xml
 
 MB = 1024 * 1024
 NS ={"n": "http://www.portalfiscal.inf.br/nfe"}
@@ -192,15 +193,18 @@ def _ler(nome: str, dados: bytes, notas: list, cancelados: set, erros: list) -> 
     try:
         raiz = _raiz(dados)
         chave = cancelamento(raiz)
+        servicos = [] if chave or raiz.find(".//n:infNFe", NS) is not None else nfse_xml.ler(raiz)
         if chave:
             cancelados.add(chave)
+        elif servicos:  # NFS-e (ServicoLido) vêm na mesma lista; a rota separa
+            notas.extend(servicos)
         else:
             notas.append(ler_xml(raiz=raiz))
     except Exception as e:  # noqa: BLE001 – arquivo inválido vira linha do relatório
         erros.append(f"{nome}: {e}")
 
 
-def ler_arquivos(nome: str, conteudo: bytes) -> tuple[list[NotaLida], list[str], set[str]]:
+def ler_arquivos(nome: str, conteudo: bytes) -> tuple[list[NotaLida | nfse_xml.ServicoLido], list[str], set[str]]:
     """Retorna (notas lidas, erros por arquivo, chaves das notas canceladas por evento).
 
     O .zip é lido entrada por entrada, com teto por XML, pela soma descompactada e pela quantidade de arquivos:

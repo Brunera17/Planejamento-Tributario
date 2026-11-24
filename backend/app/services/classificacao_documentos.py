@@ -159,6 +159,7 @@ def _por_nfe(s: Sugestao, nome: str, conteudo: bytes, cnpj: str, competencias: l
             notas, _, _ = nfe_xml.ler_arquivos(nome, conteudo)
     except Exception:  # noqa: BLE001 – ZIP inválido: segue para as palavras-chave
         return False
+    notas = [n for n in notas if isinstance(n, nfe_xml.NotaLida)]
     if not notas:
         return False
     emitidas = sum(n.cnpj_emitente == cnpj for n in notas)

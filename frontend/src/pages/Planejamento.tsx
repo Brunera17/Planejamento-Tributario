@@ -82,7 +82,7 @@ type ColetaDados = {
   devolucoes: Record<string, number>;
   servicos: Record<string, number>;
   folha: Record<string, { folha: number | null; pro_labore: number | null }>;
-  saidas: { competencia: string; notas: number; itens: number; valor: number }[];
+  saidas: { competencia: string; notas: number; itens: number; valor: number; receita?: number; fora?: { cfop: number; valor: number; sem_regra: boolean }[] }[];
 };
 
 function useAtualizar(pid: number) {
@@ -189,8 +189,8 @@ function Coleta({ pid }: { pid: number }) {
         semPadding
       >
         <Tabela
-          cabecalho={["Competência", "Faturamento (notas de saída)", "Serviços (NFS-e)", "Compras", "Devoluções", "Folha", "Pró-labore"]}
-          numericas={[1, 2, 3, 4, 5, 6]}
+          cabecalho={["Competência", "Faturamento (notas de saída)", "Receita pelo CFOP", "Serviços (NFS-e)", "Compras", "Devoluções", "Folha", "Pró-labore"]}
+          numericas={[1, 2, 3, 4, 5, 6, 7]}
         >
           {data.competencias.map((c) => {
             const s = data.saidas.find((x) => x.competencia === c);
@@ -210,6 +210,24 @@ function Coleta({ pid }: { pid: number }) {
                     <span className="text-text-muted">sem notas</span>
                   ) : (
                     <span className="text-alert">pendente</span>
+                  )}
+                </td>
+                <td className="num px-2 py-1.5">
+                  {s?.receita != null ? (
+                    <>
+                      {brl(s.receita)}
+                      {!!s.fora?.length && (
+                        // o detalhe por CFOP fica no title: a lista inteira alargava a tabela
+                        <span
+                          className="block cursor-help text-xs text-text-muted underline decoration-dotted underline-offset-2"
+                          title={"Fora da receita (remessa, lançamento de venda já em NFC-e…):\n" + s.fora.map((f) => `CFOP ${f.cfop}${f.sem_regra ? " (sem regra)" : ""}: ${brl(f.valor)}`).join("\n")}
+                        >
+                          {brl(s.fora.reduce((t, f) => t + Number(f.valor), 0))} fora
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-text-muted">—</span>
                   )}
                 </td>
                 <td className="px-2 py-1 text-right">
@@ -258,9 +276,9 @@ const TIPOS_IMPORTACAO = {
     formatos: [".xls", ".xlsx"],
   },
   xml: {
-    nome: "XML de NF-e",
+    nome: "XML de NF-e ou NFS-e",
     detalhe:
-      "Notas de saída, de entrada ou de devolução, avulsas ou num arquivo .zip. As de saída preenchem o faturamento e a lista de produtos para revisão; as de entrada, as compras para revenda e as devoluções de venda do mês (sem apagar valor digitado).",
+      "Notas de saída, de entrada ou de devolução, avulsas ou num arquivo .zip. As de saída preenchem o faturamento e a lista de produtos para revisão; as de entrada, as compras para revenda e as devoluções de venda do mês (sem apagar valor digitado). As NFS-e prestadas pela empresa (padrão nacional ou da prefeitura) somam os serviços do mês; as tomadas ficam de fora.",
     formatos: [".xml", ".zip"],
   },
   planilha: {
@@ -290,22 +308,27 @@ function ImportarDocumentos({
     <Modal aberto={aberto} fechar={fechar} titulo="Importar documentos" descricao="Os valores lidos entram no movimento mensal; notas já importadas não são duplicadas.">
       <div className="space-y-4 text-sm">
         <fieldset className="grid gap-2 sm:grid-cols-3">
-          <legend className="mb-1 font-medium">Tipo de documento</legend>
+          <legend className="mb-1.5 font-medium">Tipo de documento</legend>
           {(Object.keys(TIPOS_IMPORTACAO) as (keyof typeof TIPOS_IMPORTACAO)[]).map((k) => (
-            <label key={k} className={`flex cursor-pointer gap-2 rounded border px-3 py-2 ${tipo === k ? "border-brand bg-highlight" : "border-border"}`}>
+            <label
+              key={k}
+              className={`flex cursor-pointer flex-col justify-between gap-1 rounded border px-3 py-2.5 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand ${
+                tipo === k ? "border-brand bg-highlight shadow-[inset_3px_0_0_var(--color-brand)]" : "border-border bg-white hover:border-brand"
+              }`}
+            >
+              {/* a bolinha nativa fica só para o leitor de tela e o teclado; o cartão inteiro mostra a escolha */}
               <input
                 type="radio"
                 name="tipo-documento"
+                className="sr-only"
                 checked={tipo === k}
                 onChange={() => {
                   setTipo(k);
                   setArquivos([]);
                 }}
               />
-              <span>
-                <span className="block font-medium">{TIPOS_IMPORTACAO[k].nome}</span>
-                <span className="text-xs text-text-muted">{TIPOS_IMPORTACAO[k].formatos.join(", ")}</span>
-              </span>
+              <span className={`font-medium leading-snug ${tipo === k ? "text-brand" : ""}`}>{TIPOS_IMPORTACAO[k].nome}</span>
+              <span className="text-xs text-text-muted">{TIPOS_IMPORTACAO[k].formatos.join(", ")}</span>
             </label>
           ))}
         </fieldset>
