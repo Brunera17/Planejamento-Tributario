@@ -57,6 +57,25 @@ def test_simples_mercadoria_no_anexo_i_e_servico_no_iii():
     assert r.detalhes["anexo_servico"] == 3 and r.detalhes["receita_servico"] == D("90000")
 
 
+def test_revenda_no_anexo_i_e_producao_propria_no_ii():
+    # comércio que também fabrica: além dos R$ 150 mil de revenda (5102), R$ 30 mil de produção própria (5101)
+    e = entrada()
+    producao = [ItemSaida(m, "94036000", 5101, Ambito.INTERNA, True, False, False, D("10000")) for m in COMPS]
+    e = replace(e, itens=e.itens + producao, faixas_mercadoria={a: list(tabelas.faixas_simples(a)) for a in ("I", "II")})
+    r = engine.simular(e).simples
+    # Anexo II, 4ª faixa: (960.000 × 11,2% − 22.500) ÷ 960.000 = 8,85625% → 30.000 × 8,85625% = 2.656,875
+    assert c(r.total) == c(D("12534.375") + D("2656.875") + D("11058.75"))
+    f_ii = tabelas.faixas_simples("II")[3]
+    assert c(tributo(r, "IPI")) == c(D("2656.875") * f_ii.p_ipi)  # IPI só na produção própria
+    assert r.detalhes["das_sem_segregacao"] == D("12534.375") + D("2656.875") + D("11058.75")
+
+
+def test_sem_as_tabelas_dos_dois_anexos_vale_o_do_cadastro():
+    e = entrada()
+    e = replace(e, itens=e.itens + [ItemSaida(COMPS[0], "94036000", 5101, Ambito.INTERNA, True, False, False, D("10000"))])
+    assert c(engine.simular(e).simples.total) == c(D("160000") * D("0.0835625") + D("11058.75"))
+
+
 def test_presumido_com_presuncao_por_atividade_e_iss():
     r = engine.simular(entrada()).presumido
     assert c(tributo(r, "PIS") + tributo(r, "COFINS")) == D("8760.00")  # (150.000 + 90.000) × 3,65%

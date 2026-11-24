@@ -214,6 +214,8 @@ class EntradaSimulacao:
     servicos: dict[str, Decimal] = field(default_factory=dict)
     anexo_servico: str = "III"  # III, IV, V ou R (o Fator R decide entre III e V)
     faixas_servico: dict[str, list[FaixaSimples]] = field(default_factory=dict)  # Anexos III, IV e V
+    # Anexos I e II: com os dois, cada item vai para o anexo do seu CFOP (revenda ou produção própria); vazio = anexo_simples
+    faixas_mercadoria: dict[str, list[FaixaSimples]] = field(default_factory=dict)
 
 
 # ------------------------------------------------------------------ saídas

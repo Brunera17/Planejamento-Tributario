@@ -50,6 +50,17 @@ def aliquota_efetiva(rbt12: Decimal, faixas: list[FaixaSimples]) -> AliquotaSimp
     return AliquotaSimples(rbt12, f, efetiva)
 
 
+# CFOP (sem o 1º dígito) de venda de produção do próprio estabelecimento: Anexo II; o resto da mercadoria é revenda, Anexo I
+PRODUCAO_PROPRIA = {101, 103, 105, 109, 111, 113, 116, 118, 122, 124, 125, 401, 402}
+
+
+def anexo_do_item(cfop: int, entrada: EntradaSimulacao) -> str:
+    """Revenda no Anexo I e produção própria no II (LC 123/2006, art. 18, § 4º, I e II), pelo CFOP do item; sem as
+    tabelas dos dois anexos, o anexo do cadastro."""
+    anexo = "II" if cfop % 1000 in PRODUCAO_PROPRIA else "I"
+    return anexo if anexo in entrada.faixas_mercadoria else entrada.anexo_simples
+
+
 FATOR_R_MINIMO = Decimal("0.28")  # LC 123/2006, art. 18, §5º-J e §5º-M
 TETO_ISS = Decimal("0.05")  # LC 123/2006, Anexos III e IV, nota da 5ª faixa
 
@@ -138,27 +149,41 @@ def calcular_simples(
     acima_sublimite = rbt12 > p.sublimite_simples
     elegivel = rbt12 <= p.teto_simples
 
-    icms = pis = cofins = ZERO
+    # cada item na alíquota do anexo do seu CFOP, com a mesma RBT12 da empresa inteira
+    aliqs = {a: aliquota_efetiva(rbt12, fx) for a, fx in entrada.faixas_mercadoria.items()} | {entrada.anexo_simples: aliq}
+    por_anexo: dict[str, Decimal] = {}
+    icms = pis = cofins = irpj = csll = cpp = ipi = das_mercadoria = ZERO
     for it in itens:
         rl = it.receita_liquida
+        anexo = anexo_do_item(it.item.cfop, entrada)
+        a, fx = aliqs[anexo], aliqs[anexo].faixa
+        por_anexo[anexo] = por_anexo.get(anexo, ZERO) + rl
         if not it.st_interna:
-            icms += rl * aliq.parcela(f.p_icms)
+            icms += rl * a.parcela(fx.p_icms)
         if not it.item.monofasico:
-            pis += rl * aliq.parcela(f.p_pis)
-            cofins += rl * aliq.parcela(f.p_cofins)
+            pis += rl * a.parcela(fx.p_pis)
+            cofins += rl * a.parcela(fx.p_cofins)
+        irpj += rl * a.parcela(fx.p_irpj)
+        csll += rl * a.parcela(fx.p_csll)
+        cpp += rl * a.parcela(fx.p_cpp)
+        ipi += rl * a.parcela(fx.p_ipi)  # Anexo II: o IPI da indústria vai no DAS
+        das_mercadoria += rl * a.efetiva
+    for anexo, valor in sorted(por_anexo.items()):
+        if anexo != entrada.anexo_simples and valor:
+            memoria.registrar("Simples", f"Receita no Anexo {anexo} (pelo CFOP)", "Σ itens de " + (
+                "produção própria" if anexo == "II" else "revenda"), valor, fundamento="LC 123/2006, art. 18, § 4º")
+            memoria.registrar("Simples", f"Faixa {aliqs[anexo].faixa.faixa} do Anexo {anexo}", "maior faixa com RBT12 inicial ≤ RBT12",
+                              Decimal(aliqs[anexo].faixa.faixa))
+            memoria.registrar("Simples", f"Alíquota efetiva do Anexo {anexo}", "(RBT12 × alíquota nominal − parcela a deduzir) ÷ RBT12",
+                              aliqs[anexo].efetiva, fundamento=FUNDAMENTO)
 
     receita = sum((b.receita_liquida for b in bases.values()), ZERO)
-    mercadoria = sum((b.receita_mercadoria for b in bases.values()), ZERO)
-    irpj = mercadoria * aliq.parcela(f.p_irpj)
-    csll = mercadoria * aliq.parcela(f.p_csll)
-    cpp = mercadoria * aliq.parcela(f.p_cpp)
-    ipi = mercadoria * aliq.parcela(f.p_ipi)  # Anexo II: o IPI da indústria vai no DAS
 
     # serviço: no anexo dele, com a mesma RBT12 da empresa inteira
     servico = sum((b.receita_servico for b in bases.values()), ZERO)
     iss = iss_fora_das = cpp_fora = ZERO
     detalhes_servico: dict[str, Decimal] = {}
-    das_sem_segregacao = mercadoria * aliq.efetiva
+    das_sem_segregacao = das_mercadoria
     if servico:
         anexo_s, fr = anexo_do_servico(entrada, rbt12)
         aliq_s = aliquota_efetiva(rbt12, entrada.faixas_servico[anexo_s])
