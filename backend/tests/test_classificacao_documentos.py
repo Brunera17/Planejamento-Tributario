@@ -9,6 +9,7 @@ from app.services.classificacao_documentos import (
     APLICACAO,
     ENTRADAS,
     EXTRATO,
+    FINANCEIRO,
     INVENTARIO,
     MARKETPLACE,
     PGDAS,
@@ -107,3 +108,54 @@ def test_rota_classifica_sem_gravar(cliente, contador):
     assert ok["tipo_documento_id"] == tipos[SAIDAS] and ok["competencia"] == "2026-08"
     assert "erro" in ruim
     assert cliente.get(f"/api/planejamentos/{pid}/documentos", headers=contador).json()["documentos"] == []
+
+
+def _xls_como_dominio(xls: bytes, blanks: int = 300) -> bytes:
+    """Imita o .xls da Domínio: registros BLANK soltos entre a área global e a aba, com o endereço da aba
+    apontando para eles. O Excel abre; o xlrd sozinho recusa ("Expected BOF record")."""
+    import struct
+
+    from xlrd import compdoc
+    from xlwt.CompoundDoc import XlsDoc
+
+    s = compdoc.CompDoc(xls, logfile=io.StringIO()).get_named_stream("Workbook")
+    pos, sheets = 0, []
+    while True:
+        tipo, tam = struct.unpack_from("<HH", s, pos)
+        if tipo == 0x0085:
+            sheets.append(pos)
+        pos += 4 + tam
+        if tipo == 0x000A:
+            break
+    lixo = struct.pack("<HHHHH", 0x0201, 6, 0, 0, 15) * blanks
+    novo = bytearray(s[:pos] + lixo + s[pos:])
+    for p in sheets:  # abas que vinham depois continuam no lugar certo; a primeira aponta para o lixo
+        antigo = struct.unpack_from("<I", novo, p + 4)[0]
+        struct.pack_into("<I", novo, p + 4, antigo if antigo == pos else antigo + len(lixo))
+    buf = io.BytesIO()
+    XlsDoc().save(buf, bytes(novo))
+    return buf.getvalue()
+
+
+def test_xls_da_dominio_com_registros_soltos():
+    xls = _xls_como_dominio(gerar("Saídas", "09", [(1, 5, "PECA", 5102, "87089990", 1, 10, 10, 0)]))
+    import xlrd
+    with pytest.raises(xlrd.XLRDError):
+        xlrd.open_workbook(file_contents=xls, logfile=io.StringIO())
+    s = classificar("documento.xls", xls, CNPJ, COMPS)
+    assert (s.tipo, s.competencia) == (SAIDAS, "2026-09")
+
+
+def test_zip_dentro_de_zip():
+    interno = _zip(*[_nfe(i, CNPJ, OUTRO, "2026-09-05") for i in range(1, 4)])
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("09 2026/danfe.pdf", b"%PDF-1.4")
+        z.writestr("09 2026/notas.zip", interno)
+    s = classificar("09_2026.zip", buf.getvalue(), CNPJ, COMPS)
+    assert (s.tipo, s.competencia) == (SAIDAS, "2026-09") and s.motivo.startswith("3 NF-e emitidas")
+
+
+def test_planilha_de_despesas_e_financeira():
+    xlsx = _planilha(["PLANEJAMENTO TRIBUTÁRIO PARA 2026"], ["DESPESAS COM VENDAS", "__/2026"], ["Fretes"])
+    assert classificar("planilha.xlsx", xlsx, CNPJ, COMPS).tipo == FINANCEIRO

@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import io
 import re
+import zipfile
 from collections import Counter
 from dataclasses import dataclass, field
 
 from pypdf import PdfReader
 
+from app.core.config import get_settings
 from app.services import nfe_xml, pgdas, relatorio_contabil
 from app.utils.validacao import sem_acentos
 
@@ -37,7 +39,7 @@ PALAVRAS = [
     (MARKETPLACE, r"marketplace|mercado ?livre|shopee|amazon|magalu|tarifas? de (venda|envio|armazenagem|armazenamento)"),
     (APLICACAO, r"extrato (de )?(aplicac|investimento|cdb|fundo)|aplicac|cdb|rendimento|investimento|fundo de"),
     (EXTRATO, r"extrato|saldo anterior|conta corrente|banco"),
-    (FINANCEIRO, r"fluxo de caixa|financeir|caixa|contas a (pagar|receber)"),
+    (FINANCEIRO, r"fluxo de caixa|financeir|caixa|contas a (pagar|receber)|despesa"),
     (ENTRADAS, r"entrada|compra"),
     (SAIDAS, r"saida|venda|faturamento"),
 ]
@@ -98,10 +100,44 @@ def _texto_planilha(nome: str, conteudo: bytes) -> str:
     return "\n".join(" ".join(str(c) for c in r if c not in (None, "")) for r in linhas[:40])
 
 
+POR_PASTA = 50  # XMLs lidos de cada .zip (o de fora e cada um de dentro): basta uma amostra para classificar
+MAX_AMOSTRA = 500
+ZIP_INTERNO_MAX_MB = 64  # .zip dentro de .zip: o portal junta milhares de XML num só, maior que o upload
+
+
+def _amostra_zip(conteudo: bytes, notas: list, orcamento: list[int], nivel: int = 0) -> None:
+    """Lê uma amostra de NF-e do .zip, descendo em .zip dentro de .zip (até 2 níveis), como exporta o portal.
+    `orcamento` é o que ainda pode ser descompactado, compartilhado entre os níveis (proteção contra zip bomb)."""
+    cfg = get_settings()
+    with zipfile.ZipFile(io.BytesIO(conteudo)) as z:
+        infos = [i for i in z.infolist() if not i.is_dir()]
+        xmls = [i for i in infos if i.filename.lower().endswith(".xml")][:POR_PASTA]
+        internos = [i for i in infos if i.filename.lower().endswith(".zip")] if nivel < 2 else []
+        for info, limite in [(i, cfg.nfe_xml_max_mb * nfe_xml.MB) for i in xmls] + \
+                            [(i, ZIP_INTERNO_MAX_MB * nfe_xml.MB) for i in internos]:
+            if len(notas) >= MAX_AMOSTRA:
+                return
+            dados = nfe_xml._ler_entrada(z, info, min(limite, orcamento[0]))
+            if dados is None:
+                continue
+            orcamento[0] -= len(dados)
+            if info.filename.lower().endswith(".zip"):
+                try:
+                    _amostra_zip(dados, notas, orcamento, nivel + 1)
+                except zipfile.BadZipFile:
+                    continue
+            else:
+                nfe_xml._ler(info.filename, dados, notas, set(), [])
+
+
 def _por_nfe(s: Sugestao, nome: str, conteudo: bytes, cnpj: str, competencias: list[str]) -> bool:
+    notas: list = []
     try:
-        notas, _, _ = nfe_xml.ler_arquivos(nome, conteudo)
-    except Exception:  # noqa: BLE001 – ZIP inválido ou grande demais: segue para as palavras-chave
+        if nome.lower().endswith(".zip"):
+            _amostra_zip(conteudo, notas, [get_settings().nfe_zip_descompactado_max_mb * nfe_xml.MB])
+        else:
+            notas, _, _ = nfe_xml.ler_arquivos(nome, conteudo)
+    except Exception:  # noqa: BLE001 – ZIP inválido: segue para as palavras-chave
         return False
     if not notas:
         return False
@@ -110,6 +146,10 @@ def _por_nfe(s: Sugestao, nome: str, conteudo: bytes, cnpj: str, competencias: l
     _escolher_mes(s, Counter(n.competencia for n in notas), competencias)
     acao = "emitida" if s.tipo == SAIDAS else "recebida"
     s.motivo = f"{len(notas)} NF-e {acao}{'s' if len(notas) > 1 else ''} pela empresa"
+    if emitidas and emitidas != len(notas):
+        s.motivo += f" ({emitidas} emitidas e {len(notas) - emitidas} recebidas)"
+    if nome.lower().endswith(".zip"):
+        s.motivo += " — amostra do .zip" if len(notas) >= POR_PASTA else ""
     return True
 
 
