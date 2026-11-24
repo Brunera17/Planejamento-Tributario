@@ -4,7 +4,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 
 import { api, baixarArquivo, lerSessao, mensagemErro } from "../api/cliente";
 import type { Bloco, Catalogo, Planejamento as TPlanejamento, SimulacaoResumo } from "../api/tipos";
-import { Badge, BarraProgresso, Botao, BotaoLink, Cabecalho, CampoMoeda, Card, EnvioArquivo, Erro, Ficha, Modal, Obrigatorio, Tabela, useConfirmacao } from "../components/ui";
+import { Badge, BarraProgresso, Botao, BotaoLink, Cabecalho, CampoMoeda, Card, EnvioArquivo, Erro, Ficha, Modal, Obrigatorio, Progresso, Tabela, useConfirmacao, useProgresso } from "../components/ui";
 import { brl, competenciaExtenso, dataHora, editarMoeda, formatarCnpj, lerMoeda, REGIMES } from "../lib/formato";
 import { Bens } from "./Bens";
 import { Documentos } from "./Documentos";
@@ -117,28 +117,46 @@ function Coleta({ pid }: { pid: number }) {
     },
   });
 
+  const progresso = useProgresso();
   const importar = useMutation({
-    mutationFn: (f: File) => {
-      const fd = new FormData();
-      fd.append("arquivo", f);
-      return api.post(`/planejamentos/${pid}/nfe`, fd);
+    // um arquivo por vez: a barra conta os arquivos, e o arquivo que falha não impede os outros
+    mutationFn: async (arquivos: File[]) => {
+      const total = { lidos: 0, importados: 0, ignorados: 0 };
+      const avisos: string[] = [];
+      const falhas: string[] = [];
+      for (const [k, f] of arquivos.entries()) {
+        const fd = new FormData();
+        fd.append("arquivo", f);
+        try {
+          const r = (await progresso.enviar(k, arquivos.length, (cfg) => api.post(`/planejamentos/${pid}/nfe`, fd, cfg))).data;
+          total.lidos += r.lidos;
+          total.importados += r.importados;
+          total.ignorados += r.ignorados;
+          avisos.push(...(r.avisos ?? []));
+        } catch (e) {
+          falhas.push(arquivos.length > 1 ? `${f.name}: ${mensagemErro(e)}` : mensagemErro(e));
+        }
+      }
+      return { total, avisos, falhas };
     },
-    onSuccess: (r) => {
+    onSuccess: ({ total, avisos, falhas }) => {
       setRelatorios(null);
-      const avisos: string[] = r.data.avisos ?? [];
-      setLog([`${r.data.lidos} notas lidas: ${r.data.importados} importadas e ${r.data.ignorados} ignoradas.`, ...avisos].join("\n"));
+      setErro(falhas.length ? falhas.join("\n") : null);
+      // cada arquivo devolve a soma do mês até ali ("Serviços de 07/2026: …"): fica só o último aviso de cada assunto
+      const ultimos = [...new Map(avisos.map((a) => [a.split(":")[0], a])).values()];
+      setLog([`${total.lidos} notas lidas: ${total.importados} importadas e ${total.ignorados} ignoradas.`, ...ultimos].join("\n"));
       atualizar();
     },
-    onError: (e) => setErro(mensagemErro(e)),
   });
 
   const importarRelatorio = useMutation({
     mutationFn: async (arquivos: File[]) => {
       const resumos: ResumoRelatorio[] = [];
-      for (const f of arquivos) {
+      for (const [k, f] of arquivos.entries()) {
         const fd = new FormData();
         fd.append("arquivo", f);
-        resumos.push({ ...(await api.post<ResumoRelatorio>(`/planejamentos/${pid}/relatorio-contabil`, fd)).data, arquivo: f.name });
+        const r = await progresso.enviar(k, arquivos.length, (cfg) => api.post<ResumoRelatorio>(`/planejamentos/${pid}/relatorio-contabil`, fd, cfg));
+        resumos.push({ ...r.data, arquivo: f.name });
       }
       return resumos;
     },
@@ -158,7 +176,7 @@ function Coleta({ pid }: { pid: number }) {
     mutationFn: (f: File) => {
       const fd = new FormData();
       fd.append("arquivo", f);
-      return api.post<{ competencias: string[]; valores: number }>(`/planejamentos/${pid}/planilha-mensal`, fd);
+      return progresso.enviar(0, 1, (cfg) => api.post<{ competencias: string[]; valores: number }>(`/planejamentos/${pid}/planilha-mensal`, fd, cfg));
     },
     onSuccess: (r) => {
       setErro(null);
@@ -176,6 +194,7 @@ function Coleta({ pid }: { pid: number }) {
 
   return (
     <div className="space-y-4">
+      {(importar.isPending || importarRelatorio.isPending || importarPlanilha.isPending) && <Progresso pct={progresso.pct} />}
       <Erro mensagem={erro} />
       {log && <p className="whitespace-pre-line text-sm">{log}</p>}
       {relatorios && <ResumoImportacao resumos={relatorios} fechar={() => setRelatorios(null)} />}
@@ -261,7 +280,7 @@ function Coleta({ pid }: { pid: number }) {
           setImportando(false);
           if (tipo === "relatorio") importarRelatorio.mutate(arquivos);
           else if (tipo === "planilha") importarPlanilha.mutate(arquivos[0]);
-          else arquivos.forEach((f) => importar.mutate(f));
+          else importar.mutate(arquivos);
         }}
         baixarModelo={() => baixarArquivo(`/planejamentos/${pid}/planilha-mensal`, "movimento-mensal.xlsx").catch((e) => setErro(mensagemErro(e)))}
       />

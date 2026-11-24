@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
+import type { AxiosRequestConfig } from "axios";
 import { Link, type LinkProps } from "react-router-dom";
 
 import { editarMoeda, lerMoeda, STATUS } from "../lib/formato";
@@ -198,6 +199,36 @@ export function useConfirmacao(): [(p: PedidoConfirmacao) => Promise<boolean>, R
 }
 
 /** Área para soltar ou escolher arquivos, com os formatos aceitos à vista. */
+/** Progresso de um envio de 0 a 100%. O navegador só informa quanto já foi enviado, não quanto o servidor já leu: o envio
+ * de cada arquivo vai até 90% da parte dele e a resposta do servidor completa o resto. */
+export function useProgresso() {
+  const [pct, setPct] = useState(0);
+  /** Faz a requisição do arquivo i de n (contados a partir de 0) e atualiza a barra. */
+  async function enviar<T>(i: number, n: number, req: (cfg: AxiosRequestConfig) => Promise<T>): Promise<T> {
+    const parte = (f: number) => setPct(Math.min(100, Math.round(((i + f) / n) * 100)));
+    if (i === 0) setPct(0);
+    const r = await req({ onUploadProgress: (e) => parte(0.9 * (e.progress ?? 0)) });
+    parte(1);
+    return r;
+  }
+  return { pct, enviar };
+}
+
+/** Barra do envio em andamento (use com useProgresso). */
+export function Progresso({ pct, acao = "Lendo os arquivos" }: { pct: number; acao?: string }) {
+  return (
+    <div role="status" className="space-y-1 text-sm">
+      <div className="flex items-baseline justify-between gap-3 text-text-muted">
+        <span>{acao}…</span>
+        <span className="num font-medium text-text">{pct}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface" role="progressbar" aria-label={acao} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-full rounded-full bg-brand transition-[width] duration-200 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function EnvioArquivo({
   formatos,
   aoEscolher,

@@ -5,7 +5,7 @@ import { api, mensagemErro } from "../api/cliente";
 import type { Empresa } from "../api/tipos";
 import { EscolhaEmpresa } from "../components/EscolhaEmpresa";
 import { PainelDas } from "../components/PainelDas";
-import { Botao, Cabecalho, Card, CampoMoeda, EnvioArquivo, Erro, Ficha, Paginacao, Tabela } from "../components/ui";
+import { Botao, Cabecalho, Card, CampoMoeda, EnvioArquivo, Erro, Ficha, Paginacao, Progresso, Tabela, useProgresso } from "../components/ui";
 import { brl, competenciaExtenso, lerMoeda, percentual } from "../lib/formato";
 
 type Linha = {
@@ -94,13 +94,14 @@ export function CalculadoraSimples() {
   }
 
   // o lote inteiro vai de uma vez: as compras (opcionais) conferem o ST e o monofásico de todas as vendas
+  const progresso = useProgresso();
   const lerNfe = useMutation({
     mutationFn: async (lote: File[]) => {
       if (!lote.length) return null;
       const corpo = new FormData();
       lote.forEach((f) => corpo.append("arquivos", f));
       corpo.append("empresa_id", empresaId);
-      return (await api.post<Leitura>("/calculadora-simples/nfe", corpo)).data;
+      return (await progresso.enviar(0, 1, (cfg) => api.post<Leitura>("/calculadora-simples/nfe", corpo, cfg))).data;
     },
     onSuccess: (d) => {
       const digitadas = linhas.filter((l) => !l.xml);
@@ -269,7 +270,7 @@ export function CalculadoraSimples() {
                   </span>
                 )}
               </div>
-              {lerNfe.isPending && <p role="status" className="mt-2 text-sm text-text-muted">Lendo os arquivos…</p>}
+              {lerNfe.isPending && <div className="mt-2"><Progresso pct={progresso.pct} /></div>}
             </div>
           ) : (
             <p className="text-sm text-text-muted">Escolha a empresa para enviar XML de NF-e.</p>

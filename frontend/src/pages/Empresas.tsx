@@ -5,7 +5,7 @@ import { api, lerSessao, mensagemErro } from "../api/cliente";
 import { useLista } from "../api/lista";
 import type { Empresa } from "../api/tipos";
 import { FormEmpresa } from "../components/FormEmpresa";
-import { Botao, Cabecalho, CarregarMais, Card, EnvioArquivo, Erro, Modal, Tabela, useConfirmacao } from "../components/ui";
+import { Botao, Cabecalho, CarregarMais, Card, EnvioArquivo, Erro, Modal, Progresso, Tabela, useConfirmacao, useProgresso } from "../components/ui";
 import { dataHora, formatarCnpj, formatarTelefone, REGIMES } from "../lib/formato";
 
 type LinhaPrevia = { linha: number; dados: Record<string, string>; situacao: string; erros: string[]; avisos: string[] };
@@ -138,10 +138,11 @@ function Importacao({ fechar }: { fechar: () => void }) {
   const [resumo, setResumo] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
+  const progresso = useProgresso();
   const enviar = (rota: string) => {
     const fd = new FormData();
     fd.append("arquivo", arquivo!);
-    return api.post(`/empresas/importacao/${rota}`, fd);
+    return progresso.enviar(0, 1, (cfg) => api.post(`/empresas/importacao/${rota}`, fd, cfg));
   };
   const verPrevia = useMutation({
     mutationFn: () => enviar("previa"),
@@ -184,6 +185,9 @@ function Importacao({ fechar }: { fechar: () => void }) {
               setErro(null);
             }}
           />
+        )}
+        {(verPrevia.isPending || confirmar.isPending) && (
+          <Progresso pct={progresso.pct} acao={confirmar.isPending ? "Importando as empresas" : "Lendo a planilha"} />
         )}
         <Erro mensagem={erro} />
         {previa && (
