@@ -12,12 +12,23 @@ from app.seeds.tabelas import ler
 CENTAVO = Decimal("0.01")
 
 
-def perfil(p: Planejamento) -> dict | None:
-    """Perfil pela divisão da CNAE (dois primeiros dígitos); sem perfil, o botão não aparece."""
+def _divisao(p: Planejamento) -> int | None:
     digitos = "".join(c for c in (p.empresa.cnae or "") if c.isdigit())
-    if len(digitos) < 2:
-        return None
-    return next((x for x in ler("despesas_referencia.json")["perfis"] if int(digitos[:2]) in x["cnae_divisoes"]), None)
+    return int(digitos[:2]) if len(digitos) >= 2 else None
+
+
+def perfil(p: Planejamento) -> dict | None:
+    """Perfil pela divisão da CNAE (dois primeiros dígitos); sem perfil, o botão aparece desativado, com o motivo."""
+    divisao = _divisao(p)
+    return next((x for x in ler("despesas_referencia.json")["perfis"] if divisao in x["cnae_divisoes"]), None)
+
+
+def sem_perfil(p: Planejamento) -> str:
+    """Por que não há simulação para esta empresa (texto do botão desativado)."""
+    divisao = _divisao(p)
+    if divisao is None:
+        return "Informe o CNAE no cadastro da empresa para simular as despesas"
+    return f"Ainda não há despesas de referência para a atividade desta empresa (CNAE da divisão {divisao:02d})"
 
 
 def _faturamento(db: Session, pid: int) -> dict[str, Decimal]:
@@ -34,7 +45,7 @@ def previa(db: Session, p: Planejamento, competencia: str | None, zerados: bool 
     ("não houve", inclusive por "Zerar despesas do mês") só entra com zerados=True. Valor maior que zero nunca muda."""
     pf = perfil(p)
     if pf is None:
-        return {"perfil": None, "meses": []}
+        return {"perfil": None, "meses": [], "motivo": sem_perfil(p)}
     itens = {i.nome: i for i in db.scalars(select(ItemDespesa).where(ItemDespesa.ativo))}
     regras = [(itens[n], Decimal(v), None) for n, v in pf["percentuais"].items() if n in itens] + \
              [(itens[n], None, Decimal(v)) for n, v in pf["fixos"].items() if n in itens]

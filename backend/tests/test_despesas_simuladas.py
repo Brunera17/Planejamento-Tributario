@@ -85,7 +85,10 @@ def _planejamento(cliente, h, cnpj, cnae, faturamento=None):
 
 def test_atividade_sem_perfil_nao_simula(cliente, contador):
     pid = _planejamento(cliente, contador, "83920456000105", "6920601")  # contabilidade: serviço sem referência
-    assert cliente.get(f"/api/planejamentos/{pid}/despesas-simuladas", headers=contador).json()["perfil"] is None
+    d = cliente.get(f"/api/planejamentos/{pid}/despesas-simuladas", headers=contador).json()
+    assert d["perfil"] is None and "divisão 69" in d["motivo"]  # a tela mostra o botão desativado com este texto
+    r = cliente.post(f"/api/planejamentos/{pid}/despesas-simuladas", headers=contador)
+    assert r.status_code == 422 and r.json()["erro"] == d["motivo"]
 
 
 def test_comercio_varejista_pela_pac_do_ibge(cliente, contador):
