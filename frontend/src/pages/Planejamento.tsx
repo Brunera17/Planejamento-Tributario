@@ -397,6 +397,7 @@ type OutraDespesa = { grupo_id: number; descricao: string; valor: number };
 type LevantamentoDados = { status: string | null; itens: Record<string, number>; estimados: number[]; grupos_sem_outras: number[]; outras: OutraDespesa[] };
 type PreviaDespesas = {
   perfil: { codigo: string; nome: string; fonte: string } | null;
+  motivo?: string; // sem perfil: por que não há simulação para a atividade
   meses: { competencia: string; faturamento: number; total: number; itens: { item: string; percentual: number | null; fixo: number | null; valor: number; ja_informado: boolean }[] }[];
 };
 
@@ -658,7 +659,19 @@ function SimularDespesas({ pid, atual }: { pid: number; atual: string }) {
     },
     onError: (e) => setErro(mensagemErro(e)),
   });
-  if (!contador || !data?.perfil) return null;
+  if (!contador || !data) return null;
+  if (!data.perfil)
+    // desativado com o motivo à vista: sumir sem explicação parecia defeito
+    return (
+      <span className="inline-flex items-center gap-2">
+        <Botao variante="secundario" disabled aria-describedby="simular-despesas-motivo">
+          Simular despesas
+        </Botao>
+        <span id="simular-despesas-motivo" className="max-w-xs text-xs leading-snug text-text-muted">
+          {data.motivo}
+        </span>
+      </span>
+    );
   const novos = data.meses.reduce((s, m) => s + m.itens.filter((x) => !x.ja_informado).length, 0);
   const total = data.meses.reduce((s, m) => s + Number(m.total), 0);
   return (
@@ -695,7 +708,7 @@ function SimularDespesas({ pid, atual }: { pid: number; atual: string }) {
                     <tr key={x.item} className={x.ja_informado ? "text-text-muted" : ""}>
                       <td className="px-2 py-1">{x.item}</td>
                       <td className="num px-2 py-1 text-right">
-                        {x.fixo != null ? "valor fixo" : `${(Number(x.percentual) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
+                        {x.fixo != null ? "valor fixo" : `${(Number(x.percentual) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`}
                       </td>
                       <td className="num px-2 py-1 text-right">{x.ja_informado ? "já informado" : brl(Number(x.valor))}</td>
                     </tr>

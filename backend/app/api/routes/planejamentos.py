@@ -515,7 +515,7 @@ def simular_despesas(pid: int, db: DB, u: Contador, competencia: str | None = No
     if competencia:
         _competencia_valida(p, competencia)
     if despesas_referencia.perfil(p) is None:
-        raise ErroNegocio("Não há despesas de referência para a atividade (CNAE) desta empresa", 422)
+        raise ErroNegocio(despesas_referencia.sem_perfil(p), 422)
     r = despesas_referencia.preencher(db, p, competencia, u.id, zerados)
     _alterou(db, p)
     auditar("DESPESAS_SIMULADAS", usuario=u, planejamento=p, recurso_tipo="planejamento", recurso_id=p.id,

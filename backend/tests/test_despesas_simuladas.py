@@ -70,9 +70,36 @@ def test_mes_enviado_para_conferencia_fica_de_fora(cliente, contador, pid):
         db.commit()
 
 
+def _planejamento(cliente, h, cnpj, cnae, faturamento=None):
+    emp = cliente.post("/api/empresas", headers=h, json={
+        "razao_social": f"EMPRESA {cnae} LTDA", "cnpj": cnpj, "regime_tributario": "SIMPLES_NACIONAL", "anexo_simples": "I",
+        "cnae": cnae}).json()
+    pid = cliente.post("/api/planejamentos", headers=h, json={
+        "empresa_id": emp["id"], "competencia_inicial": "2026-07", "competencia_final": "2026-07"}).json()["id"]
+    if faturamento:
+        itens = [(1, 2, "P1 - PRODUTO", 5102, "94036000", 1, faturamento, faturamento, 0.0)]
+        assert cliente.post(f"/api/planejamentos/{pid}/relatorio-contabil", headers=h, files={
+            "arquivo": ("SAIDAS.xls", gerar("Saídas", "07", itens), "application/vnd.ms-excel")}).status_code == 200
+    return pid
+
+
 def test_atividade_sem_perfil_nao_simula(cliente, contador):
-    pid = next(p["id"] for p in cliente.get("/api/planejamentos", headers=contador).json() if p["cnpj"] == "11222333000181")
-    assert cliente.get(f"/api/planejamentos/{pid}/despesas-simuladas", headers=contador).json()["perfil"] is None
+    pid = _planejamento(cliente, contador, "83920456000105", "6920601")  # contabilidade: serviço sem referência
+    d = cliente.get(f"/api/planejamentos/{pid}/despesas-simuladas", headers=contador).json()
+    assert d["perfil"] is None and "divisão 69" in d["motivo"]  # a tela mostra o botão desativado com este texto
+    r = cliente.post(f"/api/planejamentos/{pid}/despesas-simuladas", headers=contador)
+    assert r.status_code == 422 and r.json()["erro"] == d["motivo"]
+
+
+def test_comercio_varejista_pela_pac_do_ibge(cliente, contador):
+    pid = _planejamento(cliente, contador, "27501938000141", "4712100", faturamento=100000.0)
+    d = cliente.get(f"/api/planejamentos/{pid}/despesas-simuladas", headers=contador).json()
+    assert d["perfil"]["codigo"] == "COMERCIO_VAREJO" and "Pesquisa Anual de Comércio" in d["perfil"]["fonte"]
+    [mes] = d["meses"]
+    valores = {x["item"]: Decimal(str(x["valor"])) for x in mes["itens"]}
+    # aluguel 1,89%, energia 0,87% e comunicação 0,20% da receita do varejo (PAC 2024); sem valor fixo
+    assert valores == {"Aluguel de Imóveis": Decimal("1890.00"), "Energia Elétrica": Decimal("870.00"),
+                       "Telefone e Internet": Decimal("200.00")}
 
 
 def test_zerados_so_entram_com_a_opcao_e_valor_real_nunca_muda(cliente, contador, pid):
