@@ -24,6 +24,42 @@
    "fixos": {
     "Honorários Contábeis": "3500.00"
    }
+  },
+  {
+   "codigo": "COMERCIO_VEICULOS",
+   "nome": "Comércio e reparação de veículos automotores e motocicletas",
+   "cnae_divisoes": [45],
+   "fonte": "IBGE, Pesquisa Anual de Comércio 2024 (SIDRA, Dados de Comércio – Total de empresas, Brasil): consumo intermediário ÷ receita operacional líquida do segmento. Energia inclui gás, água e esgoto. Serviços de terceiros e outras despesas operacionais ficam de fora: misturam itens que o catálogo separa",
+   "percentuais": {
+    "Aluguel de Imóveis": "0.0110",
+    "Energia Elétrica": "0.0022",
+    "Telefone e Internet": "0.0013"
+   },
+   "fixos": {}
+  },
+  {
+   "codigo": "COMERCIO_ATACADO",
+   "nome": "Comércio por atacado",
+   "cnae_divisoes": [46],
+   "fonte": "IBGE, Pesquisa Anual de Comércio 2024 (SIDRA, Dados de Comércio – Total de empresas, Brasil): consumo intermediário ÷ receita operacional líquida do segmento. Energia inclui gás, água e esgoto. Serviços de terceiros e outras despesas operacionais ficam de fora: misturam itens que o catálogo separa",
+   "percentuais": {
+    "Aluguel de Imóveis": "0.0056",
+    "Energia Elétrica": "0.0013",
+    "Telefone e Internet": "0.0007"
+   },
+   "fixos": {}
+  },
+  {
+   "codigo": "COMERCIO_VAREJO",
+   "nome": "Comércio varejista",
+   "cnae_divisoes": [47],
+   "fonte": "IBGE, Pesquisa Anual de Comércio 2024 (SIDRA, Dados de Comércio – Total de empresas, Brasil): consumo intermediário ÷ receita operacional líquida do segmento. Energia inclui gás, água e esgoto. Serviços de terceiros e outras despesas operacionais ficam de fora: misturam itens que o catálogo separa",
+   "percentuais": {
+    "Aluguel de Imóveis": "0.0189",
+    "Energia Elétrica": "0.0087",
+    "Telefone e Internet": "0.0020"
+   },
+   "fixos": {}
   }
  ]
 }
