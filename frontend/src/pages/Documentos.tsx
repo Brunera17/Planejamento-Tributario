@@ -313,6 +313,7 @@ type PreviaDespesas = {
   valores: number;
   outras: number;
   total: number;
+  folha: number; // folha e pró-labore: vão para a aba Faturamento, compras e folha
   substitui_digitados: number;
   avisos: string[];
 };
@@ -350,7 +351,7 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
         const comp = s.competencia && abertos.includes(s.competencia) ? s.competencia : null;
         const cobre = s.cobre_tipos ?? [];
         const despesas = s.despesas ?? null;
-        const temValores = !!despesas && despesas.valores + despesas.outras > 0;
+        const temValores = !!despesas && despesas.valores + despesas.outras + despesas.folha > 0;
         return {
           file, tipo: s.tipo_documento_id ?? null, competencia: comp, motivo: s.motivo ?? "", meses: s.competencias_no_arquivo ?? [], erro: s.erro,
           cobre, marcarCobertos: cobre.length > 0, despesas: temValores ? despesas : null, importarDespesas: temValores,
@@ -422,6 +423,7 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
       qc.invalidateQueries({ queryKey: ["planejamento", String(pid)] });
       qc.invalidateQueries({ queryKey: ["progresso", pid] });
       qc.invalidateQueries({ queryKey: ["levantamento", pid] });
+      qc.invalidateQueries({ queryKey: ["coleta", pid] }); // folha e pró-labore da planilha de despesas
     },
   });
 
@@ -474,6 +476,7 @@ function EnvioEmLote({ pid, dados }: { pid: number; dados: Dados }) {
                             <span>
                               Importar os valores na aba Despesas: {i.despesas.valores + i.despesas.outras} valores em{" "}
                               {i.despesas.meses.map(competenciaExtenso).join(", ")}, total {brl(i.despesas.total)}
+                              {i.despesas.folha > 0 && `; e ${i.despesas.folha} de folha/pró-labore na aba Faturamento, compras e folha`}
                               {i.despesas.substitui_digitados > 0 && (
                                 <span className="block text-alert-ink">Substitui {i.despesas.substitui_digitados} valores já informados com outro valor</span>
                               )}

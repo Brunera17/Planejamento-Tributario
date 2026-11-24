@@ -3,7 +3,8 @@
 Formato: uma aba por período; em cada aba, blocos por grupo ("DESPESAS COM VENDAS", "DESPESAS ADMINISTRATIVAS"…) cuja
 linha de título traz as datas dos meses nas colunas. Cada linha é uma despesa: número = valor do mês, "N/A" = não houve
 (0), vazio = não informado. O mês de cada valor vem da data no título da coluna. A linha é ligada ao catálogo pelas
-palavras do nome, dentro do grupo; a que não está no catálogo entra como "outra despesa" do grupo.
+palavras do nome, dentro do grupo; a que não está no catálogo entra como "outra despesa" do grupo. Folha de pagamento
+e pró-labore vão para a folha do mês (aba Faturamento, compras e folha).
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.models import GrupoDespesa, ItemDespesa, Levantamento, LevantamentoItem, OutraDespesa, Planejamento
+from app.models import FolhaMensal, GrupoDespesa, ItemDespesa, Levantamento, LevantamentoItem, OutraDespesa, Planejamento
 from app.utils.validacao import sem_acentos
 
 PREFIXO_OUTRA = "Planilha: "  # outras despesas vindas da planilha: trocadas a cada nova importação
@@ -36,6 +37,7 @@ class Leitura:
     meses: list[str] = field(default_factory=list)
     valores: dict[tuple[str, int], Decimal] = field(default_factory=dict)  # (competência, item) -> valor
     outras: list[tuple[str, int, str, Decimal]] = field(default_factory=list)  # competência, grupo, descrição, valor
+    folha: dict[tuple[str, str], Decimal] = field(default_factory=dict)  # (competência, "folha"/"pro_labore") -> valor
     avisos: list[str] = field(default_factory=list)
 
 
@@ -112,9 +114,11 @@ def _ler_aba(linhas: list[tuple], competencias: list[str], grupos: dict[int, str
         numeros = {comp: v for comp, v in celulas.items() if isinstance(v, Decimal) and v >= 0}
         if not numeros:
             continue
-        if "folha" in _palavras(rotulo):
-            if any(numeros.values()):
-                lt.avisos.append(f"{rotulo}: informe na aba Faturamento, compras e folha; não importado")
+        palavras = _palavras(rotulo)
+        campo = "folha" if "folha" in palavras else "pro_labore" if {"pro", "labore"} <= palavras else None
+        if campo:  # não é despesa do catálogo: vai para a folha do mês (aba Faturamento, compras e folha)
+            for comp, v in numeros.items():
+                lt.folha[(comp, campo)] = v
             continue
         item = _melhor(rotulo, itens.get(grupo, [])) if grupo else None
         if item is None and grupo is None:
@@ -128,7 +132,7 @@ def _ler_aba(linhas: list[tuple], competencias: list[str], grupos: dict[int, str
                     lt.outras.append((comp, grupo, (PREFIXO_OUTRA + _sem_parenteses(rotulo).strip(" :"))[:200], v))
         else:
             lt.avisos.append(f"{rotulo}: grupo não identificado; não importado")
-    lt.meses = sorted({comp for comp, _ in lt.valores} | {o[0] for o in lt.outras})
+    lt.meses = sorted({comp for comp, _ in lt.valores} | {o[0] for o in lt.outras} | {comp for comp, _ in lt.folha})
     return lt
 
 
@@ -159,12 +163,21 @@ def previa(db: Session, p: Planejamento, lt: Leitura) -> dict:
         select(LevantamentoItem).where(LevantamentoItem.levantamento_id == lv.id))}
     substitui = sum(1 for k, v in lt.valores.items() if k[0] not in fechados and k in atuais
                     and not atuais[k].estimado and atuais[k].valor != v)
+    # folha: fora do levantamento de despesas, segue a regra da aba de folha (o mês fechado não a trava)
+    folhas = _folhas(db, p.id, sorted({c for c, _ in lt.folha}))
+    substitui += sum(1 for (c, campo), v in lt.folha.items()
+                     if c in folhas and getattr(folhas[c], campo) is not None and getattr(folhas[c], campo) != v)
     return {"meses": [m for m in lt.meses if m not in fechados], "meses_fechados": fechados,
             "valores": sum(1 for k in lt.valores if k[0] not in fechados),
             "outras": sum(1 for o in lt.outras if o[0] not in fechados),
             "total": sum((v for k, v in lt.valores.items() if k[0] not in fechados), Decimal(0))
             + sum((o[3] for o in lt.outras if o[0] not in fechados), Decimal(0)),
-            "substitui_digitados": substitui, "avisos": lt.avisos}
+            "folha": len(lt.folha), "substitui_digitados": substitui, "avisos": lt.avisos}
+
+
+def _folhas(db: Session, pid: int, meses: list[str]) -> dict[str, FolhaMensal]:
+    return {f.competencia: f for f in db.scalars(select(FolhaMensal).where(
+        FolhaMensal.planejamento_id == pid, FolhaMensal.competencia.in_(meses)))}
 
 
 def importar(db: Session, p: Planejamento, lt: Leitura, usuario_id: int) -> dict:
@@ -192,4 +205,10 @@ def importar(db: Session, p: Planejamento, lt: Leitura, usuario_id: int) -> dict
         db.add_all(OutraDespesa(levantamento_id=lv.id, grupo_id=g, descricao=d, valor=v)
                    for c, g, d, v in lt.outras if c == comp)
         lv.alterado_em = datetime.now(UTC)
+    folhas = _folhas(db, p.id, sorted({c for c, _ in lt.folha}))
+    for (comp, campo), v in lt.folha.items():
+        if comp not in folhas:
+            folhas[comp] = FolhaMensal(planejamento_id=p.id, competencia=comp)
+            db.add(folhas[comp])
+        setattr(folhas[comp], campo, v)
     return r

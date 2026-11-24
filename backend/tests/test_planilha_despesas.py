@@ -34,6 +34,7 @@ def _planilha(fretes=(100, 110, "N/A"), outras=(0, 50, 0)) -> bytes:
         ("Serviços de terceiros  - Honorários Contábeis", (800, 800, 800)),
         ("Outras despesas administrativas (descrever quais):", outras),
         ("Folha de pagamento", (5000, 5000, 5000)),
+        ("Pró-labore", (2000, "N/A", None)),
     ])
     bloco("DESPESAS GERAIS", [("Percas mercadorias", (10, None, 30)), ("Copa e cozinha (consumo de funcionarios)", ("N/A",) * 3)])
     bloco("OUTRAS DESPESAS OPERACIONAIS", [("Despesas Bancárias (taxas, tarifas)", (45, 45, 45), "Pacote do banco")])
@@ -69,7 +70,7 @@ def test_previa_nao_grava(cliente, contador, pid):
     p = r.json()
     assert p["meses"] == ["2026-07", "2026-08"]  # setembro está fora do período do planejamento
     assert any("Está na imagem ao lado" in a for a in p["avisos"])
-    assert any("Folha de pagamento" in a for a in p["avisos"])
+    assert p["folha"] == 4  # folha em jul. e ago.; pró-labore em jul. (2.000) e ago. (N/A = 0)
     assert _mes(cliente, contador, pid, "2026-07")[0] == {}
 
 
@@ -87,6 +88,10 @@ def test_importa_cada_coluna_no_seu_mes(cliente, contador, pid):
     assert jul["Despesas Bancárias (taxas, tarifas)"] == 45
     assert "Campanhas de Publicidade (marketplace)" not in jul
     assert outras_jul == [] and [o["descricao"] for o in outras_ago] == ["Planilha: Outras despesas administrativas"]
+    coleta = cliente.get(f"/api/planejamentos/{pid}/coleta", headers=contador).json()
+    folha = coleta["folha"]
+    assert Decimal(str(folha["2026-07"]["folha"])) == 5000 and Decimal(str(folha["2026-07"]["pro_labore"])) == 2000
+    assert Decimal(str(folha["2026-08"]["pro_labore"])) == 0
 
 
 def test_reimportar_substitui_sem_duplicar(cliente, contador, pid):
